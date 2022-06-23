@@ -6,13 +6,12 @@ import "./system-contracts/TransactionHelper.sol";
 
 import "./system-contracts/interfaces/IAccountAbstraction.sol";
 
-contract ArgentAccount is IAccountAbstraction {
+contract ArgentAccountNoProxy is IAccountAbstraction {
     using TransactionHelper for Transaction;
 
     address public signer;
 
-    function initialize(address _signer) external {
-        require(signer == address(0), "argent/already-init");
+    constructor(address _signer) {
         signer = _signer;
     }
 
@@ -104,7 +103,7 @@ contract ArgentAccount is IAccountAbstraction {
         view
         returns (address _recoveredAddress)
     {
-        require(_signature.length == 65, "argent/signature-length-incorrect");
+        require(_signature.length == 65, "Signature length is incorrect");
         uint8 v;
         bytes32 r;
         bytes32 s;
