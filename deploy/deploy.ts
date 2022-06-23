@@ -1,7 +1,6 @@
 import {
   utils,
   Wallet,
-  Provider,
   EIP712Signer,
   ContractFactory,
 } from "zksync-web3";
@@ -19,7 +18,6 @@ const logBalance = async (address: string, provider: Provider) => {
 
 export default async function (hre: HardhatRuntimeEnvironment) {
   // Initialize the wallet
-	console.log("private key", process.env.PRIVATE_KEY);
   const signer = new Wallet(process.env.PRIVATE_KEY as string);
   const signerAddress = await signer.getAddress();
   console.log(`Signer address is ${signerAddress}`);

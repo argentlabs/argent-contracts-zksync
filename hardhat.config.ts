@@ -1,3 +1,4 @@
+import "@nomiclabs/hardhat-ethers";
 import "@matterlabs/hardhat-zksync-deploy";
 import "@matterlabs/hardhat-zksync-solc";
 import dotenv from "dotenv";
