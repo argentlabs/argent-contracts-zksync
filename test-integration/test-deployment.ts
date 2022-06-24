@@ -72,11 +72,10 @@ describe("Argent Account", () => {
   });
 
   it("Should deploy a new Proxy Account (1)", async () => {
-    const data = initdata(signer.address);
     const tx = await accountFactory.deployProxyAccount(
       salt,
       accountImplementation,
-      data
+      signer.address
     );
     const receipt = await tx.wait();
 
@@ -103,7 +102,10 @@ describe("Argent Account", () => {
       accountFactory.address,
       proxyBytecodeHash,
       salt,
-      abiCoder.encode(["address", "bytes"], [accountImplementation, data])
+      abiCoder.encode(
+        ["address", "bytes"],
+        [accountImplementation, initdata(signer.address)]
+      )
     );
     console.log(`Proxy 1 address from create2: ${create2Address}`);
   });
