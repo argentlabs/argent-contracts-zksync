@@ -11,9 +11,12 @@ contract ArgentAccount is IAccountAbstraction {
 
     address public signer;
 
+    event AccountCreated(address account, address signer);
+
     function initialize(address _signer) external {
         require(signer == address(0), "argent/already-init");
         signer = _signer;
+        emit AccountCreated(address(this), signer);
     }
 
     /**
