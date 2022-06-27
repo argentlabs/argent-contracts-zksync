@@ -1,10 +1,9 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
 
-import "./system-contracts/Constants.sol";
-import "./system-contracts/TransactionHelper.sol";
-
-import "./system-contracts/interfaces/IAccountAbstraction.sol";
+import "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
+import "@matterlabs/zksync-contracts/l2/system-contracts/TransactionHelper.sol";
+import "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccountAbstraction.sol";
 
 contract ArgentAccountNoProxy is IAccountAbstraction {
     using TransactionHelper for Transaction;
