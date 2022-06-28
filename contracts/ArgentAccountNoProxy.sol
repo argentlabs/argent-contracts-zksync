@@ -5,44 +5,184 @@ import "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import "@matterlabs/zksync-contracts/l2/system-contracts/TransactionHelper.sol";
 import "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccountAbstraction.sol";
 
-contract ArgentAccountNoProxy is IAccountAbstraction {
+import "@openzeppelin/contracts/interfaces/IERC1271.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+
+contract ArgentAccountNoProxy is IAccountAbstraction, IERC1271 {
     using TransactionHelper for Transaction;
 
-    address public signer;
-
-    constructor(address _signer) {
-        signer = _signer;
+    enum EscapeType {
+        None,
+        Guardian,
+        Signer
     }
 
-    /**
-     * @dev Simulate behaivour of the EOA if caller is not the bootloader.
-     * Essentially, for all non-bootloader caller halt the execution with empty return data.
-     * If all functions will use this modifier AND the contract will implement an empty payable fallback()
-     * then the contract will be indistinguishable from the EOA when called.
-     */
-    modifier ignoreNonBootloader() {
-        if (msg.sender != BOOTLOADER_FORMAL_ADDRESS) {
-            // If function was called outside of the bootloader, behave like an EOA.
-            assembly {
-                return(0, 0)
-            }
-        }
-        // Continure execution if called from the bootloader.
+    struct Escape {
+        uint96 activeAt; // timestamp for activation of escape mode, 0 otherwise
+        uint8 escapeType; // packed EscapeType enum
+    }
+
+    uint8 public constant noEscape = uint8(EscapeType.None);
+    uint8 public constant guardianEscape = uint8(EscapeType.Guardian);
+    uint8 public constant signerEscape = uint8(EscapeType.Signer);
+    uint256 public constant escapeSecurityPeriod = 1 weeks;
+    bytes4 constant eip1271SuccessReturnValue = 0x1626ba7e;
+
+    address public signer;
+    address public guardian;
+    address public guardianBackup;
+    Escape public escape;
+
+    event AccountCreated(address account, address signer, address guardian);
+    event AccountUpgraded(address newImplementation);
+    event TransactionExecuted(bytes32 hashed, bytes response);
+
+    event SignerChanged(address newSigner);
+    event GuardianChanged(address newGuardian);
+    event GuardianBackupChanged(address newGuardianBackup);
+
+    event EscapeSignerTriggerred(uint96 activeAt);
+    event EscapeGuardianTriggerred(uint96 activeAt);
+    event SignerEscaped(address newSigner);
+    event GuardianEscaped(address newGuardian);
+    event EscapeCancelled();
+
+    constructor(address _signer, address _guardian) {
+        require(signer == address(0), "argent/already-init");
+        require(_signer != address(0), "argent/invalid-signer");
+        signer = _signer;
+        guardian = _guardian;
+        emit AccountCreated(address(this), signer, guardian);
+    }
+
+    modifier onlySelf() {
+        require(msg.sender == address(this), "argent/only-self");
         _;
     }
 
-    function validateTransaction(Transaction calldata _transaction) external payable override ignoreNonBootloader {
+    modifier requireGuardian() {
+        require(guardian != address(0), "argent/guardian-required");
+        _;
+    }
+
+    modifier onlyBootloader() {
+        require(
+            msg.sender == BOOTLOADER_FORMAL_ADDRESS,
+            "Only bootloader can call this method"
+        );
+        // Continue execution if called from the bootloader.
+        _;
+    }
+
+    // Recovery
+
+    function changeSigner(address _newSigner) public onlySelf {
+        require(_newSigner != address(0), "argent/null-signer");
+        signer = _newSigner;
+        emit SignerChanged(_newSigner);
+    }
+
+    function changeGuardian(address _newGuardian) public onlySelf {
+        require(
+            !(guardianBackup != address(0) && _newGuardian == address(0)),
+            "argent/null-guardian"
+        );
+        guardian = _newGuardian;
+        emit GuardianChanged(_newGuardian);
+    }
+
+    function changeGuardianBackup(address _newGuardianBackup)
+        public
+        onlySelf
+        requireGuardian
+    {
+        guardianBackup = _newGuardianBackup;
+        emit GuardianBackupChanged(_newGuardianBackup);
+    }
+
+    function triggerEscapeSigner() public onlySelf requireGuardian {
+        // no escape if there is an guardian escape triggered by the signer in progress
+        if (escape.activeAt != 0) {
+            require(
+                escape.escapeType == signerEscape,
+                "argent/cannot-override-signer-escape"
+            );
+        }
+
+        uint96 activeAt = uint96(block.timestamp + escapeSecurityPeriod);
+        escape = Escape(activeAt, signerEscape);
+        emit EscapeSignerTriggerred(activeAt);
+    }
+
+    function triggerEscapeGuardian() public onlySelf requireGuardian {
+        uint96 activeAt = uint96(block.timestamp + escapeSecurityPeriod);
+        escape = Escape(activeAt, guardianEscape);
+        emit EscapeGuardianTriggerred(activeAt);
+    }
+
+    function cancelEscape() public onlySelf {
+        require(
+            escape.activeAt != 0 && escape.escapeType != noEscape,
+            "argent/not-escaping"
+        );
+
+        delete escape;
+        emit EscapeCancelled();
+    }
+
+    function escapeSigner(address _newSigner) public onlySelf requireGuardian {
+        require(escape.activeAt != 0, "argent/not-escaping");
+        require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
+        require(
+            escape.escapeType == signerEscape,
+            "argent/invalid-escape-type"
+        );
+        delete escape;
+
+        require(_newSigner != address(0), "argent/null-signer");
+        signer = _newSigner;
+
+        emit SignerEscaped(_newSigner);
+    }
+
+    function escapeGuardian(address _newGuardian) public onlySelf {
+        require(escape.activeAt != 0, "argent/not-escaping");
+        require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
+        require(
+            escape.escapeType == guardianEscape,
+            "argent/invalid-escape-type"
+        );
+        delete escape;
+
+        require(_newGuardian != address(0), "argent/null-guardian");
+        guardian = _newGuardian;
+
+        emit GuardianEscaped(_newGuardian);
+    }
+
+    // Account methods
+
+    function validateTransaction(Transaction calldata _transaction)
+        external
+        payable
+        override
+        onlyBootloader
+    {
         _validateTransaction(_transaction);
     }
 
     function _validateTransaction(Transaction calldata _transaction) internal {
         NONCE_HOLDER_SYSTEM_CONTRACT.incrementNonceIfEquals(_transaction.reserved[0]);
         bytes32 txHash = _transaction.encodeHash();
-
-        require(_recoverSignatureAddress(txHash, _transaction.signature) == signer);
+        require(isValidSignature(txHash, _transaction.signature) == eip1271SuccessReturnValue);
     }
 
-    function executeTransaction(Transaction calldata _transaction) external payable override ignoreNonBootloader {
+    function executeTransaction(Transaction calldata _transaction)
+        external
+        payable
+        override
+        onlyBootloader
+    {
         _execute(_transaction);
     }
 
@@ -50,7 +190,7 @@ contract ArgentAccountNoProxy is IAccountAbstraction {
         external
         payable
         override
-        ignoreNonBootloader
+        onlyBootloader
     {
         _validateTransaction(_transaction);
         _execute(_transaction);
@@ -68,34 +208,24 @@ contract ArgentAccountNoProxy is IAccountAbstraction {
         require(success);
     }
 
-    fallback() external payable {
-        // fallback of default AA shouldn't be called by bootloader under no circumstances
+	function isValidSignature(bytes32 _hash, bytes calldata _signature) public override view returns (bytes4) {
+        // The signature is the concatenation of the ECDSA signatures of the owners
+        // Each ECDSA signature is 65 bytes long. That means that the combined signature is 130 bytes long. 
+        require(_signature.length == 130, "argent/invalid-signature-length");
+
+        address recoveredAddr1 = ECDSA.recover(_hash, _signature[0:65]);
+        require(recoveredAddr1 == signer, "argent/invalid-signer-signature");
+
+        address recoveredAddr2 = ECDSA.recover(_hash, _signature[65:130]);
+        require(recoveredAddr2 == guardian, "argent/invalid-guardian-signature");
+
+        return eip1271SuccessReturnValue;
+	}
+
+	receive() external payable {
+        // If the bootloader called the `receive` function, it likely means
+        // that something went wrong and the transaction should be aborted. The bootloader should
+        // only interact through the `validateTransaction`/`executeTransaction` methods.
         assert(msg.sender != BOOTLOADER_FORMAL_ADDRESS);
-
-        // If the contract is called directly, behave like an EOA
-    }
-
-    function _recoverSignatureAddress(bytes32 _hash, bytes memory _signature)
-        internal
-        view
-        returns (address _recoveredAddress)
-    {
-        require(_signature.length == 65, "Signature length is incorrect");
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-        // Signature loading code
-        // we jump 32 (0x20) as the first slot of bytes contains the length
-        // we jump 65 (0x41) per signature
-        // for v we load 32 bytes ending with v (the first 31 come from s) then apply a mask
-        assembly {
-            r := mload(add(_signature, 0x20))
-            s := mload(add(_signature, 0x40))
-            v := and(mload(add(_signature, 0x41)), 0xff)
-        }
-        require(v == 27 || v == 28);
-
-        _recoveredAddress = ecrecover(_hash, v, r, s);
-        require(_recoveredAddress != address(0));
     }
 }
