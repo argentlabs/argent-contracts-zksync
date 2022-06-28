@@ -16,9 +16,10 @@ contract AccountFactory {
     function deployProxyAccount(
         bytes32 _salt,
         address _implementation,
-        address _signer
+        address _signer,
+        address _guardian
     ) external returns (address) {
-        bytes memory data = abi.encodeWithSelector(ArgentAccount.initialize.selector, _signer);
+        bytes memory data = abi.encodeWithSelector(ArgentAccount.initialize.selector, _signer, _guardian);
         return DEPLOYER_SYSTEM_CONTRACT.create2AA(_salt, bytecodeHash, 0, abi.encode(_implementation, data));
     }
 

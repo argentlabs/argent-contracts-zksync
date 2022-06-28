@@ -1,8 +1,8 @@
 import "@nomiclabs/hardhat-ethers";
 import hre, { ethers } from "hardhat";
 import { utils, Wallet, EIP712Signer, Contract } from "zksync-web3";
-import { ETH_ADDRESS } from "zksync-web3/build/src/utils";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
+import { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
 
 const accountInterface = new ethers.utils.Interface([
   "function initialize(address _signer)",
@@ -37,16 +37,33 @@ const getAccountAddressFromFactory = async (
 
 describe("Argent Account", () => {
   let signer: Wallet;
+  let guardian: Wallet;
   let deployer: Deployer;
 
   let accountImplementation: string;
   let accountFactory: Contract;
+  let accountArtifact: ZkSyncArtifact;
   let proxyBytecodeHash: Uint8Array;
 
   let proxy1: string;
   let proxy2: string;
 
-  const deployAccount = async (signerAddress: string): Promise<string> => {
+  before(async () => {
+    signer = new Wallet(process.env.PRIVATE_KEY as string);
+    guardian = new Wallet(process.env.GUARDIAN_PRIVATE_KEY as string);
+    deployer = new Deployer(hre, signer);
+    accountArtifact = await deployer.loadArtifact("ArgentAccount");
+  });
+
+  const initdata = (signer: string, guardian: string) => {
+    const iface = new ethers.utils.Interface(accountArtifact.abi);
+    return iface.encodeFunctionData("initialize", [signer, guardian]);
+  };
+
+  const deployAccount = async (
+    signerAddress: string,
+    guardianAddress: string
+  ): Promise<string> => {
     const salt = ethers.constants.HashZero;
 
     const predictedAddress = await getAccountAddressFromFactory(
@@ -57,7 +74,12 @@ describe("Argent Account", () => {
     );
     console.log(`Predicted address from factory: ${predictedAddress}`);
 
-    const tx = await accountFactory.deployProxyAccount(salt, accountImplementation, signerAddress);
+    const tx = await accountFactory.deployProxyAccount(
+      salt,
+      accountImplementation,
+      signerAddress,
+      guardianAddress
+    );
     const receipt = await tx.wait();
 
     const [{ deployedAddress }] = utils.getDeployedContracts(receipt);
@@ -81,17 +103,8 @@ describe("Argent Account", () => {
     console.log(`${address} ETH L2 balance is ${ethers.utils.formatEther(balance)}`);
   };
 
-  before(async () => {
-    // Initialize the wallet
-    signer = new Wallet(process.env.PRIVATE_KEY as string);
-
-    // Create deployer object and load the artifact of the contract we want to deploy.
-    deployer = new Deployer(hre, signer);
-  });
-
   it("Should deploy a new ArgentAccount implementation", async () => {
-    const artifact = await deployer.loadArtifact("ArgentAccount");
-    const accountContract = await deployer.deploy(artifact, []);
+    const accountContract = await deployer.deploy(accountArtifact, []);
     accountImplementation = accountContract.address;
     console.log(`Account Implementation was deployed to ${accountImplementation}`);
   });
@@ -105,12 +118,15 @@ describe("Argent Account", () => {
   });
 
   it("Should deploy a new Proxy Account (1)", async () => {
-    proxy1 = await deployAccount(signer.address);
+    proxy1 = await deployAccount(signer.address, guardian.address);
     console.log(`Proxy1 deployed at ${proxy1}`);
   });
 
   it("Should deploy a new Proxy Account (2)", async () => {
-    proxy2 = await deployAccount("0xEA674fdDe714fd979de3EdF0F56AA9716B898ec8");
+    proxy2 = await deployAccount(
+      "0xEA674fdDe714fd979de3EdF0F56AA9716B898ec8",
+      guardian.address
+    );
     console.log(`Proxy2 deployed at ${proxy2}`);
   });
 
@@ -143,12 +159,14 @@ describe("Argent Account", () => {
       data: "0x",
       customData: {
         ergsPerPubdata: 0,
-        feeToken: ETH_ADDRESS,
+        feeToken: utils.ETH_ADDRESS,
       },
     };
 
-    const eip712Signer = new EIP712Signer(signer, chainId);
-    const signature = await eip712Signer.sign(unsignedTx);
+    const signature = ethers.utils.concat([
+      await new EIP712Signer(signer, chainId).sign(unsignedTx),
+      await new EIP712Signer(guardian, chainId).sign(unsignedTx),
+    ]);
 
     const txRequest = {
       ...unsignedTx,
@@ -188,12 +206,14 @@ describe("Argent Account", () => {
       data: "0x",
       customData: {
         ergsPerPubdata: 0,
-        feeToken: ETH_ADDRESS,
+        feeToken: utils.ETH_ADDRESS,
       },
     };
 
-    const eip712Signer = new EIP712Signer(signer, chainId);
-    const signature = await eip712Signer.sign(unsignedTx);
+    const signature = ethers.utils.concat([
+      await new EIP712Signer(signer, chainId).sign(unsignedTx),
+      await new EIP712Signer(guardian, chainId).sign(unsignedTx),
+    ]);
 
     const txRequest = {
       ...unsignedTx,
