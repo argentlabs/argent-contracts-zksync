@@ -1,8 +1,9 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
 
+import "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
+
 import {ArgentAccount} from "./ArgentAccount.sol";
-import "./system-contracts/Constants.sol";
 
 contract AccountFactory {
     bytes32 public bytecodeHash;
