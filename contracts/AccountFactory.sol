@@ -6,6 +6,7 @@ import "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {ArgentAccount} from "./ArgentAccount.sol";
 
 contract AccountFactory {
+    bytes32 constant CREATE2_PREFIX = keccak256("zksyncCreate2");
     bytes32 public bytecodeHash;
 
     constructor(bytes32 _bytecodeHash) {
@@ -28,5 +29,28 @@ contract AccountFactory {
                 0,
                 abi.encode(_implementation, data)
             );
+    }
+
+    function computeCreate2Address(
+        bytes32 _salt,
+        address _implementation,
+        address _signer
+    ) public view returns (address) {
+        bytes memory inputData = abi.encode(
+            _implementation,
+            abi.encodeWithSelector(ArgentAccount.initialize.selector, _signer)
+        );
+
+        bytes32 senderBytes = bytes32(uint256(uint160(address(this))));
+        bytes32 data = keccak256(
+            bytes.concat(
+                CREATE2_PREFIX,
+                senderBytes,
+                _salt,
+                bytecodeHash,
+                keccak256(inputData)
+            )
+        );
+        return address(uint160(uint256(data)));
     }
 }
