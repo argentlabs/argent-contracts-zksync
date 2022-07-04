@@ -5,7 +5,7 @@ import { ETH_ADDRESS } from "zksync-web3/build/src/utils";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { ContractFactory } from "ethers";
 
-const ACCOUNT_IFACE = new ethers.utils.Interface([
+const accountInterface = new ethers.utils.Interface([
   "function initialize(address _signer)",
   "event AccountCreated(address account, address signer)",
 ]);
@@ -14,7 +14,7 @@ const getAccountAddressFromLogs = (logs: any[]): string => {
   return logs
     .map((log: { topics: string[]; data: string }) => {
       try {
-        const decoded = ACCOUNT_IFACE.parseLog(log);
+        const decoded = accountInterface.parseLog(log);
         if (decoded.name === "AccountCreated") {
           return decoded.args.account;
         }
@@ -34,7 +34,9 @@ const getAccountAddressFromCreate2 = (
   signerAddress: string
 ): string => {
   const abiCoder = new ethers.utils.AbiCoder();
-  const data = ACCOUNT_IFACE.encodeFunctionData("initialize", [signerAddress]);
+  const data = accountInterface.encodeFunctionData("initialize", [
+    signerAddress,
+  ]);
   return utils.create2Address(
     factoryAddress,
     bytecodeHash,

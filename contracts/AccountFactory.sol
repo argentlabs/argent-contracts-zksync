@@ -6,7 +6,7 @@ import "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {ArgentAccount} from "./ArgentAccount.sol";
 
 contract AccountFactory {
-    bytes32 constant CREATE2_PREFIX = keccak256("zksyncCreate2");
+    bytes32 constant create2Prefix = keccak256("zksyncCreate2");
     bytes32 public bytecodeHash;
 
     constructor(bytes32 _bytecodeHash) {
@@ -44,7 +44,7 @@ contract AccountFactory {
         bytes32 senderBytes = bytes32(uint256(uint160(address(this))));
         bytes32 data = keccak256(
             bytes.concat(
-                CREATE2_PREFIX,
+                create2Prefix,
                 senderBytes,
                 _salt,
                 bytecodeHash,
