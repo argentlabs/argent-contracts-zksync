@@ -3,6 +3,60 @@ import hre, { ethers } from "hardhat";
 import { utils, Wallet, EIP712Signer, Contract } from "zksync-web3";
 import { ETH_ADDRESS } from "zksync-web3/build/src/utils";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
+import { ContractFactory } from "ethers";
+
+const accountInterface = new ethers.utils.Interface([
+  "function initialize(address _signer)",
+  "event AccountCreated(address account, address signer)",
+]);
+
+const getAccountAddressFromLogs = (logs: any[]): string => {
+  return logs
+    .map((log: { topics: string[]; data: string }) => {
+      try {
+        const decoded = accountInterface.parseLog(log);
+        if (decoded.name === "AccountCreated") {
+          return decoded.args.account;
+        }
+        return null;
+      } catch (error) {
+        return null;
+      }
+    })
+    .filter(Boolean)[0];
+};
+
+const getAccountAddressFromCreate2 = (
+  factoryAddress: string,
+  bytecodeHash: Uint8Array,
+  implementation: string,
+  salt: string,
+  signerAddress: string
+): string => {
+  const abiCoder = new ethers.utils.AbiCoder();
+  const data = accountInterface.encodeFunctionData("initialize", [
+    signerAddress,
+  ]);
+  return utils.create2Address(
+    factoryAddress,
+    bytecodeHash,
+    salt,
+    abiCoder.encode(["address", "bytes"], [implementation, data])
+  );
+};
+
+const getAccountAddressFromFactory = async (
+  accountFactory: Contract,
+  implementation: string,
+  salt: string,
+  signerAddress: string
+) => {
+  return await accountFactory.functions.computeCreate2Address(
+    salt,
+    implementation,
+    signerAddress
+  );
+};
 
 describe("Argent Account", () => {
   let signer: Wallet;
@@ -15,15 +69,17 @@ describe("Argent Account", () => {
   let proxy1: string;
   let proxy2: string;
 
-  const initdata = (signer: string) => {
-    const iface = new ethers.utils.Interface([
-      "function initialize(address _signer)",
-    ]);
-    return iface.encodeFunctionData("initialize", [signer]);
-  };
-
   const deployAccount = async (signerAddress: string): Promise<string> => {
     const salt = ethers.constants.HashZero;
+
+    const predictedAddress = await getAccountAddressFromFactory(
+      accountFactory,
+      accountImplementation,
+      salt,
+      signerAddress
+    );
+    console.log(`Predicted address from factory: ${predictedAddress}`);
+
     const tx = await accountFactory.deployProxyAccount(
       salt,
       accountImplementation,
@@ -31,32 +87,13 @@ describe("Argent Account", () => {
     );
     const receipt = await tx.wait();
 
-    const iface = new ethers.utils.Interface([
-      "event AccountCreated(address account, address signer)",
-    ]);
-    const address = receipt.logs
-      .map((log: { topics: string[]; data: string }) => {
-        try {
-          const decoded = iface.parseLog(log);
-          if (decoded.name === "AccountCreated") {
-            return decoded.args.account;
-          }
-          return null;
-        } catch (error) {
-          return null;
-        }
-      })
-      .filter(Boolean)[0];
-
-    const abiCoder = new ethers.utils.AbiCoder();
-    const create2Address = utils.create2Address(
+    const address = getAccountAddressFromLogs(receipt.logs);
+    const create2Address = getAccountAddressFromCreate2(
       accountFactory.address,
       proxyBytecodeHash,
+      accountImplementation,
       salt,
-      abiCoder.encode(
-        ["address", "bytes"],
-        [accountImplementation, initdata(signerAddress)]
-      )
+      signerAddress
     );
 
     if (address !== create2Address) {
