@@ -3,28 +3,11 @@ import hre, { ethers } from "hardhat";
 import { utils, Wallet, EIP712Signer, Contract } from "zksync-web3";
 import { ETH_ADDRESS } from "zksync-web3/build/src/utils";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
-import { ContractFactory } from "ethers";
 
 const accountInterface = new ethers.utils.Interface([
   "function initialize(address _signer)",
   "event AccountCreated(address account, address signer)",
 ]);
-
-const getAccountAddressFromLogs = (logs: any[]): string => {
-  return logs
-    .map((log: { topics: string[]; data: string }) => {
-      try {
-        const decoded = accountInterface.parseLog(log);
-        if (decoded.name === "AccountCreated") {
-          return decoded.args.account;
-        }
-        return null;
-      } catch (error) {
-        return null;
-      }
-    })
-    .filter(Boolean)[0];
-};
 
 const getAccountAddressFromCreate2 = (
   factoryAddress: string,
@@ -87,7 +70,7 @@ describe("Argent Account", () => {
     );
     const receipt = await tx.wait();
 
-    const address = getAccountAddressFromLogs(receipt.logs);
+    const [{ deployedAddress }] = utils.getDeployedContracts(receipt);
     const create2Address = getAccountAddressFromCreate2(
       accountFactory.address,
       proxyBytecodeHash,
@@ -96,13 +79,13 @@ describe("Argent Account", () => {
       signerAddress
     );
 
-    if (address !== create2Address) {
+    if (deployedAddress !== create2Address) {
       throw new Error(
-        `Address from log ${address} != address from create2 ${create2Address}`
+        `Address from log ${deployedAddress} != address from create2 ${create2Address}`
       );
     }
 
-    return address;
+    return deployedAddress;
   };
 
   const logBalance = async (address: string) => {
