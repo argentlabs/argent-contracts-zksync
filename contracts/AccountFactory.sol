@@ -18,17 +18,8 @@ contract AccountFactory {
         address _implementation,
         address _signer
     ) external returns (address) {
-        bytes memory data = abi.encodeWithSelector(
-            ArgentAccount.initialize.selector,
-            _signer
-        );
-        return
-            DEPLOYER_SYSTEM_CONTRACT.create2AA(
-                _salt,
-                bytecodeHash,
-                0,
-                abi.encode(_implementation, data)
-            );
+        bytes memory data = abi.encodeWithSelector(ArgentAccount.initialize.selector, _signer);
+        return DEPLOYER_SYSTEM_CONTRACT.create2AA(_salt, bytecodeHash, 0, abi.encode(_implementation, data));
     }
 
     function computeCreate2Address(
@@ -42,15 +33,7 @@ contract AccountFactory {
         );
 
         bytes32 senderBytes = bytes32(uint256(uint160(address(this))));
-        bytes32 data = keccak256(
-            bytes.concat(
-                create2Prefix,
-                senderBytes,
-                _salt,
-                bytecodeHash,
-                keccak256(inputData)
-            )
-        );
+        bytes32 data = keccak256(bytes.concat(create2Prefix, senderBytes, _salt, bytecodeHash, keccak256(inputData)));
         return address(uint160(uint256(data)));
     }
 }

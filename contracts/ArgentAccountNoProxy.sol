@@ -31,32 +31,18 @@ contract ArgentAccountNoProxy is IAccountAbstraction {
         _;
     }
 
-    function validateTransaction(Transaction calldata _transaction)
-        external
-        payable
-        override
-        ignoreNonBootloader
-    {
+    function validateTransaction(Transaction calldata _transaction) external payable override ignoreNonBootloader {
         _validateTransaction(_transaction);
     }
 
     function _validateTransaction(Transaction calldata _transaction) internal {
-        NONCE_HOLDER_SYSTEM_CONTRACT.incrementNonceIfEquals(
-            _transaction.reserved[0]
-        );
+        NONCE_HOLDER_SYSTEM_CONTRACT.incrementNonceIfEquals(_transaction.reserved[0]);
         bytes32 txHash = _transaction.encodeHash();
 
-        require(
-            _recoverSignatureAddress(txHash, _transaction.signature) == signer
-        );
+        require(_recoverSignatureAddress(txHash, _transaction.signature) == signer);
     }
 
-    function executeTransaction(Transaction calldata _transaction)
-        external
-        payable
-        override
-        ignoreNonBootloader
-    {
+    function executeTransaction(Transaction calldata _transaction) external payable override ignoreNonBootloader {
         _execute(_transaction);
     }
 
@@ -77,15 +63,7 @@ contract ArgentAccountNoProxy is IAccountAbstraction {
 
         bool success;
         assembly {
-            success := call(
-                gas(),
-                to,
-                value,
-                add(data, 0x20),
-                mload(data),
-                0,
-                0
-            )
+            success := call(gas(), to, value, add(data, 0x20), mload(data), 0, 0)
         }
         require(success);
     }

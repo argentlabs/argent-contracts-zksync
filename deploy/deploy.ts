@@ -1,9 +1,4 @@
-import {
-  utils,
-  Wallet,
-  EIP712Signer,
-  ContractFactory,
-} from "zksync-web3";
+import { utils, Wallet, EIP712Signer, ContractFactory } from "zksync-web3";
 import * as ethers from "ethers";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
@@ -11,9 +6,7 @@ import { ETH_ADDRESS } from "zksync-web3/build/src/utils";
 
 const logBalance = async (address: string, provider: Provider) => {
   const balance = await provider.getBalance(address);
-  console.log(
-    `${address} ETH L2 balance is ${ethers.utils.formatEther(balance)}`
-  );
+  console.log(`${address} ETH L2 balance is ${ethers.utils.formatEther(balance)}`);
 };
 
 export default async function (hre: HardhatRuntimeEnvironment) {
@@ -33,7 +26,7 @@ export default async function (hre: HardhatRuntimeEnvironment) {
     accountArtifact.abi,
     accountArtifact.bytecode,
     deployer.zkWallet,
-    "createAA"
+    "createAA",
   );
 
   const account1 = await accountFactory.deploy(signerAddress);

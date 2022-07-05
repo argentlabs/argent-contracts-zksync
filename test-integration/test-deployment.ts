@@ -14,17 +14,15 @@ const getAccountAddressFromCreate2 = (
   bytecodeHash: Uint8Array,
   implementation: string,
   salt: string,
-  signerAddress: string
+  signerAddress: string,
 ): string => {
   const abiCoder = new ethers.utils.AbiCoder();
-  const data = accountInterface.encodeFunctionData("initialize", [
-    signerAddress,
-  ]);
+  const data = accountInterface.encodeFunctionData("initialize", [signerAddress]);
   return utils.create2Address(
     factoryAddress,
     bytecodeHash,
     salt,
-    abiCoder.encode(["address", "bytes"], [implementation, data])
+    abiCoder.encode(["address", "bytes"], [implementation, data]),
   );
 };
 
@@ -32,13 +30,9 @@ const getAccountAddressFromFactory = async (
   accountFactory: Contract,
   implementation: string,
   salt: string,
-  signerAddress: string
+  signerAddress: string,
 ) => {
-  return await accountFactory.functions.computeCreate2Address(
-    salt,
-    implementation,
-    signerAddress
-  );
+  return await accountFactory.functions.computeCreate2Address(salt, implementation, signerAddress);
 };
 
 describe("Argent Account", () => {
@@ -59,15 +53,11 @@ describe("Argent Account", () => {
       accountFactory,
       accountImplementation,
       salt,
-      signerAddress
+      signerAddress,
     );
     console.log(`Predicted address from factory: ${predictedAddress}`);
 
-    const tx = await accountFactory.deployProxyAccount(
-      salt,
-      accountImplementation,
-      signerAddress
-    );
+    const tx = await accountFactory.deployProxyAccount(salt, accountImplementation, signerAddress);
     const receipt = await tx.wait();
 
     const [{ deployedAddress }] = utils.getDeployedContracts(receipt);
@@ -76,13 +66,11 @@ describe("Argent Account", () => {
       proxyBytecodeHash,
       accountImplementation,
       salt,
-      signerAddress
+      signerAddress,
     );
 
     if (deployedAddress !== create2Address) {
-      throw new Error(
-        `Address from log ${deployedAddress} != address from create2 ${create2Address}`
-      );
+      throw new Error(`Address from log ${deployedAddress} != address from create2 ${create2Address}`);
     }
 
     return deployedAddress;
@@ -90,9 +78,7 @@ describe("Argent Account", () => {
 
   const logBalance = async (address: string) => {
     const balance = await deployer.zkWallet.provider.getBalance(address);
-    console.log(
-      `${address} ETH L2 balance is ${ethers.utils.formatEther(balance)}`
-    );
+    console.log(`${address} ETH L2 balance is ${ethers.utils.formatEther(balance)}`);
   };
 
   before(async () => {
@@ -107,21 +93,14 @@ describe("Argent Account", () => {
     const artifact = await deployer.loadArtifact("ArgentAccount");
     const accountContract = await deployer.deploy(artifact, []);
     accountImplementation = accountContract.address;
-    console.log(
-      `Account Implementation was deployed to ${accountImplementation}`
-    );
+    console.log(`Account Implementation was deployed to ${accountImplementation}`);
   });
 
   it("Should deploy a new AccountFactory", async () => {
     const artifact = await deployer.loadArtifact("AccountFactory");
     const { bytecode } = await deployer.loadArtifact("Proxy");
     proxyBytecodeHash = utils.hashBytecode(bytecode);
-    accountFactory = await deployer.deploy(
-      artifact,
-      [proxyBytecodeHash],
-      undefined,
-      [bytecode]
-    );
+    accountFactory = await deployer.deploy(artifact, [proxyBytecodeHash], undefined, [bytecode]);
     console.log(`Account Factory was deployed to ${accountFactory.address}`);
   });
 
