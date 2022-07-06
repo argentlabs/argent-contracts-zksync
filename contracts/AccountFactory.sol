@@ -26,12 +26,11 @@ contract AccountFactory {
     function computeCreate2Address(
         bytes32 _salt,
         address _implementation,
-        address _signer
+        address _signer,
+        address _guardian
     ) public view returns (address) {
-        bytes memory inputData = abi.encode(
-            _implementation,
-            abi.encodeWithSelector(ArgentAccount.initialize.selector, _signer)
-        );
+        bytes memory initData = abi.encodeWithSelector(ArgentAccount.initialize.selector, _signer, _guardian);
+        bytes memory inputData = abi.encode(_implementation, initData);
 
         bytes32 senderBytes = bytes32(uint256(uint160(address(this))));
         bytes32 data = keccak256(bytes.concat(create2Prefix, senderBytes, _salt, bytecodeHash, keccak256(inputData)));

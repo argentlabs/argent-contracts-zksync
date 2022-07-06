@@ -5,8 +5,8 @@ import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
 
 const accountInterface = new ethers.utils.Interface([
-  "function initialize(address _signer)",
-  "event AccountCreated(address account, address signer)",
+  "function initialize(address _signer, address _guardian)",
+  "event AccountCreated(address account, address signer, address guardian)",
 ]);
 
 const getAccountAddressFromCreate2 = (
@@ -15,9 +15,10 @@ const getAccountAddressFromCreate2 = (
   implementation: string,
   salt: string,
   signerAddress: string,
+  guardianAddress: string,
 ): string => {
   const abiCoder = new ethers.utils.AbiCoder();
-  const data = accountInterface.encodeFunctionData("initialize", [signerAddress]);
+  const data = accountInterface.encodeFunctionData("initialize", [signerAddress, guardianAddress]);
   return utils.create2Address(
     factoryAddress,
     bytecodeHash,
@@ -31,8 +32,9 @@ const getAccountAddressFromFactory = async (
   implementation: string,
   salt: string,
   signerAddress: string,
+  guardianAddress: string,
 ) => {
-  return await accountFactory.functions.computeCreate2Address(salt, implementation, signerAddress);
+  return await accountFactory.functions.computeCreate2Address(salt, implementation, signerAddress, guardianAddress);
 };
 
 describe("Argent Account", () => {
@@ -55,11 +57,6 @@ describe("Argent Account", () => {
     accountArtifact = await deployer.loadArtifact("ArgentAccount");
   });
 
-  const initdata = (signer: string, guardian: string) => {
-    const iface = new ethers.utils.Interface(accountArtifact.abi);
-    return iface.encodeFunctionData("initialize", [signer, guardian]);
-  };
-
   const deployAccount = async (signerAddress: string, guardianAddress: string): Promise<string> => {
     const salt = ethers.constants.HashZero;
 
@@ -68,6 +65,7 @@ describe("Argent Account", () => {
       accountImplementation,
       salt,
       signerAddress,
+      guardianAddress,
     );
     console.log(`Predicted address from factory: ${predictedAddress}`);
 
@@ -81,6 +79,7 @@ describe("Argent Account", () => {
       accountImplementation,
       salt,
       signerAddress,
+      guardianAddress,
     );
 
     if (deployedAddress !== create2Address) {

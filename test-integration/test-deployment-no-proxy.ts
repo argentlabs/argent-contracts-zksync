@@ -23,10 +23,9 @@ describe("Argent Account (No Proxy)", () => {
   });
 
   it("Should deploy a new ArgentAccountNoProxy and send a test transaction", async () => {
-    const signerAddress = await signer.getAddress();
-    console.log(`Signer address is ${signerAddress}`);
+    console.log(`Signer address is ${signer.address}`);
 
-    const account1 = await accountFactory.deploy(signerAddress, guardian.address);
+    const account1 = await accountFactory.deploy(signer.address, guardian.address);
     await account1.deployed();
     console.log(`Account 1 was deployed to ${account1.address}`);
 
