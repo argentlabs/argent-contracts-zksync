@@ -1,11 +1,6 @@
 import "@nomiclabs/hardhat-ethers";
 import hre, { ethers } from "hardhat";
-import {
-  utils,
-  Wallet,
-  EIP712Signer,
-  ContractFactory,
-} from "zksync-web3";
+import { utils, Wallet, EIP712Signer, ContractFactory } from "zksync-web3";
 import { ETH_ADDRESS } from "zksync-web3/build/src/utils";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 
