@@ -19,7 +19,7 @@ contract AccountFactory {
         address _signer,
         address _guardian
     ) external returns (address) {
-        bytes memory data = abi.encodeWithSelector(ArgentAccount.initialize.selector, _signer, _guardian);
+        bytes memory data = abi.encodeCall(ArgentAccount.initialize, (_signer, _guardian));
         return DEPLOYER_SYSTEM_CONTRACT.create2AA(_salt, bytecodeHash, 0, abi.encode(_implementation, data));
     }
 
@@ -29,7 +29,7 @@ contract AccountFactory {
         address _signer,
         address _guardian
     ) public view returns (address) {
-        bytes memory initData = abi.encodeWithSelector(ArgentAccount.initialize.selector, _signer, _guardian);
+        bytes memory initData = abi.encodeCall(ArgentAccount.initialize, (_signer, _guardian));
         bytes memory inputData = abi.encode(_implementation, initData);
 
         bytes32 senderBytes = bytes32(uint256(uint160(address(this))));

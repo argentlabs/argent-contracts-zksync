@@ -44,7 +44,6 @@ describe("Argent Account", () => {
 
   let accountImplementation: string;
   let accountFactory: Contract;
-  let accountArtifact: ZkSyncArtifact;
   let proxyBytecodeHash: Uint8Array;
 
   let proxy1: string;
@@ -54,7 +53,6 @@ describe("Argent Account", () => {
     signer = new Wallet(process.env.PRIVATE_KEY as string);
     guardian = new Wallet(process.env.GUARDIAN_PRIVATE_KEY as string);
     deployer = new Deployer(hre, signer);
-    accountArtifact = await deployer.loadArtifact("ArgentAccount");
   });
 
   const deployAccount = async (signerAddress: string, guardianAddress: string): Promise<string> => {
@@ -95,7 +93,8 @@ describe("Argent Account", () => {
   };
 
   it("Should deploy a new ArgentAccount implementation", async () => {
-    const accountContract = await deployer.deploy(accountArtifact, []);
+    const artifact = await deployer.loadArtifact("ArgentAccount");
+    const accountContract = await deployer.deploy(artifact, []);
     accountImplementation = accountContract.address;
     console.log(`Account Implementation was deployed to ${accountImplementation}`);
   });
