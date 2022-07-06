@@ -145,9 +145,29 @@ contract ArgentAccountNoProxy is IAccountAbstraction, IERC1271 {
     }
 
     function _validateTransaction(Transaction calldata _transaction) internal {
+        require(_transaction.signature.length == 130, "argent/invalid-signature-length");
+
         NONCE_HOLDER_SYSTEM_CONTRACT.incrementNonceIfEquals(_transaction.reserved[0]);
         bytes32 txHash = _transaction.encodeHash();
-        require(isValidSignature(txHash, _transaction.signature) == eip1271SuccessReturnValue);
+        bytes4 selector = bytes4(_transaction.data);
+        if (selector == this.escapeSigner.selector || selector == this.triggerEscapeSigner.selector) {
+            validateGuardianSignature(txHash, _transaction.signature);
+        } else if (selector == this.escapeGuardian.selector || selector == this.triggerEscapeGuardian.selector) {
+            validateSignerSignature(txHash, _transaction.signature);
+        } else {
+            validateSignerSignature(txHash, _transaction.signature);
+            validateGuardianSignature(txHash, _transaction.signature);
+        }
+    }
+
+    function validateSignerSignature(bytes32 _hash, bytes calldata _signature) internal view {
+        address recovered = ECDSA.recover(_hash, _signature[:65]);
+        require(recovered == signer, "argent/invalid-signer-signature");
+    }
+
+    function validateGuardianSignature(bytes32 _hash, bytes calldata _signature) internal view {
+        address recovered = ECDSA.recover(_hash, _signature[65:]);
+        require(recovered == guardian, "argent/invalid-guardian-signature");
     }
 
     function executeTransaction(Transaction calldata _transaction) external payable override onlyBootloader {
@@ -172,15 +192,10 @@ contract ArgentAccountNoProxy is IAccountAbstraction, IERC1271 {
     }
 
     function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4) {
-        // The signature is the concatenation of the ECDSA signatures of the owners
-        // Each ECDSA signature is 65 bytes long. That means that the combined signature is 130 bytes long.
         require(_signature.length == 130, "argent/invalid-signature-length");
 
-        address recoveredAddr1 = ECDSA.recover(_hash, _signature[0:65]);
-        require(recoveredAddr1 == signer, "argent/invalid-signer-signature");
-
-        address recoveredAddr2 = ECDSA.recover(_hash, _signature[65:130]);
-        require(recoveredAddr2 == guardian, "argent/invalid-guardian-signature");
+        validateSignerSignature(_hash, _signature);
+        validateGuardianSignature(_hash, _signature);
 
         return eip1271SuccessReturnValue;
     }

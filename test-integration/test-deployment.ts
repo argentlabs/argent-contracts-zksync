@@ -2,7 +2,6 @@ import "@nomiclabs/hardhat-ethers";
 import hre, { ethers } from "hardhat";
 import { utils, Wallet, EIP712Signer, Contract } from "zksync-web3";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
-import { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
 
 const accountInterface = new ethers.utils.Interface([
   "function initialize(address _signer, address _guardian)",
