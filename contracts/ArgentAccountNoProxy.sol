@@ -66,10 +66,7 @@ contract ArgentAccountNoProxy is IAccountAbstraction, IERC1271 {
     }
 
     modifier onlyBootloader() {
-        require(
-            msg.sender == BOOTLOADER_FORMAL_ADDRESS,
-            "Only bootloader can call this method"
-        );
+        require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "Only bootloader can call this method");
         // Continue execution if called from the bootloader.
         _;
     }
@@ -83,19 +80,12 @@ contract ArgentAccountNoProxy is IAccountAbstraction, IERC1271 {
     }
 
     function changeGuardian(address _newGuardian) public onlySelf {
-        require(
-            !(guardianBackup != address(0) && _newGuardian == address(0)),
-            "argent/null-guardian"
-        );
+        require(!(guardianBackup != address(0) && _newGuardian == address(0)), "argent/null-guardian");
         guardian = _newGuardian;
         emit GuardianChanged(_newGuardian);
     }
 
-    function changeGuardianBackup(address _newGuardianBackup)
-        public
-        onlySelf
-        requireGuardian
-    {
+    function changeGuardianBackup(address _newGuardianBackup) public onlySelf requireGuardian {
         guardianBackup = _newGuardianBackup;
         emit GuardianBackupChanged(_newGuardianBackup);
     }
@@ -103,10 +93,7 @@ contract ArgentAccountNoProxy is IAccountAbstraction, IERC1271 {
     function triggerEscapeSigner() public onlySelf requireGuardian {
         // no escape if there is an guardian escape triggered by the signer in progress
         if (escape.activeAt != 0) {
-            require(
-                escape.escapeType == signerEscape,
-                "argent/cannot-override-signer-escape"
-            );
+            require(escape.escapeType == signerEscape, "argent/cannot-override-signer-escape");
         }
 
         uint96 activeAt = uint96(block.timestamp + escapeSecurityPeriod);
@@ -121,10 +108,7 @@ contract ArgentAccountNoProxy is IAccountAbstraction, IERC1271 {
     }
 
     function cancelEscape() public onlySelf {
-        require(
-            escape.activeAt != 0 && escape.escapeType != noEscape,
-            "argent/not-escaping"
-        );
+        require(escape.activeAt != 0 && escape.escapeType != noEscape, "argent/not-escaping");
 
         delete escape;
         emit EscapeCancelled();
@@ -133,10 +117,7 @@ contract ArgentAccountNoProxy is IAccountAbstraction, IERC1271 {
     function escapeSigner(address _newSigner) public onlySelf requireGuardian {
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
-        require(
-            escape.escapeType == signerEscape,
-            "argent/invalid-escape-type"
-        );
+        require(escape.escapeType == signerEscape, "argent/invalid-escape-type");
         delete escape;
 
         require(_newSigner != address(0), "argent/null-signer");
@@ -148,10 +129,7 @@ contract ArgentAccountNoProxy is IAccountAbstraction, IERC1271 {
     function escapeGuardian(address _newGuardian) public onlySelf {
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
-        require(
-            escape.escapeType == guardianEscape,
-            "argent/invalid-escape-type"
-        );
+        require(escape.escapeType == guardianEscape, "argent/invalid-escape-type");
         delete escape;
 
         require(_newGuardian != address(0), "argent/null-guardian");
@@ -162,12 +140,7 @@ contract ArgentAccountNoProxy is IAccountAbstraction, IERC1271 {
 
     // Account methods
 
-    function validateTransaction(Transaction calldata _transaction)
-        external
-        payable
-        override
-        onlyBootloader
-    {
+    function validateTransaction(Transaction calldata _transaction) external payable override onlyBootloader {
         _validateTransaction(_transaction);
     }
 
@@ -177,21 +150,11 @@ contract ArgentAccountNoProxy is IAccountAbstraction, IERC1271 {
         require(isValidSignature(txHash, _transaction.signature) == eip1271SuccessReturnValue);
     }
 
-    function executeTransaction(Transaction calldata _transaction)
-        external
-        payable
-        override
-        onlyBootloader
-    {
+    function executeTransaction(Transaction calldata _transaction) external payable override onlyBootloader {
         _execute(_transaction);
     }
 
-    function executeTransactionFromOutside(Transaction calldata _transaction)
-        external
-        payable
-        override
-        onlyBootloader
-    {
+    function executeTransactionFromOutside(Transaction calldata _transaction) external payable override onlyBootloader {
         _validateTransaction(_transaction);
         _execute(_transaction);
     }
@@ -208,9 +171,9 @@ contract ArgentAccountNoProxy is IAccountAbstraction, IERC1271 {
         require(success);
     }
 
-	function isValidSignature(bytes32 _hash, bytes calldata _signature) public override view returns (bytes4) {
+    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4) {
         // The signature is the concatenation of the ECDSA signatures of the owners
-        // Each ECDSA signature is 65 bytes long. That means that the combined signature is 130 bytes long. 
+        // Each ECDSA signature is 65 bytes long. That means that the combined signature is 130 bytes long.
         require(_signature.length == 130, "argent/invalid-signature-length");
 
         address recoveredAddr1 = ECDSA.recover(_hash, _signature[0:65]);
@@ -220,9 +183,9 @@ contract ArgentAccountNoProxy is IAccountAbstraction, IERC1271 {
         require(recoveredAddr2 == guardian, "argent/invalid-guardian-signature");
 
         return eip1271SuccessReturnValue;
-	}
+    }
 
-	receive() external payable {
+    receive() external payable {
         // If the bootloader called the `receive` function, it likely means
         // that something went wrong and the transaction should be aborted. The bootloader should
         // only interact through the `validateTransaction`/`executeTransaction` methods.

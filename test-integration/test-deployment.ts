@@ -60,10 +60,7 @@ describe("Argent Account", () => {
     return iface.encodeFunctionData("initialize", [signer, guardian]);
   };
 
-  const deployAccount = async (
-    signerAddress: string,
-    guardianAddress: string
-  ): Promise<string> => {
+  const deployAccount = async (signerAddress: string, guardianAddress: string): Promise<string> => {
     const salt = ethers.constants.HashZero;
 
     const predictedAddress = await getAccountAddressFromFactory(
@@ -74,12 +71,7 @@ describe("Argent Account", () => {
     );
     console.log(`Predicted address from factory: ${predictedAddress}`);
 
-    const tx = await accountFactory.deployProxyAccount(
-      salt,
-      accountImplementation,
-      signerAddress,
-      guardianAddress
-    );
+    const tx = await accountFactory.deployProxyAccount(salt, accountImplementation, signerAddress, guardianAddress);
     const receipt = await tx.wait();
 
     const [{ deployedAddress }] = utils.getDeployedContracts(receipt);
@@ -123,10 +115,7 @@ describe("Argent Account", () => {
   });
 
   it("Should deploy a new Proxy Account (2)", async () => {
-    proxy2 = await deployAccount(
-      "0xEA674fdDe714fd979de3EdF0F56AA9716B898ec8",
-      guardian.address
-    );
+    proxy2 = await deployAccount("0xEA674fdDe714fd979de3EdF0F56AA9716B898ec8", guardian.address);
     console.log(`Proxy2 deployed at ${proxy2}`);
   });
 

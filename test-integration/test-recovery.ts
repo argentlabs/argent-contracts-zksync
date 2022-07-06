@@ -1,12 +1,6 @@
 import "@nomiclabs/hardhat-ethers";
 import hre, { ethers } from "hardhat";
-import {
-  utils,
-  Wallet,
-  EIP712Signer,
-  ContractFactory,
-  Contract,
-} from "zksync-web3";
+import { utils, Wallet, EIP712Signer, ContractFactory, Contract } from "zksync-web3";
 import { ETH_ADDRESS } from "zksync-web3/build/src/utils";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
@@ -29,9 +23,7 @@ describe("Recovery", () => {
 
   const logBalance = async (address: string) => {
     const balance = await deployer.zkWallet.provider.getBalance(address);
-    console.log(
-      `${address} ETH L2 balance is ${ethers.utils.formatEther(balance)}`
-    );
+    console.log(`${address} ETH L2 balance is ${ethers.utils.formatEther(balance)}`);
   };
 
   before(async () => {
@@ -47,35 +39,21 @@ describe("Recovery", () => {
     accountInterface = new ethers.utils.Interface(accountArtifact.abi);
 
     const { abi, bytecode } = await deployer.loadArtifact("Proxy");
-    proxyFactory = new ContractFactory(
-      abi,
-      bytecode,
-      deployer.zkWallet,
-      "createAA"
-    );
+    proxyFactory = new ContractFactory(abi, bytecode, deployer.zkWallet, "createAA");
   });
 
   it("Should deploy a new ArgentAccount implementation", async () => {
     const accountContract = await deployer.deploy(accountArtifact, []);
     accountImplementation = accountContract.address;
-    console.log(
-      `Account Implementation was deployed to ${accountImplementation}`
-    );
+    console.log(`Account Implementation was deployed to ${accountImplementation}`);
   });
 
   it("Should deploy a new Proxy Account (1)", async () => {
-    proxy = await proxyFactory.deploy(
-      accountImplementation,
-      initdata(signer.address, guardian.address)
-    );
+    proxy = await proxyFactory.deploy(accountImplementation, initdata(signer.address, guardian.address));
     await proxy.deployed();
     console.log(`Proxy 1 was deployed to ${proxy.address}`);
 
-    account = new Contract(
-      proxy.address,
-      accountArtifact.abi,
-      deployer.zkWallet.provider,
-    );
+    account = new Contract(proxy.address, accountArtifact.abi, deployer.zkWallet.provider);
   });
 
   it("Should fund Proxy 1 from signer key", async () => {
@@ -155,7 +133,6 @@ describe("Recovery", () => {
     await sentTx.wait();
 
     await logBalance(account.address);
-    console.log("guardian after", await account.guardian())
+    console.log("guardian after", await account.guardian());
   });
-
 });
