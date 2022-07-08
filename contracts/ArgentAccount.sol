@@ -155,12 +155,16 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
         } else if (selector == this.escapeGuardian.selector || selector == this.triggerEscapeGuardian.selector) {
             validateSignerSignature(txHash, _transaction.signature);
         } else {
-            validateSignerSignature(txHash, _transaction.signature);
-            validateGuardianSignature(txHash, _transaction.signature);
+            validateSignatures(txHash, _transaction.signature);
         }
     }
 
-    function validateSignerSignature(bytes32 _hash, bytes calldata _signature) internal view {
+    function validateSignatures(bytes32 _hash, bytes calldata _signature) internal view {
+        validateSignerSignature(_hash, _signature);
+        // validateGuardianSignature(_hash, _signature);
+    }
+
+   function validateSignerSignature(bytes32 _hash, bytes calldata _signature) internal view {
         address recovered = ECDSA.recover(_hash, _signature[:65]);
         require(recovered == signer, "argent/invalid-signer-signature");
     }
@@ -194,8 +198,7 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4) {
         require(_signature.length == 130, "argent/invalid-signature-length");
 
-        validateSignerSignature(_hash, _signature);
-        validateGuardianSignature(_hash, _signature);
+        validateSignatures(_hash, _signature);
 
         return eip1271SuccessReturnValue;
     }
