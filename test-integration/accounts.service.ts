@@ -30,7 +30,6 @@ export const deployAccount = async (
   const tx = await factory.deployProxyAccount(salt, implementation.address, signerAddress, guardianAddress);
   const receipt = await tx.wait();
   const [{ deployedAddress }] = zksync.utils.getDeployedContracts(receipt);
-  console.log(`Deployed account to: ${deployedAddress}`);
 
   if (deployedAddress !== create2Address) {
     throw new Error(`Deployed address (${deployedAddress}) != address predicted from create2 (${create2Address})`);
@@ -73,7 +72,49 @@ const getAccountAddressFromFactory = async (
   return address;
 };
 
-export const logBalance = async (deployer: Deployer, address: string) => {
-  const balance = await deployer.zkWallet.provider.getBalance(address);
+export const sendEIP712Transaction = async (
+  transaction: zksync.types.TransactionRequest,
+  from: string,
+  provider: zksync.Provider,
+  signer: zksync.Wallet,
+  guardian: zksync.Wallet,
+) => {
+  const { chainId } = await provider.getNetwork();
+  const unsignedTransaction = {
+    type: zksync.utils.EIP712_TX_TYPE,
+    to: transaction.to,
+    data: transaction.data ?? "0x",
+    value: transaction.value ?? "0x0",
+    chainId: transaction.chainId ?? chainId,
+    gasPrice: transaction.gasPrice ?? (await provider.getGasPrice()),
+    gasLimit: transaction.gasLimit ?? (await provider.estimateGas(transaction)),
+    nonce: transaction.nonce ?? (await provider.getTransactionCount(from)),
+    customData: {
+      ergsPerPubdata: transaction.customData?.ergsPerPubData ?? 0,
+      feeToken: transaction.customData?.feeToken ?? zksync.utils.ETH_ADDRESS,
+    },
+  };
+
+  const signature = ethers.utils.concat([
+    await new zksync.EIP712Signer(signer, chainId).sign(unsignedTransaction),
+    await new zksync.EIP712Signer(guardian, chainId).sign(unsignedTransaction),
+  ]);
+
+  const transactionRequest = {
+    ...unsignedTransaction,
+    customData: {
+      ...unsignedTransaction.customData,
+      aaParams: { from, signature },
+    },
+  };
+
+  const serialized = zksync.utils.serialize(transactionRequest);
+  const response = await provider.sendTransaction(serialized);
+  const receipt = await response.wait();
+  return receipt;
+};
+
+export const logBalance = async (provider: zksync.Provider, address: string) => {
+  const balance = await provider.getBalance(address);
   console.log(`${address} ETH L2 balance is ${ethers.utils.formatEther(balance)}`);
 };

@@ -10,9 +10,6 @@ module.exports = {
     version: "0.1.0",
     compilerSource: "docker",
     settings: {
-      optimizer: {
-        enabled: true,
-      },
       experimental: {
         dockerImage: "matterlabs/zksolc",
       },

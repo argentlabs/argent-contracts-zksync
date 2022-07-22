@@ -2,7 +2,7 @@ import "@nomiclabs/hardhat-ethers";
 import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
-import { ArgentArtifacts, ArgentContext, deployAccount, logBalance } from "./accounts.service";
+import { ArgentArtifacts, ArgentContext, deployAccount, logBalance, sendEIP712Transaction } from "./accounts.service";
 
 describe("Argent account", () => {
   let signer: zksync.Wallet;
@@ -47,126 +47,58 @@ describe("Argent account", () => {
   });
 
   describe("Transfers", () => {
-    let proxy1: string;
-    let proxy2: string;
+    let account1: string;
+    let account2: string;
 
-    it("Should deploy a new Proxy Account (1)", async () => {
-      proxy1 = await deployAccount(argent, signer.address, guardian.address);
-      console.log(`Proxy1 deployed at ${proxy1}`);
+    it("Should deploy a new account (1)", async () => {
+      account1 = await deployAccount(argent, signer.address, guardian.address);
+      console.log(`Account 1 deployed to ${account1}`);
     });
 
-    it("Should deploy a new Proxy Account (2)", async () => {
-      proxy2 = await deployAccount(argent, "0xEA674fdDe714fd979de3EdF0F56AA9716B898ec8", guardian.address);
-      console.log(`Proxy2 deployed at ${proxy2}`);
+    it("Should deploy a new account (2)", async () => {
+      account2 = await deployAccount(argent, "0xEA674fdDe714fd979de3EdF0F56AA9716B898ec8", guardian.address);
+      console.log(`Account 2 deployed to ${account2}`);
     });
 
-    it("Should fund Proxy 1 from signer key", async () => {
-      const { deployer } = argent;
-      const transferHandle = await deployer.zkWallet.transfer({
-        to: proxy1,
+    it("Should fund account 1 from signer key", async () => {
+      const { zkWallet } = argent.deployer;
+      const response = await zkWallet.transfer({
+        to: account1,
         amount: ethers.utils.parseEther("0.0001"),
         overrides: {},
       });
-      await transferHandle.wait();
+      await response.wait();
 
-      await logBalance(deployer, proxy1);
-      await logBalance(deployer, proxy2);
+      await logBalance(zkWallet.provider, account1);
+      await logBalance(zkWallet.provider, account2);
     });
 
-    it("Should transfer ETH from Proxy 1 to Proxy 2", async () => {
-      const { deployer } = argent;
-      const { provider } = deployer.zkWallet;
-      const { chainId } = await provider.getNetwork();
-      const transferTx = {
-        to: proxy2,
+    it("Should transfer ETH from account 1 to account 2", async () => {
+      const { provider } = argent.deployer.zkWallet;
+      const transaction = {
+        to: account2,
         value: ethers.utils.parseEther("0.00002668"),
       };
-      const unsignedTx = {
-        ...transferTx,
-        type: zksync.utils.EIP712_TX_TYPE,
-        chainId,
-        gasPrice: await provider.getGasPrice(),
-        gasLimit: await provider.estimateGas(transferTx),
-        nonce: 0,
-        data: "0x",
-        customData: {
-          ergsPerPubdata: 0,
-          feeToken: zksync.utils.ETH_ADDRESS,
-        },
-      };
 
-      const signature = ethers.utils.concat([
-        await new zksync.EIP712Signer(signer, chainId).sign(unsignedTx),
-        await new zksync.EIP712Signer(guardian, chainId).sign(unsignedTx),
-      ]);
+      const receipt = await sendEIP712Transaction(transaction, account1, provider, signer, guardian);
+      console.log(`Transaction hash is ${receipt.transactionHash}`);
 
-      const txRequest = {
-        ...unsignedTx,
-        customData: {
-          ...unsignedTx.customData,
-          aaParams: {
-            from: proxy1,
-            signature,
-          },
-        },
-      };
-
-      const serializedTx = zksync.utils.serialize(txRequest);
-
-      const sentTx = await provider.sendTransaction(serializedTx);
-      console.log(`Tx Hash is ${sentTx.hash}`);
-      await sentTx.wait();
-
-      await logBalance(deployer, proxy1);
-      await logBalance(deployer, proxy2);
+      await logBalance(provider, account1);
+      await logBalance(provider, account2);
     });
 
-    it("Should fail transfer ETH from Proxy 2 to Proxy 1", async () => {
-      const { deployer } = argent;
-      const { provider } = deployer.zkWallet;
-      const { chainId } = await provider.getNetwork();
-      const transferTx = {
-        to: proxy1,
+    it("Should fail to transfer ETH from account 2 to account 1", async () => {
+      const { provider } = argent.deployer.zkWallet;
+      const transaction = {
+        to: account1,
         value: ethers.utils.parseEther("0.00000668"),
       };
-      const unsignedTx = {
-        ...transferTx,
-        type: zksync.utils.EIP712_TX_TYPE,
-        chainId,
-        gasPrice: await provider.getGasPrice(),
-        gasLimit: await provider.estimateGas(transferTx),
-        nonce: 0,
-        data: "0x",
-        customData: {
-          ergsPerPubdata: 0,
-          feeToken: zksync.utils.ETH_ADDRESS,
-        },
-      };
-
-      const signature = ethers.utils.concat([
-        await new zksync.EIP712Signer(signer, chainId).sign(unsignedTx),
-        await new zksync.EIP712Signer(guardian, chainId).sign(unsignedTx),
-      ]);
-
-      const txRequest = {
-        ...unsignedTx,
-        customData: {
-          ...unsignedTx.customData,
-          aaParams: {
-            from: proxy2,
-            signature,
-          },
-        },
-      };
-
-      const serializedTx = zksync.utils.serialize(txRequest);
 
       try {
-        const sentTx = await provider.sendTransaction(serializedTx);
-        console.log(`Tx Hash is ${sentTx.hash}`);
-        await sentTx.wait();
+        const receipt = await sendEIP712Transaction(transaction, account2, provider, signer, guardian);
+        console.log(`Transaction hash is ${receipt.transactionHash}`);
       } catch (error) {
-        console.log(`Transfer failed`);
+        console.log("Transfer failed");
       }
     });
   });
