@@ -5,12 +5,13 @@
   "author": "Argent Labs",
   "license": "MIT",
   "scripts": {
-    "test-integration": "hardhat test ./test-integration/*"
+    "test-integration": "hardhat test --bail ./test-integration/*"
   },
   "devDependencies": {
     "@matterlabs/hardhat-zksync-deploy": "^0.3.6",
     "@matterlabs/hardhat-zksync-solc": "^0.3.6",
     "@matterlabs/zksync-contracts": "^0.2.4",
+    "@nomicfoundation/hardhat-chai-matchers": "^1.0.2",
     "@nomiclabs/hardhat-ethers": "^2.1.0",
     "@openzeppelin/contracts": "^4.7.1",
     "@types/mocha": "^9.1.1",

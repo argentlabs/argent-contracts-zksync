@@ -1,7 +1,7 @@
-import "@nomiclabs/hardhat-ethers";
 import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
+import { expect } from "chai";
 import { ArgentArtifacts, ArgentContext, deployAccount, logBalance, sendEIP712Transaction } from "./accounts.service";
 
 describe("Argent account", () => {
@@ -47,59 +47,83 @@ describe("Argent account", () => {
   });
 
   describe("Transfers", () => {
-    let account1: string;
-    let account2: string;
+    let account1: zksync.Contract;
+    let account2: zksync.Contract;
 
     it("Should deploy a new account (1)", async () => {
       account1 = await deployAccount(argent, signer.address, guardian.address);
-      console.log(`Account 1 deployed to ${account1}`);
+      console.log(`Account 1 deployed to ${account1.address}`);
     });
 
     it("Should deploy a new account (2)", async () => {
       account2 = await deployAccount(argent, "0xEA674fdDe714fd979de3EdF0F56AA9716B898ec8", guardian.address);
-      console.log(`Account 2 deployed to ${account2}`);
+      console.log(`Account 2 deployed to ${account2.address}`);
     });
 
     it("Should fund account 1 from signer key", async () => {
       const { zkWallet } = argent.deployer;
       const response = await zkWallet.transfer({
-        to: account1,
+        to: account1.address,
         amount: ethers.utils.parseEther("0.0001"),
-        overrides: {},
       });
       await response.wait();
 
-      await logBalance(zkWallet.provider, account1);
-      await logBalance(zkWallet.provider, account2);
+      await logBalance(zkWallet.provider, account1.address);
+      await logBalance(zkWallet.provider, account2.address);
     });
 
     it("Should transfer ETH from account 1 to account 2", async () => {
       const { provider } = argent.deployer.zkWallet;
       const transaction = {
-        to: account2,
+        to: account2.address,
         value: ethers.utils.parseEther("0.00002668"),
       };
 
-      const receipt = await sendEIP712Transaction(transaction, account1, provider, signer, guardian);
+      const receipt = await sendEIP712Transaction(transaction, account1.address, provider, signer, guardian);
       console.log(`Transaction hash is ${receipt.transactionHash}`);
 
-      await logBalance(provider, account1);
-      await logBalance(provider, account2);
+      await logBalance(provider, account1.address);
+      await logBalance(provider, account2.address);
     });
 
     it("Should fail to transfer ETH from account 2 to account 1", async () => {
       const { provider } = argent.deployer.zkWallet;
       const transaction = {
-        to: account1,
+        to: account1.address,
         value: ethers.utils.parseEther("0.00000668"),
       };
 
       try {
-        const receipt = await sendEIP712Transaction(transaction, account2, provider, signer, guardian);
+        const receipt = await sendEIP712Transaction(transaction, account2.address, provider, signer, guardian);
         console.log(`Transaction hash is ${receipt.transactionHash}`);
       } catch (error) {
         console.log("Transfer failed");
       }
     });
+  });
+
+  describe("Recovery", () => {
+    let account: zksync.Contract;
+
+    it("Should deploy and fund the account", async () => {
+      account = await deployAccount(argent, signer.address, guardian.address);
+      const { zkWallet } = argent.deployer;
+      const response = await zkWallet.transfer({
+        to: account.address,
+        amount: ethers.utils.parseEther("0.0001"),
+      });
+      await response.wait();
+      await logBalance(zkWallet.provider, account.address);
+    });
+
+    it("Should be initialized properly", async () => {
+      expect(await account.callStatic.signer()).to.equal(signer.address);
+      expect(await account.guadian()).to.equal(guardian.address);
+    });
+
+    it("Should refuse being initialized twice", async () => {
+      await expect(account.initialize(signer.address, guardian.address)).to.be.revertedWith("argent/already-init");
+    });
+
   });
 });

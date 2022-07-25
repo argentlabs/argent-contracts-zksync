@@ -20,7 +20,7 @@ export const deployAccount = async (
   argent: ArgentContext,
   signerAddress: string,
   guardianAddress: string,
-): Promise<string> => {
+): Promise<zksync.Contract> => {
   const salt = ethers.constants.HashZero;
   const { factory, implementation } = argent;
 
@@ -39,7 +39,8 @@ export const deployAccount = async (
     throw new Error(`Deployed address (${deployedAddress}) != address predicted from factory (${factoryAddress})`);
   }
 
-  return deployedAddress;
+  const account = await ethers.getContractAt("ArgentAccount", deployedAddress);
+  return account;
 };
 
 const getAccountAddressFromCreate2 = async (
