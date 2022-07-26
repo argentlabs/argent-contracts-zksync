@@ -22,10 +22,11 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
         uint8 escapeType; // packed EscapeType enum
     }
 
+    string public constant version = "0.0.1";
     uint8 public constant noEscape = uint8(EscapeType.None);
     uint8 public constant guardianEscape = uint8(EscapeType.Guardian);
     uint8 public constant signerEscape = uint8(EscapeType.Signer);
-    uint256 public constant escapeSecurityPeriod = 1 weeks;
+    uint96 public constant escapeSecurityPeriod = 1 weeks;
     bytes4 constant eip1271SuccessReturnValue = 0x1626ba7e;
 
     address public signer;
@@ -96,13 +97,13 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
             require(escape.escapeType == signerEscape, "argent/cannot-override-signer-escape");
         }
 
-        uint96 activeAt = uint96(block.timestamp + escapeSecurityPeriod);
+        uint96 activeAt = uint96(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(activeAt, signerEscape);
         emit EscapeSignerTriggerred(activeAt);
     }
 
     function triggerEscapeGuardian() public onlySelf requireGuardian {
-        uint96 activeAt = uint96(block.timestamp + escapeSecurityPeriod);
+        uint96 activeAt = uint96(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(activeAt, guardianEscape);
         emit EscapeGuardianTriggerred(activeAt);
     }

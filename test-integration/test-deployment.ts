@@ -2,7 +2,7 @@ import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { expect } from "chai";
-import { ArgentArtifacts, ArgentContext, deployAccount, logBalance, sendEIP712Transaction } from "./accounts.service";
+import { ArgentArtifacts, ArgentContext, deployAccount, logBalance, sendArgentTransaction } from "./accounts.service";
 
 describe("Argent account", () => {
   let signer: zksync.Wallet;
@@ -27,22 +27,26 @@ describe("Argent account", () => {
         factory: await deployer.loadArtifact("AccountFactory"),
         proxy: await deployer.loadArtifact("Proxy"),
       };
+      ethers.provider = deployer.zkWallet.provider; // needed for .getContractAt(...) in hardhat-ethers 
+      const balance = await deployer.zkWallet.provider.getBalance(signer.address);
+      console.log(`Signer ETH L2 balance is ${ethers.utils.formatEther(balance)}`);
     });
 
     it("Should deploy a new ArgentAccount implementation", async () => {
       implementation = await deployer.deploy(artifacts.implementation, []);
-      console.log(`Account Implementation was deployed to ${implementation.address}`);
+      console.log(`Account implementation deployed to ${implementation.address}`);
     });
 
     it("Should deploy a new AccountFactory", async () => {
       const { bytecode } = artifacts.proxy;
       const proxyBytecodeHash = zksync.utils.hashBytecode(bytecode);
       factory = await deployer.deploy(artifacts.factory, [proxyBytecodeHash], undefined, [bytecode]);
-      console.log(`Account Factory was deployed to ${factory.address}`);
+      console.log(`Account factory deployed to ${factory.address}`);
     });
 
     after(async () => {
-      argent = { deployer, artifacts, implementation, factory };
+      const { provider } = deployer.zkWallet;
+      argent = { deployer, provider, artifacts, implementation, factory };
     });
   });
 
@@ -73,28 +77,26 @@ describe("Argent account", () => {
     });
 
     it("Should transfer ETH from account 1 to account 2", async () => {
-      const { provider } = argent.deployer.zkWallet;
       const transaction = {
         to: account2.address,
         value: ethers.utils.parseEther("0.00002668"),
       };
 
-      const receipt = await sendEIP712Transaction(transaction, account1.address, provider, signer, guardian);
+      const receipt = await sendArgentTransaction(transaction, account1.address, argent.provider, signer, guardian);
       console.log(`Transaction hash is ${receipt.transactionHash}`);
 
-      await logBalance(provider, account1.address);
-      await logBalance(provider, account2.address);
+      await logBalance(argent.provider, account1.address);
+      await logBalance(argent.provider, account2.address);
     });
 
     it("Should fail to transfer ETH from account 2 to account 1", async () => {
-      const { provider } = argent.deployer.zkWallet;
       const transaction = {
         to: account1.address,
         value: ethers.utils.parseEther("0.00000668"),
       };
 
       try {
-        const receipt = await sendEIP712Transaction(transaction, account2.address, provider, signer, guardian);
+        const receipt = await sendArgentTransaction(transaction, account2.address, argent.provider, signer, guardian);
         console.log(`Transaction hash is ${receipt.transactionHash}`);
       } catch (error) {
         console.log("Transfer failed");
@@ -104,9 +106,10 @@ describe("Argent account", () => {
 
   describe("Recovery", () => {
     let account: zksync.Contract;
+    let dapp: zksync.Contract;
 
-    it("Should deploy and fund the account", async () => {
-      account = await deployAccount(argent, signer.address, guardian.address);
+    before(async () => {
+      account = await deployAccount(argent, signer.address, guardian.address, ethers.utils.zeroPad([1], 32));
       const { zkWallet } = argent.deployer;
       const response = await zkWallet.transfer({
         to: account.address,
@@ -114,16 +117,53 @@ describe("Argent account", () => {
       });
       await response.wait();
       await logBalance(zkWallet.provider, account.address);
+
+      const dappArtifact = await argent.deployer.loadArtifact("TestDapp");
+      dapp = await argent.deployer.deploy(dappArtifact);
+    });
+
+    it("Dapp should work with an EOA", async () => {
+      expect(await dapp.userNumbers(signer.address)).to.equal(0n);
+      const response = await dapp.setNumber(42);
+      await response.wait();
+      expect(await dapp.userNumbers(signer.address)).to.equal(42n);
+    });
+
+    it("Dapp should work with the Argent account", async () => {
+      expect(await dapp.userNumbers(account.address)).to.equal(0n);
+      const transaction = await dapp.populateTransaction.setNumber(69);
+      await sendArgentTransaction(transaction, account.address, argent.provider, signer, guardian);
+      expect(await dapp.userNumbers(account.address)).to.equal(69n);
     });
 
     it("Should be initialized properly", async () => {
+      expect(await account.version()).to.equal("0.0.1");
       expect(await account.callStatic.signer()).to.equal(signer.address);
-      expect(await account.guadian()).to.equal(guardian.address);
+      expect(await account.guardian()).to.equal(guardian.address);
     });
 
-    it("Should refuse being initialized twice", async () => {
-      await expect(account.initialize(signer.address, guardian.address)).to.be.revertedWith("argent/already-init");
+    it("Should refuse to be initialized twice", async () => {
+      const eoaAccount = new zksync.Contract(
+        account.address,
+        argent.artifacts.implementation.abi,
+        argent.deployer.zkWallet,
+      );
+      expectRejection("argent/already-init", async () => {
+        const response = await eoaAccount.initialize(signer.address, guardian.address);
+        response.wait();
+      });
+      // below not working?
+      // await expect(eoaAccount.initialize(signer.address, guardian.address)).to.be.revertedWith("argent/already-init");
     });
-
   });
 });
+
+const expectRejection = async (errorMessage: string, promise: () => Promise<unknown>) => {
+  let message = "";
+  try {
+    await promise();
+  } catch (error) {
+    message = `${error}`;
+  }
+  expect(message).to.include(errorMessage);
+}

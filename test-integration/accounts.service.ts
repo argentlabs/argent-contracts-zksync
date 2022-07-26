@@ -1,10 +1,12 @@
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
+import { BytesLike } from "ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 
 export interface ArgentContext {
   deployer: Deployer;
+  provider: zksync.Provider;
   artifacts: ArgentArtifacts;
   implementation: zksync.Contract;
   factory: zksync.Contract;
@@ -20,8 +22,8 @@ export const deployAccount = async (
   argent: ArgentContext,
   signerAddress: string,
   guardianAddress: string,
+  salt: BytesLike = ethers.constants.HashZero,
 ): Promise<zksync.Contract> => {
-  const salt = ethers.constants.HashZero;
   const { factory, implementation } = argent;
 
   const create2Address = await getAccountAddressFromCreate2(argent, salt, signerAddress, guardianAddress);
@@ -45,7 +47,7 @@ export const deployAccount = async (
 
 const getAccountAddressFromCreate2 = async (
   { factory, implementation, artifacts }: ArgentContext,
-  salt: string,
+  salt: BytesLike,
   signerAddress: string,
   guardianAddress: string,
 ) => {
@@ -60,20 +62,19 @@ const getAccountAddressFromCreate2 = async (
 
 const getAccountAddressFromFactory = async (
   { factory, implementation }: ArgentContext,
-  salt: string,
+  salt: BytesLike,
   signerAddress: string,
   guardianAddress: string,
 ) => {
-  const [address] = await factory.functions.computeCreate2Address(
+  return await factory.callStatic.computeCreate2Address(
     salt,
     implementation.address,
     signerAddress,
     guardianAddress,
   );
-  return address;
 };
 
-export const sendEIP712Transaction = async (
+export const sendArgentTransaction = async (
   transaction: zksync.types.TransactionRequest,
   from: string,
   provider: zksync.Provider,
