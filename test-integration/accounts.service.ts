@@ -1,7 +1,7 @@
+import { ethers } from "hardhat";
+import { BytesLike } from "ethers";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
-import { BytesLike } from "ethers";
-import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 
 export interface ArgentContext {
@@ -66,21 +66,17 @@ const getAccountAddressFromFactory = async (
   signerAddress: string,
   guardianAddress: string,
 ) => {
-  return await factory.callStatic.computeCreate2Address(
-    salt,
-    implementation.address,
-    signerAddress,
-    guardianAddress,
-  );
+  return await factory.callStatic.computeCreate2Address(salt, implementation.address, signerAddress, guardianAddress);
 };
 
 export const sendArgentTransaction = async (
   transaction: zksync.types.TransactionRequest,
-  from: string,
+  from: string | zksync.Contract,
   provider: zksync.Provider,
-  signer: zksync.Wallet,
-  guardian: zksync.Wallet,
+  signatories: zksync.Wallet[],
 ) => {
+  from = typeof from !== "string" ? from.address : from;
+
   const { chainId } = await provider.getNetwork();
   const unsignedTransaction = {
     type: zksync.utils.EIP712_TX_TYPE,
@@ -97,10 +93,10 @@ export const sendArgentTransaction = async (
     },
   };
 
-  const signature = ethers.utils.concat([
-    await new zksync.EIP712Signer(signer, chainId).sign(unsignedTransaction),
-    await new zksync.EIP712Signer(guardian, chainId).sign(unsignedTransaction),
-  ]);
+  const signaturePromises = signatories.map((signatory) =>
+    new zksync.EIP712Signer(signatory, chainId).sign(unsignedTransaction),
+  );
+  const signature = ethers.utils.concat(await Promise.all(signaturePromises));
 
   const transactionRequest = {
     ...unsignedTransaction,

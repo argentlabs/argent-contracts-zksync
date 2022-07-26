@@ -1,21 +1,19 @@
 import hre, { ethers } from "hardhat";
+import { PopulatedTransaction } from "ethers";
 import * as zksync from "zksync-web3";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { expect } from "chai";
 import { ArgentArtifacts, ArgentContext, deployAccount, logBalance, sendArgentTransaction } from "./accounts.service";
 
 describe("Argent account", () => {
-  let signer: zksync.Wallet;
-  let guardian: zksync.Wallet;
-  let argent: ArgentContext;
+  const signer = new zksync.Wallet(process.env.PRIVATE_KEY as string);
+  const guardian = new zksync.Wallet(process.env.GUARDIAN_PRIVATE_KEY as string);
 
-  before(async () => {
-    signer = new zksync.Wallet(process.env.PRIVATE_KEY as string);
-    guardian = new zksync.Wallet(process.env.GUARDIAN_PRIVATE_KEY as string);
-  });
+  let argent: ArgentContext;
 
   describe("Infrastructure deployment", () => {
     let deployer: Deployer;
+    let provider: zksync.Provider;
     let artifacts: ArgentArtifacts;
     let implementation: zksync.Contract;
     let factory: zksync.Contract;
@@ -27,8 +25,8 @@ describe("Argent account", () => {
         factory: await deployer.loadArtifact("AccountFactory"),
         proxy: await deployer.loadArtifact("Proxy"),
       };
-      ethers.provider = deployer.zkWallet.provider; // needed for .getContractAt(...) in hardhat-ethers 
-      const balance = await deployer.zkWallet.provider.getBalance(signer.address);
+      provider = ethers.provider = deployer.zkWallet.provider; // needed for .getContractAt(...) in hardhat-ethers
+      const balance = await provider.getBalance(signer.address);
       console.log(`Signer ETH L2 balance is ${ethers.utils.formatEther(balance)}`);
     });
 
@@ -45,7 +43,6 @@ describe("Argent account", () => {
     });
 
     after(async () => {
-      const { provider } = deployer.zkWallet;
       argent = { deployer, provider, artifacts, implementation, factory };
     });
   });
@@ -82,7 +79,7 @@ describe("Argent account", () => {
         value: ethers.utils.parseEther("0.00002668"),
       };
 
-      const receipt = await sendArgentTransaction(transaction, account1.address, argent.provider, signer, guardian);
+      const receipt = await sendArgentTransaction(transaction, account1.address, argent.provider, [signer, guardian]);
       console.log(`Transaction hash is ${receipt.transactionHash}`);
 
       await logBalance(argent.provider, account1.address);
@@ -96,7 +93,7 @@ describe("Argent account", () => {
       };
 
       try {
-        const receipt = await sendArgentTransaction(transaction, account2.address, argent.provider, signer, guardian);
+        const receipt = await sendArgentTransaction(transaction, account2.address, argent.provider, [signer, guardian]);
         console.log(`Transaction hash is ${receipt.transactionHash}`);
       } catch (error) {
         console.log("Transfer failed");
@@ -105,8 +102,12 @@ describe("Argent account", () => {
   });
 
   describe("Recovery", () => {
+    const wrongSigner = zksync.Wallet.createRandom();
+    const wrongGuardian = zksync.Wallet.createRandom();
+
     let account: zksync.Contract;
     let dapp: zksync.Contract;
+    let dappTransaction: PopulatedTransaction;
 
     before(async () => {
       account = await deployAccount(argent, signer.address, guardian.address, ethers.utils.zeroPad([1], 32));
@@ -120,20 +121,7 @@ describe("Argent account", () => {
 
       const dappArtifact = await argent.deployer.loadArtifact("TestDapp");
       dapp = await argent.deployer.deploy(dappArtifact);
-    });
-
-    it("Dapp should work with an EOA", async () => {
-      expect(await dapp.userNumbers(signer.address)).to.equal(0n);
-      const response = await dapp.setNumber(42);
-      await response.wait();
-      expect(await dapp.userNumbers(signer.address)).to.equal(42n);
-    });
-
-    it("Dapp should work with the Argent account", async () => {
-      expect(await dapp.userNumbers(account.address)).to.equal(0n);
-      const transaction = await dapp.populateTransaction.setNumber(69);
-      await sendArgentTransaction(transaction, account.address, argent.provider, signer, guardian);
-      expect(await dapp.userNumbers(account.address)).to.equal(69n);
+      dappTransaction = await dapp.populateTransaction.setNumber(69);
     });
 
     it("Should be initialized properly", async () => {
@@ -152,18 +140,61 @@ describe("Argent account", () => {
         const response = await eoaAccount.initialize(signer.address, guardian.address);
         response.wait();
       });
-      // below not working?
-      // await expect(eoaAccount.initialize(signer.address, guardian.address)).to.be.revertedWith("argent/already-init");
+    });
+
+    it("Dapp with an EOA should work", async () => {
+      expect(await dapp.userNumbers(signer.address)).to.equal(0n);
+      const response = await dapp.setNumber(42);
+      await response.wait();
+      expect(await dapp.userNumbers(signer.address)).to.equal(42n);
+    });
+
+    describe("Dapp with guardian", () => {
+      it("should should successfully call the dapp", async () => {
+        expect(await dapp.userNumbers(account.address)).to.equal(0n);
+        await sendArgentTransaction(dappTransaction, account, argent.provider, [signer, guardian]);
+        expect(await dapp.userNumbers(account.address)).to.equal(69n);
+      });
+
+      it("should revert with bad nonce", async () => {
+        const transaction = { ...dappTransaction, nonce: 999 };
+        expectRejection("Tx nonce is incorrect", () =>
+          sendArgentTransaction(transaction, account, argent.provider, [signer, guardian])
+        );
+      });
+
+      it("should revert with bad signer", async () => {
+        expectRejection("argent/invalid-signer-signature", () =>
+          sendArgentTransaction(dappTransaction, account, argent.provider, [wrongSigner, guardian]),
+        );
+      });
+
+      it("should revert with bad guardian", async () => {
+        expectRejection("argent/invalid-guardian-signature", () =>
+          sendArgentTransaction(dappTransaction, account, argent.provider, [signer, wrongGuardian]),
+        );
+      });
+
+      it("should revert with only 1 signer", async () => {
+        expectRejection("argent/invalid-signature-length", () =>
+          sendArgentTransaction(dappTransaction, account, argent.provider, [signer]),
+        );
+      });
     });
   });
 });
 
-const expectRejection = async (errorMessage: string, promise: () => Promise<unknown>) => {
+// TODO: check why below not working?
+// await expect(promise).to.be.revertedWith("reason");
+const expectRejection = async (errorMessage: string, promise: Promise<unknown> | (() => Promise<unknown>)) => {
   let message = "";
   try {
-    await promise();
+    if (typeof promise === "function") {
+      promise = promise();
+    }
+    await promise;
   } catch (error) {
     message = `${error}`;
   }
   expect(message).to.include(errorMessage);
-}
+};
