@@ -81,7 +81,8 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     }
 
     function changeGuardian(address _newGuardian) public onlySelf {
-        require(!(guardianBackup != address(0) && _newGuardian == address(0)), "argent/null-guardian");
+        // TODO: next line to be reviewed by Julien
+        require(_newGuardian != address(0) || guardianBackup == address(0), "argent/null-guardian");
         guardian = _newGuardian;
         emit GuardianChanged(_newGuardian);
     }
@@ -165,7 +166,7 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
         // validateGuardianSignature(_hash, _signature);
     }
 
-   function validateSignerSignature(bytes32 _hash, bytes calldata _signature) internal view {
+    function validateSignerSignature(bytes32 _hash, bytes calldata _signature) internal view {
         address recovered = ECDSA.recover(_hash, _signature[:65]);
         require(recovered == signer, "argent/invalid-signer-signature");
     }

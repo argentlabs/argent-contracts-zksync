@@ -4,7 +4,7 @@ import * as zksync from "zksync-web3";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { expect } from "chai";
 import { ArgentArtifacts, ArgentContext, deployAccount, deployFundedAccount, logBalance } from "./account.service";
-import { sendTransaction, waitForTransaction } from "./transaction.service";
+import { makeTransactionSender, sendTransaction, TransactionSender, waitForTransaction } from "./transaction.service";
 
 describe("Argent account", () => {
   const signer = new zksync.Wallet(process.env.PRIVATE_KEY as string);
@@ -98,7 +98,7 @@ describe("Argent account", () => {
         value: ethers.utils.parseEther("0.00002668"),
       };
 
-      const receipt = await waitForTransaction(transaction, account1.address, provider, [signer, guardian]);
+      const { receipt } = await waitForTransaction(transaction, account1.address, provider, [signer, guardian]);
       console.log(`Transaction hash is ${receipt.transactionHash}`);
 
       await logBalance(provider, account1.address);
@@ -112,7 +112,7 @@ describe("Argent account", () => {
       };
 
       try {
-        const receipt = await waitForTransaction(transaction, account2.address, provider, [signer, guardian]);
+        const { receipt } = await waitForTransaction(transaction, account2.address, provider, [signer, guardian]);
         console.log(`Transaction hash is ${receipt.transactionHash}`);
       } catch (error) {
         console.log("Transfer failed");
@@ -142,40 +142,38 @@ describe("Argent account", () => {
 
     describe("Calling the dapp using a guardian", () => {
       let account: zksync.Contract;
+      let sender: TransactionSender;
 
       before(async () => {
         account = await deployFundedAccount(argent, signer.address, guardian.address);
+        sender = makeTransactionSender(account, provider);
       });
 
       it("should should successfully call the dapp", async () => {
         expect(await dapp.userNumbers(account.address)).to.equal(0n);
-        await waitForTransaction(dappTransaction, account, provider, [signer, guardian]);
+        await sender.waitForTransaction(dappTransaction, [signer, guardian]);
         expect(await dapp.userNumbers(account.address)).to.equal(69n);
       });
 
       it("should revert with bad nonce", async () => {
         const transaction = { ...dappTransaction, nonce: 999 };
-        expectRejection("Tx nonce is incorrect", () =>
-          waitForTransaction(transaction, account, provider, [signer, guardian]),
-        );
+        expectRejection("Tx nonce is incorrect", sender.waitForTransaction(transaction, [signer, guardian]));
       });
 
       it("should revert with bad signer", async () => {
         expectRejection("argent/invalid-signer-signature", () =>
-          waitForTransaction(dappTransaction, account, provider, [wrongSigner, guardian]),
+          sender.waitForTransaction(dappTransaction, [wrongSigner, guardian]),
         );
       });
 
       it("should revert with bad guardian", async () => {
         expectRejection("argent/invalid-guardian-signature", () =>
-          waitForTransaction(dappTransaction, account, provider, [signer, wrongGuardian]),
+          sender.waitForTransaction(dappTransaction, [signer, wrongGuardian]),
         );
       });
 
       it("should revert with only 1 signer", async () => {
-        expectRejection("argent/invalid-signature-length", () =>
-          waitForTransaction(dappTransaction, account, provider, [signer]),
-        );
+        expectRejection("argent/invalid-signature-length", () => sender.waitForTransaction(dappTransaction, [signer]));
       });
     });
 
@@ -183,22 +181,43 @@ describe("Argent account", () => {
       const newSigner = zksync.Wallet.createRandom();
 
       let account: zksync.Contract;
+      let sender: TransactionSender;
 
       before(async () => {
         account = await deployFundedAccount(argent, signer.address, ethers.constants.AddressZero);
+        sender = makeTransactionSender(account, provider);
       });
 
       it("should should successfully call the dapp", async () => {
         expect(await dapp.userNumbers(account.address)).to.equal(0n);
-        await waitForTransaction(dappTransaction, account, provider, [signer, guardian]);
+        await sender.waitForTransaction(dappTransaction, [signer, guardian]);
         expect(await dapp.userNumbers(account.address)).to.equal(69n);
       });
 
       it("should change the signer", async () => {
         expect(await account.callStatic.signer()).to.equal(signer.address);
+
         const transaction = await account.populateTransaction.changeSigner(newSigner.address);
-        await waitForTransaction(transaction, account, provider, [signer, 0]);
+        const { response } = await sender.waitForTransaction(transaction, [signer, 0]);
+
+        await expect(response).to.emit(account, "SignerChanged").withArgs(newSigner.address);
         expect(await account.callStatic.signer()).to.equal(newSigner.address);
+      });
+
+      it("should revert calls that require the guardian to be set", async () => {
+        const transaction = await account.populateTransaction.triggerEscapeGuardian();
+        const response = sender.sendTransaction(transaction, [newSigner, 0]);
+        await expect(response).to.be.reverted; // TODO: check why error reason doesn't bubble up
+      });
+
+      it("should add a guardian", async () => {
+        expect(await account.guardian()).to.equal(ethers.constants.AddressZero);
+
+        const transaction = await account.populateTransaction.changeGuardian(guardian.address);
+        const { response } = await sender.waitForTransaction(transaction, [newSigner, 0]);
+        await expect(response).to.emit(account, "GuardianChanged").withArgs(guardian.address);
+
+        expect(await account.guardian()).to.equal(guardian.address);
       });
     });
   });

@@ -6,9 +6,8 @@ export const sendTransaction = async (
   from: string | zksync.Contract,
   provider: zksync.Provider,
   signatories: Array<zksync.Wallet | 0>,
-  showSignature?: boolean,
 ) => {
-  from = typeof from !== "string" ? from.address : from;
+  from = typeof from === "string" ? from : from.address;
 
   const { chainId } = await provider.getNetwork();
   const unsignedTransaction = {
@@ -32,9 +31,6 @@ export const sendTransaction = async (
       : new zksync.EIP712Signer(signatory, chainId).sign(unsignedTransaction),
   );
   const signature = ethers.utils.concat(await Promise.all(signaturePromises));
-  if (showSignature) {
-    console.log("signature", signature)
-  }
 
   const transactionRequest = {
     ...unsignedTransaction,
@@ -51,5 +47,14 @@ export const sendTransaction = async (
 export const waitForTransaction = async (...args: Parameters<typeof sendTransaction>) => {
   const response = await sendTransaction(...args);
   const receipt = await response.wait();
-  return receipt;
+  return { response, receipt };
 };
+
+export const makeTransactionSender = (from: string | zksync.Contract, provider: zksync.Provider) => ({
+  sendTransaction: (transaction: zksync.types.TransactionRequest, signatories: Array<zksync.Wallet | 0>) =>
+    sendTransaction(transaction, from, provider, signatories),
+  waitForTransaction: (transaction: zksync.types.TransactionRequest, signatories: Array<zksync.Wallet | 0>) =>
+    waitForTransaction(transaction, from, provider, signatories),
+});
+
+export type TransactionSender = ReturnType<typeof makeTransactionSender>;
