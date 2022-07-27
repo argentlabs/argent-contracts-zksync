@@ -6,7 +6,6 @@ import * as zksync from "zksync-web3";
 
 export interface ArgentContext {
   deployer: Deployer;
-  provider: zksync.Provider;
   artifacts: ArgentArtifacts;
   implementation: zksync.Contract;
   factory: zksync.Contract;
@@ -22,8 +21,9 @@ export const deployAccount = async (
   argent: ArgentContext,
   signerAddress: string,
   guardianAddress: string,
-  salt: BytesLike = ethers.constants.HashZero,
+  salt?: BytesLike,
 ): Promise<zksync.Contract> => {
+  salt ??= ethers.utils.randomBytes(32);
   const { factory, implementation } = argent;
 
   const create2Address = await getAccountAddressFromCreate2(argent, salt, signerAddress, guardianAddress);
@@ -42,6 +42,18 @@ export const deployAccount = async (
   }
 
   const account = await ethers.getContractAt("ArgentAccount", deployedAddress);
+  return account;
+};
+
+export const deployFundedAccount: typeof deployAccount = async (argent, signerAddress, guardianAddress, salt) => {
+  const account = await deployAccount(argent, signerAddress, guardianAddress, salt);
+
+  const response = await argent.deployer.zkWallet.transfer({
+    to: account.address,
+    amount: ethers.utils.parseEther("0.0001"),
+  });
+  await response.wait();
+
   return account;
 };
 
@@ -67,49 +79,6 @@ const getAccountAddressFromFactory = async (
   guardianAddress: string,
 ) => {
   return await factory.callStatic.computeCreate2Address(salt, implementation.address, signerAddress, guardianAddress);
-};
-
-export const sendArgentTransaction = async (
-  transaction: zksync.types.TransactionRequest,
-  from: string | zksync.Contract,
-  provider: zksync.Provider,
-  signatories: zksync.Wallet[],
-) => {
-  from = typeof from !== "string" ? from.address : from;
-
-  const { chainId } = await provider.getNetwork();
-  const unsignedTransaction = {
-    type: zksync.utils.EIP712_TX_TYPE,
-    to: transaction.to,
-    data: transaction.data ?? "0x",
-    value: transaction.value ?? "0x0",
-    chainId: transaction.chainId ?? chainId,
-    gasPrice: transaction.gasPrice ?? (await provider.getGasPrice()),
-    gasLimit: transaction.gasLimit ?? (await provider.estimateGas(transaction)),
-    nonce: transaction.nonce ?? (await provider.getTransactionCount(from)),
-    customData: {
-      ergsPerPubdata: transaction.customData?.ergsPerPubData ?? 0,
-      feeToken: transaction.customData?.feeToken ?? zksync.utils.ETH_ADDRESS,
-    },
-  };
-
-  const signaturePromises = signatories.map((signatory) =>
-    new zksync.EIP712Signer(signatory, chainId).sign(unsignedTransaction),
-  );
-  const signature = ethers.utils.concat(await Promise.all(signaturePromises));
-
-  const transactionRequest = {
-    ...unsignedTransaction,
-    customData: {
-      ...unsignedTransaction.customData,
-      aaParams: { from, signature },
-    },
-  };
-
-  const serialized = zksync.utils.serialize(transactionRequest);
-  const response = await provider.sendTransaction(serialized);
-  const receipt = await response.wait();
-  return receipt;
 };
 
 export const logBalance = async (provider: zksync.Provider, address: string) => {
