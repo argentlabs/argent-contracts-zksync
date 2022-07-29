@@ -3,7 +3,6 @@ import { PopulatedTransaction } from "ethers";
 import * as zksync from "zksync-web3";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { expect } from "chai";
-import "chai-as-promised";
 import { ArgentArtifacts, ArgentContext, deployAccount, deployFundedAccount } from "./account.service";
 import { TransactionSender, waitForTransaction } from "./transaction.service";
 
@@ -11,6 +10,7 @@ const signer = new zksync.Wallet(process.env.PRIVATE_KEY as string);
 const guardian = new zksync.Wallet(process.env.GUARDIAN_PRIVATE_KEY as string);
 const newSigner = zksync.Wallet.createRandom();
 const newGuardian = zksync.Wallet.createRandom();
+const newGuardianBackup = zksync.Wallet.createRandom();
 const wrongSigner = zksync.Wallet.createRandom();
 const wrongGuardian = zksync.Wallet.createRandom();
 const deployer = new Deployer(hre, signer);
@@ -279,6 +279,44 @@ describe("Argent account", () => {
 
         await expect(response).to.emit(account, "GuardianChanged").withArgs(newGuardian.address);
         expect(await account.guardian()).to.equal(newGuardian.address);
+      });
+    });
+
+    describe("Changing guardian backup", () => {
+      let account: zksync.Contract;
+      let sender: TransactionSender;
+      let transaction: PopulatedTransaction;
+
+      before(async () => {
+        [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
+        transaction = await account.populateTransaction.changeGuardianBackup(newGuardianBackup.address);
+      });
+
+      it("should revert with the wrong signer signature", async () => {
+        const promise = sender.sendTransaction(transaction, [wrongSigner, guardian]);
+        expect(promise).to.be.rejectedWith("argent/invalid-signer-signature");
+      });
+
+      it("should revert with the wrong guardian signature", async () => {
+        const promise = sender.sendTransaction(transaction, [signer, wrongGuardian]);
+        expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
+      });
+
+      it("should work with the correct signatures", async () => {
+        expect(await account.guardianBackup()).to.equal(ethers.constants.AddressZero);
+
+        const { response } = await sender.waitForTransaction(transaction, [signer, guardian]);
+
+        await expect(response).to.emit(account, "GuardianBackupChanged").withArgs(newGuardianBackup.address);
+        expect(await account.guardianBackup()).to.equal(newGuardianBackup.address);
+      });
+
+      it("should fail when no guardian", async () => {
+        const [, senderNoGuardian] = await deployFundedAccount(argent, signer.address, ethers.constants.AddressZero);
+
+        const promise = senderNoGuardian.waitForTransaction(transaction, [signer, 0]);
+        // FIXME: investigate why the correct error reason doesn't bubble up
+        await expect(promise).to.be.rejectedWith("transaction failed");
       });
     });
   });
