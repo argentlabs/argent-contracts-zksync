@@ -4,7 +4,7 @@ import * as zksync from "zksync-web3";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { expect } from "chai";
 import "chai-as-promised";
-import { ArgentArtifacts, ArgentContext, deployAccount, deployFundedAccount, logBalance } from "./account.service";
+import { ArgentArtifacts, ArgentContext, deployAccount, deployFundedAccount } from "./account.service";
 import { TransactionSender, waitForTransaction } from "./transaction.service";
 
 const signer = new zksync.Wallet(process.env.PRIVATE_KEY as string);
@@ -35,14 +35,14 @@ describe("Argent account", () => {
 
     it("Should deploy a new ArgentAccount implementation", async () => {
       implementation = await deployer.deploy(artifacts.implementation, []);
-      console.log(`Account implementation deployed to ${implementation.address}`);
+      console.log(`        Account implementation deployed to ${implementation.address}`);
     });
 
     it("Should deploy a new AccountFactory", async () => {
       const { bytecode } = artifacts.proxy;
       const proxyBytecodeHash = zksync.utils.hashBytecode(bytecode);
       factory = await deployer.deploy(artifacts.factory, [proxyBytecodeHash], undefined, [bytecode]);
-      console.log(`Account factory deployed to ${factory.address}`);
+      console.log(`        Account factory deployed to ${factory.address}`);
     });
 
     after(async () => {
@@ -79,36 +79,39 @@ describe("Argent account", () => {
 
     it("Should deploy a new account (1)", async () => {
       account1 = await deployAccount(argent, signer.address, guardian.address);
-      console.log(`Account 1 deployed to ${account1.address}`);
+      console.log(`        Account 1 deployed to ${account1.address}`);
     });
 
     it("Should deploy a new account (2)", async () => {
       account2 = await deployAccount(argent, "0xEA674fdDe714fd979de3EdF0F56AA9716B898ec8", guardian.address);
-      console.log(`Account 2 deployed to ${account2.address}`);
+      console.log(`        Account 2 deployed to ${account2.address}`);
     });
 
     it("Should fund account 1 from signer key", async () => {
-      const response = await deployer.zkWallet.transfer({
-        to: account1.address,
-        amount: ethers.utils.parseEther("0.0001"),
-      });
+      const amount = ethers.utils.parseEther("0.0001");
+      const balanceBefore = await provider.getBalance(account1.address);
+
+      const response = await deployer.zkWallet.transfer({ to: account1.address, amount });
       await response.wait();
 
-      await logBalance(provider, account1.address);
-      await logBalance(provider, account2.address);
+      const balanceAfter = await provider.getBalance(account1.address);
+      expect(balanceAfter.sub(balanceBefore)).to.equal(amount);
     });
 
     it("Should transfer ETH from account 1 to account 2", async () => {
-      const transaction = {
-        to: account2.address,
-        value: ethers.utils.parseEther("0.00002668"),
-      };
+      const amount = ethers.utils.parseEther("0.00002668");
+      const balanceBefore1 = await provider.getBalance(account1.address);
+      const balanceBefore2 = await provider.getBalance(account2.address);
 
-      const { receipt } = await waitForTransaction(transaction, account1.address, provider, [signer, guardian]);
-      console.log(`Transaction hash is ${receipt.transactionHash}`);
+      const transaction = { to: account2.address, value: amount };
+      await waitForTransaction(transaction, account1.address, provider, [signer, guardian]);
 
-      await logBalance(provider, account1.address);
-      await logBalance(provider, account2.address);
+      const balanceAfter1 = await provider.getBalance(account1.address);
+      const balanceAfter2 = await provider.getBalance(account2.address);
+
+      expect(balanceBefore2).to.equal(0n);
+      expect(balanceAfter1).to.be.lessThan(balanceBefore1.sub(amount)); // account for paid gas
+      expect(balanceAfter2).to.equal(amount);
     });
 
     it("Should fail to transfer ETH from account 2 to account 1", async () => {
@@ -117,12 +120,8 @@ describe("Argent account", () => {
         value: ethers.utils.parseEther("0.00000668"),
       };
 
-      try {
-        const { receipt } = await waitForTransaction(transaction, account2.address, provider, [signer, guardian]);
-        console.log(`Transaction hash is ${receipt.transactionHash}`);
-      } catch (error) {
-        console.log("Transfer failed");
-      }
+      const promise = waitForTransaction(transaction, account2.address, provider, [signer, guardian]);
+      expect(promise).to.be.revertedWith("transaction failed");
     });
   });
 
@@ -167,7 +166,7 @@ describe("Argent account", () => {
         await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
       });
 
-      it("should revert with only 1 signer", async () => {
+      it("should revert with just 1 signer", async () => {
         const promise = sender.waitForTransaction(dappTransaction, [signer]);
         await expect(promise).to.be.rejectedWith("argent/invalid-signature-length");
       });
