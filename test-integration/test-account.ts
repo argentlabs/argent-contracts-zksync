@@ -7,18 +7,22 @@ import "chai-as-promised";
 import { ArgentArtifacts, ArgentContext, deployAccount, deployFundedAccount, logBalance } from "./account.service";
 import { makeTransactionSender, TransactionSender, waitForTransaction } from "./transaction.service";
 
-describe("Argent account", () => {
-  const signer = new zksync.Wallet(process.env.PRIVATE_KEY as string);
-  const guardian = new zksync.Wallet(process.env.GUARDIAN_PRIVATE_KEY as string);
-  const deployer = new Deployer(hre, signer);
-  const provider = (ethers.provider = deployer.zkWallet.provider); // needed for hardhat-ethers's .getContractAt(...)
+const signer = new zksync.Wallet(process.env.PRIVATE_KEY as string);
+const guardian = new zksync.Wallet(process.env.GUARDIAN_PRIVATE_KEY as string);
+const newSigner = zksync.Wallet.createRandom();
+const newGuardian = zksync.Wallet.createRandom();
+const wrongSigner = zksync.Wallet.createRandom();
+const wrongGuardian = zksync.Wallet.createRandom();
+const deployer = new Deployer(hre, signer);
+const provider = (ethers.provider = deployer.zkWallet.provider); // needed for hardhat-ethers's .getContractAt(...)
 
+describe("Argent account", () => {
   let artifacts: ArgentArtifacts;
   let implementation: zksync.Contract;
   let factory: zksync.Contract;
   let argent: ArgentContext;
 
-  describe("Infrastructure deployment", () => {
+  describe.only("Infrastructure deployment", () => {
     before(async () => {
       artifacts = {
         implementation: await deployer.loadArtifact("ArgentAccount"),
@@ -122,10 +126,7 @@ describe("Argent account", () => {
     });
   });
 
-  describe("Using a dapp", () => {
-    const wrongSigner = zksync.Wallet.createRandom();
-    const wrongGuardian = zksync.Wallet.createRandom();
-
+  describe.only("Using a dapp", () => {
     let dapp: zksync.Contract;
     let dappTransaction: PopulatedTransaction;
 
@@ -151,12 +152,6 @@ describe("Argent account", () => {
         sender = makeTransactionSender(account, provider);
       });
 
-      it("should should successfully call the dapp", async () => {
-        expect(await dapp.userNumbers(account.address)).to.equal(0n);
-        await sender.waitForTransaction(dappTransaction, [signer, guardian]);
-        expect(await dapp.userNumbers(account.address)).to.equal(69n);
-      });
-
       it("should revert with bad nonce", async () => {
         const transaction = { ...dappTransaction, nonce: 999 };
         const promise = sender.waitForTransaction(transaction, [signer, guardian]);
@@ -165,23 +160,27 @@ describe("Argent account", () => {
 
       it("should revert with bad signer", async () => {
         const promise = sender.waitForTransaction(dappTransaction, [wrongSigner, guardian]);
-        expect(promise).to.be.rejectedWith("argent/invalid-signer-signature");
+        await expect(promise).to.be.rejectedWith("argent/invalid-signer-signature");
       });
 
       it("should revert with bad guardian", async () => {
         const promise = sender.waitForTransaction(dappTransaction, [signer, wrongGuardian]);
-        expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
+        await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
       });
 
       it("should revert with only 1 signer", async () => {
         const promise = sender.waitForTransaction(dappTransaction, [signer]);
-        expect(promise).to.be.rejectedWith("argent/invalid-signature-length");
+        await expect(promise).to.be.rejectedWith("argent/invalid-signature-length");
+      });
+
+      it("should successfully call the dapp", async () => {
+        expect(await dapp.userNumbers(account.address)).to.equal(0n);
+        await sender.waitForTransaction(dappTransaction, [signer, guardian]);
+        expect(await dapp.userNumbers(account.address)).to.equal(69n);
       });
     });
 
     describe("Calling the dapp without using a guardian", () => {
-      const newSigner = zksync.Wallet.createRandom();
-
       let account: zksync.Contract;
       let sender: TransactionSender;
 
@@ -190,9 +189,9 @@ describe("Argent account", () => {
         sender = makeTransactionSender(account, provider);
       });
 
-      it("should should successfully call the dapp", async () => {
+      it("should successfully call the dapp", async () => {
         expect(await dapp.userNumbers(account.address)).to.equal(0n);
-        await sender.waitForTransaction(dappTransaction, [signer, guardian]);
+        await sender.waitForTransaction(dappTransaction, [signer, 0]);
         expect(await dapp.userNumbers(account.address)).to.equal(69n);
       });
 
@@ -206,9 +205,11 @@ describe("Argent account", () => {
         expect(await account.callStatic.signer()).to.equal(newSigner.address);
       });
 
-      it.skip("should revert calls that require the guardian to be set", async () => {
-        const transaction = await account.populateTransaction.triggerEscapeGuardian();
-        expect(sender.sendTransaction(transaction, [newSigner, 0])).to.be.rejectedWith("transaction failed");
+      it("should revert calls that require the guardian to be set", async () => {
+        const transaction = await account.populateTransaction.changeGuardianBackup(wrongGuardian.address);
+        const promise = sender.waitForTransaction(transaction, [newSigner, 0]);
+        // FIXME: investigate why the correct error reason doesn't bubble up
+        await expect(promise).to.be.rejectedWith("transaction failed");
       });
 
       it("should add a guardian", async () => {
