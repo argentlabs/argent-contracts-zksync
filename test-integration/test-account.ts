@@ -5,7 +5,7 @@ import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { expect } from "chai";
 import "chai-as-promised";
 import { ArgentArtifacts, ArgentContext, deployAccount, deployFundedAccount, logBalance } from "./account.service";
-import { makeTransactionSender, TransactionSender, waitForTransaction } from "./transaction.service";
+import { TransactionSender, waitForTransaction } from "./transaction.service";
 
 const signer = new zksync.Wallet(process.env.PRIVATE_KEY as string);
 const guardian = new zksync.Wallet(process.env.GUARDIAN_PRIVATE_KEY as string);
@@ -148,8 +148,7 @@ describe("Argent account", () => {
       let sender: TransactionSender;
 
       before(async () => {
-        account = await deployFundedAccount(argent, signer.address, guardian.address);
-        sender = makeTransactionSender(account, provider);
+        [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
       });
 
       it("should revert with bad nonce", async () => {
@@ -185,8 +184,7 @@ describe("Argent account", () => {
       let sender: TransactionSender;
 
       before(async () => {
-        account = await deployFundedAccount(argent, signer.address, ethers.constants.AddressZero);
-        sender = makeTransactionSender(account, provider);
+        [account, sender] = await deployFundedAccount(argent, signer.address, ethers.constants.AddressZero);
       });
 
       it("should successfully call the dapp", async () => {
@@ -231,8 +229,7 @@ describe("Argent account", () => {
       let transaction: PopulatedTransaction;
 
       before(async () => {
-        account = await deployFundedAccount(argent, signer.address, guardian.address);
-        sender = makeTransactionSender(account, provider);
+        [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
         transaction = await account.populateTransaction.changeSigner(newSigner.address);
       });
 
@@ -262,8 +259,7 @@ describe("Argent account", () => {
       let transaction: PopulatedTransaction;
 
       before(async () => {
-        account = await deployFundedAccount(argent, signer.address, guardian.address);
-        sender = makeTransactionSender(account, provider);
+        [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
         transaction = await account.populateTransaction.changeGuardian(newGuardian.address);
       });
 
