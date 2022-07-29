@@ -1,6 +1,7 @@
+import { ethers } from "hardhat";
+import { BytesLike } from "ethers";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
-import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 
 export interface ArgentContext {
@@ -20,8 +21,9 @@ export const deployAccount = async (
   argent: ArgentContext,
   signerAddress: string,
   guardianAddress: string,
-): Promise<string> => {
-  const salt = ethers.constants.HashZero;
+  salt?: BytesLike,
+): Promise<zksync.Contract> => {
+  salt ??= ethers.utils.randomBytes(32);
   const { factory, implementation } = argent;
 
   const create2Address = await getAccountAddressFromCreate2(argent, salt, signerAddress, guardianAddress);
@@ -39,12 +41,25 @@ export const deployAccount = async (
     throw new Error(`Deployed address (${deployedAddress}) != address predicted from factory (${factoryAddress})`);
   }
 
-  return deployedAddress;
+  const account = await ethers.getContractAt("ArgentAccount", deployedAddress);
+  return account;
+};
+
+export const deployFundedAccount: typeof deployAccount = async (argent, signerAddress, guardianAddress, salt) => {
+  const account = await deployAccount(argent, signerAddress, guardianAddress, salt);
+
+  const response = await argent.deployer.zkWallet.transfer({
+    to: account.address,
+    amount: ethers.utils.parseEther("0.0001"),
+  });
+  await response.wait();
+
+  return account;
 };
 
 const getAccountAddressFromCreate2 = async (
   { factory, implementation, artifacts }: ArgentContext,
-  salt: string,
+  salt: BytesLike,
   signerAddress: string,
   guardianAddress: string,
 ) => {
@@ -59,59 +74,11 @@ const getAccountAddressFromCreate2 = async (
 
 const getAccountAddressFromFactory = async (
   { factory, implementation }: ArgentContext,
-  salt: string,
+  salt: BytesLike,
   signerAddress: string,
   guardianAddress: string,
 ) => {
-  const [address] = await factory.functions.computeCreate2Address(
-    salt,
-    implementation.address,
-    signerAddress,
-    guardianAddress,
-  );
-  return address;
-};
-
-export const sendEIP712Transaction = async (
-  transaction: zksync.types.TransactionRequest,
-  from: string,
-  provider: zksync.Provider,
-  signer: zksync.Wallet,
-  guardian: zksync.Wallet,
-) => {
-  const { chainId } = await provider.getNetwork();
-  const unsignedTransaction = {
-    type: zksync.utils.EIP712_TX_TYPE,
-    to: transaction.to,
-    data: transaction.data ?? "0x",
-    value: transaction.value ?? "0x0",
-    chainId: transaction.chainId ?? chainId,
-    gasPrice: transaction.gasPrice ?? (await provider.getGasPrice()),
-    gasLimit: transaction.gasLimit ?? (await provider.estimateGas(transaction)),
-    nonce: transaction.nonce ?? (await provider.getTransactionCount(from)),
-    customData: {
-      ergsPerPubdata: transaction.customData?.ergsPerPubData ?? 0,
-      feeToken: transaction.customData?.feeToken ?? zksync.utils.ETH_ADDRESS,
-    },
-  };
-
-  const signature = ethers.utils.concat([
-    await new zksync.EIP712Signer(signer, chainId).sign(unsignedTransaction),
-    await new zksync.EIP712Signer(guardian, chainId).sign(unsignedTransaction),
-  ]);
-
-  const transactionRequest = {
-    ...unsignedTransaction,
-    customData: {
-      ...unsignedTransaction.customData,
-      aaParams: { from, signature },
-    },
-  };
-
-  const serialized = zksync.utils.serialize(transactionRequest);
-  const response = await provider.sendTransaction(serialized);
-  const receipt = await response.wait();
-  return receipt;
+  return await factory.callStatic.computeCreate2Address(salt, implementation.address, signerAddress, guardianAddress);
 };
 
 export const logBalance = async (provider: zksync.Provider, address: string) => {

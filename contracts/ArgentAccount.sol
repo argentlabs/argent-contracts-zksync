@@ -22,10 +22,11 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
         uint8 escapeType; // packed EscapeType enum
     }
 
+    string public constant version = "0.0.1";
     uint8 public constant noEscape = uint8(EscapeType.None);
     uint8 public constant guardianEscape = uint8(EscapeType.Guardian);
     uint8 public constant signerEscape = uint8(EscapeType.Signer);
-    uint256 public constant escapeSecurityPeriod = 1 weeks;
+    uint96 public constant escapeSecurityPeriod = 1 weeks;
     bytes4 constant eip1271SuccessReturnValue = 0x1626ba7e;
 
     address public signer;
@@ -80,7 +81,8 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     }
 
     function changeGuardian(address _newGuardian) public onlySelf {
-        require(!(guardianBackup != address(0) && _newGuardian == address(0)), "argent/null-guardian");
+        // TODO: next line to be reviewed by Julien
+        require(_newGuardian != address(0) || guardianBackup == address(0), "argent/null-guardian");
         guardian = _newGuardian;
         emit GuardianChanged(_newGuardian);
     }
@@ -96,13 +98,13 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
             require(escape.escapeType == signerEscape, "argent/cannot-override-signer-escape");
         }
 
-        uint96 activeAt = uint96(block.timestamp + escapeSecurityPeriod);
+        uint96 activeAt = uint96(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(activeAt, signerEscape);
         emit EscapeSignerTriggerred(activeAt);
     }
 
     function triggerEscapeGuardian() public onlySelf requireGuardian {
-        uint96 activeAt = uint96(block.timestamp + escapeSecurityPeriod);
+        uint96 activeAt = uint96(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(activeAt, guardianEscape);
         emit EscapeGuardianTriggerred(activeAt);
     }
@@ -164,7 +166,7 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
         // validateGuardianSignature(_hash, _signature);
     }
 
-   function validateSignerSignature(bytes32 _hash, bytes calldata _signature) internal view {
+    function validateSignerSignature(bytes32 _hash, bytes calldata _signature) internal view {
         address recovered = ECDSA.recover(_hash, _signature[:65]);
         require(recovered == signer, "argent/invalid-signer-signature");
     }
