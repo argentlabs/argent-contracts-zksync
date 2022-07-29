@@ -22,7 +22,7 @@ describe("Argent account", () => {
   let factory: zksync.Contract;
   let argent: ArgentContext;
 
-  describe.only("Infrastructure deployment", () => {
+  describe("Infrastructure deployment", () => {
     before(async () => {
       artifacts = {
         implementation: await deployer.loadArtifact("ArgentAccount"),
@@ -126,7 +126,7 @@ describe("Argent account", () => {
     });
   });
 
-  describe.only("Using a dapp", () => {
+  describe("Using a dapp", () => {
     let dapp: zksync.Contract;
     let dappTransaction: PopulatedTransaction;
 
@@ -217,9 +217,73 @@ describe("Argent account", () => {
 
         const transaction = await account.populateTransaction.changeGuardian(guardian.address);
         const { response } = await sender.waitForTransaction(transaction, [newSigner, 0]);
-        await expect(response).to.emit(account, "GuardianChanged").withArgs(guardian.address);
 
+        await expect(response).to.emit(account, "GuardianChanged").withArgs(guardian.address);
         expect(await account.guardian()).to.equal(guardian.address);
+      });
+    });
+  });
+
+  describe("Recovery", () => {
+    describe("Changing signer", () => {
+      let account: zksync.Contract;
+      let sender: TransactionSender;
+      let transaction: PopulatedTransaction;
+
+      before(async () => {
+        account = await deployFundedAccount(argent, signer.address, guardian.address);
+        sender = makeTransactionSender(account, provider);
+        transaction = await account.populateTransaction.changeSigner(newSigner.address);
+      });
+
+      it("should revert with the wrong signer signature", async () => {
+        const promise = sender.sendTransaction(transaction, [wrongSigner, guardian]);
+        expect(promise).to.be.rejectedWith("argent/invalid-signer-signature");
+      });
+
+      it("should revert with the wrong guardian signature", async () => {
+        const promise = sender.sendTransaction(transaction, [signer, wrongGuardian]);
+        expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
+      });
+
+      it("should work with the correct signatures", async () => {
+        expect(await account.callStatic.signer()).to.equal(signer.address);
+
+        const { response } = await sender.waitForTransaction(transaction, [signer, guardian]);
+
+        await expect(response).to.emit(account, "SignerChanged").withArgs(newSigner.address);
+        expect(await account.callStatic.signer()).to.equal(newSigner.address);
+      });
+    });
+
+    describe("Changing guardian", () => {
+      let account: zksync.Contract;
+      let sender: TransactionSender;
+      let transaction: PopulatedTransaction;
+
+      before(async () => {
+        account = await deployFundedAccount(argent, signer.address, guardian.address);
+        sender = makeTransactionSender(account, provider);
+        transaction = await account.populateTransaction.changeGuardian(newGuardian.address);
+      });
+
+      it("should revert with the wrong signer signature", async () => {
+        const promise = sender.sendTransaction(transaction, [wrongSigner, guardian]);
+        expect(promise).to.be.rejectedWith("argent/invalid-signer-signature");
+      });
+
+      it("should revert with the wrong guardian signature", async () => {
+        const promise = sender.sendTransaction(transaction, [signer, wrongGuardian]);
+        expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
+      });
+
+      it("should work with the correct signatures", async () => {
+        expect(await account.guardian()).to.equal(guardian.address);
+
+        const { response } = await sender.waitForTransaction(transaction, [signer, guardian]);
+
+        await expect(response).to.emit(account, "GuardianChanged").withArgs(newGuardian.address);
+        expect(await account.guardian()).to.equal(newGuardian.address);
       });
     });
   });
