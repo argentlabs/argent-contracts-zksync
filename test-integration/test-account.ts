@@ -169,7 +169,7 @@ describe("Argent account", () => {
 
       it("should revert with just 1 signer", async () => {
         const promise = sender.waitForTransaction(dappTransaction, [signer]);
-        await expect(promise).to.be.rejectedWith("argent/invalid-signature-length");
+        await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature-length");
       });
 
       it("should successfully call the dapp", async () => {
@@ -189,7 +189,7 @@ describe("Argent account", () => {
 
       it("should successfully call the dapp", async () => {
         expect(await dapp.userNumbers(account.address)).to.equal(0n);
-        await sender.waitForTransaction(dappTransaction, [signer, 0]);
+        await sender.waitForTransaction(dappTransaction, [signer]);
         expect(await dapp.userNumbers(account.address)).to.equal(69n);
       });
 
@@ -197,7 +197,7 @@ describe("Argent account", () => {
         expect(await account.callStatic.signer()).to.equal(signer.address);
 
         const transaction = await account.populateTransaction.changeSigner(newSigner.address);
-        const { response } = await sender.waitForTransaction(transaction, [signer, 0]);
+        const { response } = await sender.waitForTransaction(transaction, [signer]);
 
         await expect(response).to.emit(account, "SignerChanged").withArgs(newSigner.address);
         expect(await account.callStatic.signer()).to.equal(newSigner.address);
@@ -214,7 +214,7 @@ describe("Argent account", () => {
         expect(await account.guardian()).to.equal(ethers.constants.AddressZero);
 
         const transaction = await account.populateTransaction.changeGuardian(guardian.address);
-        const { response } = await sender.waitForTransaction(transaction, [newSigner, 0]);
+        const { response } = await sender.waitForTransaction(transaction, [newSigner]);
 
         await expect(response).to.emit(account, "GuardianChanged").withArgs(guardian.address);
         expect(await account.guardian()).to.equal(guardian.address);
@@ -321,7 +321,7 @@ describe("Argent account", () => {
       });
     });
 
-    describe("Escape trigerring", () => {
+    describe("Escape triggering", () => {
       it("should run triggerEscapeGuardian() by signer", async () => {
         const [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
         const transaction = await account.populateTransaction.triggerEscapeGuardian();
@@ -330,7 +330,7 @@ describe("Argent account", () => {
         expect(escapeBefore.activeAt).to.equal(0n);
         expect(escapeBefore.escapeType).to.equal(await account.noEscape());
 
-        const { response, receipt } = await sender.waitForTransaction(transaction, [signer, 0]);
+        const { response, receipt } = await sender.waitForTransaction(transaction, [signer]);
         const { timestamp } = await provider.getBlock(receipt.blockHash);
         const activeAtExpected = timestamp + oneWeek;
         await expect(response).to.emit(account, "EscapeGuardianTriggerred").withArgs(activeAtExpected);
@@ -348,7 +348,7 @@ describe("Argent account", () => {
         expect(escapeBefore.activeAt).to.equal(0n);
         expect(escapeBefore.escapeType).to.equal(await account.noEscape());
 
-        const { response, receipt } = await sender.waitForTransaction(transaction, [0, guardian]);
+        const { response, receipt } = await sender.waitForTransaction(transaction, [guardian]);
         const { timestamp } = await provider.getBlock(receipt.blockHash);
         const activeAtExpected = timestamp + oneWeek;
         await expect(response).to.emit(account, "EscapeSignerTriggerred").withArgs(activeAtExpected);
@@ -358,7 +358,7 @@ describe("Argent account", () => {
         expect(escapeAfter.escapeType).to.equal(await account.signerEscape());
       });
 
-      it.skip("should run triggerEscapeSigner() by guardian backup", async () => {
+      it("should run triggerEscapeSigner() by guardian backup", async () => {
         const [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
         const backupTransaction = await account.populateTransaction.changeGuardianBackup(newGuardianBackup.address);
         await sender.waitForTransaction(backupTransaction, [signer, guardian]);
