@@ -15,6 +15,7 @@ const wrongSigner = zksync.Wallet.createRandom();
 const wrongGuardian = zksync.Wallet.createRandom();
 const deployer = new Deployer(hre, signer);
 const provider = (ethers.provider = deployer.zkWallet.provider); // needed for hardhat-ethers's .getContractAt(...)
+const oneWeek = 7 * 24 * 60 * 60;
 
 describe("Argent account", () => {
   let artifacts: ArgentArtifacts;
@@ -121,7 +122,7 @@ describe("Argent account", () => {
       };
 
       const promise = waitForTransaction(transaction, account2.address, provider, [signer, guardian]);
-      expect(promise).to.be.revertedWith("transaction failed");
+      expect(promise).to.be.rejectedWith(/transaction failed|invalid hash/);
     });
   });
 
@@ -206,7 +207,7 @@ describe("Argent account", () => {
         const transaction = await account.populateTransaction.changeGuardianBackup(wrongGuardian.address);
         const promise = sender.waitForTransaction(transaction, [newSigner, 0]);
         // FIXME: investigate why the correct error reason doesn't bubble up
-        await expect(promise).to.be.rejectedWith("transaction failed");
+        await expect(promise).to.be.rejectedWith(/transaction failed|invalid hash/);
       });
 
       it("should add a guardian", async () => {
@@ -316,7 +317,65 @@ describe("Argent account", () => {
 
         const promise = senderNoGuardian.waitForTransaction(transaction, [signer, 0]);
         // FIXME: investigate why the correct error reason doesn't bubble up
-        await expect(promise).to.be.rejectedWith("transaction failed");
+        await expect(promise).to.be.rejectedWith(/transaction failed|invalid hash/);
+      });
+    });
+
+    describe("Escape trigerring", () => {
+      it("should run triggerEscapeGuardian() by signer", async () => {
+        const [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
+        const transaction = await account.populateTransaction.triggerEscapeGuardian();
+
+        const escapeBefore = await account.escape();
+        expect(escapeBefore.activeAt).to.equal(0n);
+        expect(escapeBefore.escapeType).to.equal(await account.noEscape());
+
+        const { response, receipt } = await sender.waitForTransaction(transaction, [signer, 0]);
+        const { timestamp } = await provider.getBlock(receipt.blockHash);
+        const activeAtExpected = timestamp + oneWeek;
+        await expect(response).to.emit(account, "EscapeGuardianTriggerred").withArgs(activeAtExpected);
+
+        const escapeAfter = await account.escape();
+        expect(escapeAfter.activeAt).to.equal(activeAtExpected);
+        expect(escapeAfter.escapeType).to.equal(await account.guardianEscape());
+      });
+
+      it("should run triggerEscapeSigner() by guardian", async () => {
+        const [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
+        const transaction = await account.populateTransaction.triggerEscapeSigner();
+
+        const escapeBefore = await account.escape();
+        expect(escapeBefore.activeAt).to.equal(0n);
+        expect(escapeBefore.escapeType).to.equal(await account.noEscape());
+
+        const { response, receipt } = await sender.waitForTransaction(transaction, [0, guardian]);
+        const { timestamp } = await provider.getBlock(receipt.blockHash);
+        const activeAtExpected = timestamp + oneWeek;
+        await expect(response).to.emit(account, "EscapeSignerTriggerred").withArgs(activeAtExpected);
+
+        const escapeAfter = await account.escape();
+        expect(escapeAfter.activeAt).to.equal(activeAtExpected);
+        expect(escapeAfter.escapeType).to.equal(await account.signerEscape());
+      });
+
+      it.skip("should run triggerEscapeSigner() by guardian backup", async () => {
+        const [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
+        const backupTransaction = await account.populateTransaction.changeGuardianBackup(newGuardianBackup.address);
+        await sender.waitForTransaction(backupTransaction, [signer, guardian]);
+
+        const escapeBefore = await account.escape();
+        expect(escapeBefore.activeAt).to.equal(0n);
+        expect(escapeBefore.escapeType).to.equal(await account.noEscape());
+
+        const transaction = await account.populateTransaction.triggerEscapeSigner();
+        const { response, receipt } = await sender.waitForTransaction(transaction, [0, newGuardianBackup]);
+        const { timestamp } = await provider.getBlock(receipt.blockHash);
+        const activeAtExpected = timestamp + oneWeek;
+        await expect(response).to.emit(account, "EscapeSignerTriggerred").withArgs(activeAtExpected);
+
+        const escapeAfter = await account.escape();
+        expect(escapeAfter.activeAt).to.equal(activeAtExpected);
+        expect(escapeAfter.escapeType).to.equal(await account.signerEscape());
       });
     });
   });
