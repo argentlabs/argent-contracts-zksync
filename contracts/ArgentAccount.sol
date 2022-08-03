@@ -26,6 +26,7 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     uint8 public constant noEscape = uint8(EscapeType.None);
     uint8 public constant guardianEscape = uint8(EscapeType.Guardian);
     uint8 public constant signerEscape = uint8(EscapeType.Signer);
+    address public constant missingGuardian = address(0);
     uint96 public constant escapeSecurityPeriod = 1 weeks;
     bytes4 constant eip1271SuccessReturnValue = 0x1626ba7e;
 
@@ -163,7 +164,7 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
 
     function validateSignatures(bytes32 _hash, bytes calldata _signature) internal view {
         validateSignerSignature(_hash, _signature);
-        // validateGuardianSignature(_hash, _signature);
+        validateGuardianSignature(_hash, _signature);
     }
 
     function validateSignerSignature(bytes32 _hash, bytes calldata _signature) internal view {
@@ -172,6 +173,9 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     }
 
     function validateGuardianSignature(bytes32 _hash, bytes calldata _signature) internal view {
+        if (guardian == missingGuardian) {
+            return;
+        }
         address recovered = ECDSA.recover(_hash, _signature[65:]);
         require(recovered == guardian, "argent/invalid-guardian-signature");
     }

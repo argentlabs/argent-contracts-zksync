@@ -3,6 +3,7 @@ import { BytesLike } from "ethers";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
 import * as zksync from "zksync-web3";
+import { makeTransactionSender, TransactionSender } from "./transaction.service";
 
 export interface ArgentContext {
   deployer: Deployer;
@@ -45,7 +46,12 @@ export const deployAccount = async (
   return account;
 };
 
-export const deployFundedAccount: typeof deployAccount = async (argent, signerAddress, guardianAddress, salt) => {
+export const deployFundedAccount = async (
+  argent: ArgentContext,
+  signerAddress: string,
+  guardianAddress: string,
+  salt?: BytesLike,
+): Promise<[zksync.Contract, TransactionSender]> => {
   const account = await deployAccount(argent, signerAddress, guardianAddress, salt);
 
   const response = await argent.deployer.zkWallet.transfer({
@@ -54,7 +60,9 @@ export const deployFundedAccount: typeof deployAccount = async (argent, signerAd
   });
   await response.wait();
 
-  return account;
+  const sender = makeTransactionSender(account, argent.deployer.zkWallet.provider);
+
+  return [account, sender];
 };
 
 const getAccountAddressFromCreate2 = async (
