@@ -5,6 +5,7 @@ import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { expect } from "chai";
 import { ArgentArtifacts, ArgentContext, deployAccount, deployFundedAccount } from "./account.service";
 import { TransactionSender, waitForTransaction } from "./transaction.service";
+import { waitForTimestamp } from "./provider.service";
 
 const signer = new zksync.Wallet(process.env.PRIVATE_KEY as string);
 const guardian = new zksync.Wallet(process.env.GUARDIAN_PRIVATE_KEY as string);
@@ -15,13 +16,17 @@ const wrongSigner = zksync.Wallet.createRandom();
 const wrongGuardian = zksync.Wallet.createRandom();
 const deployer = new Deployer(hre, signer);
 const provider = (ethers.provider = deployer.zkWallet.provider); // needed for hardhat-ethers's .getContractAt(...)
-const oneWeek = 7 * 24 * 60 * 60;
 
 describe("Argent account", () => {
   let artifacts: ArgentArtifacts;
   let implementation: zksync.Contract;
   let factory: zksync.Contract;
   let argent: ArgentContext;
+
+  let escapeSecurityPeriod: number; // in seconds
+  let noEscape: number;
+  let signerEscape: number;
+  let guardianEscape: number;
 
   describe("Infrastructure deployment", () => {
     before(async () => {
@@ -37,6 +42,11 @@ describe("Argent account", () => {
     it("Should deploy a new ArgentAccount implementation", async () => {
       implementation = await deployer.deploy(artifacts.implementation, []);
       console.log(`        Account implementation deployed to ${implementation.address}`);
+      const contract = await ethers.getContractAt("ArgentAccount", implementation.address);
+      escapeSecurityPeriod = (await contract.escapeSecurityPeriod()).toNumber();
+      noEscape = await contract.noEscape();
+      signerEscape = await contract.signerEscape();
+      guardianEscape = await contract.guardianEscape();
     });
 
     it("Should deploy a new AccountFactory", async () => {
@@ -328,16 +338,16 @@ describe("Argent account", () => {
 
         const escapeBefore = await account.escape();
         expect(escapeBefore.activeAt).to.equal(0n);
-        expect(escapeBefore.escapeType).to.equal(await account.noEscape());
+        expect(escapeBefore.escapeType).to.equal(noEscape);
 
         const { response, receipt } = await sender.waitForTransaction(transaction, [signer]);
         const { timestamp } = await provider.getBlock(receipt.blockHash);
-        const activeAtExpected = timestamp + oneWeek;
+        const activeAtExpected = timestamp + escapeSecurityPeriod;
         await expect(response).to.emit(account, "EscapeGuardianTriggerred").withArgs(activeAtExpected);
 
         const escapeAfter = await account.escape();
         expect(escapeAfter.activeAt).to.equal(activeAtExpected);
-        expect(escapeAfter.escapeType).to.equal(await account.guardianEscape());
+        expect(escapeAfter.escapeType).to.equal(guardianEscape);
       });
 
       it("should run triggerEscapeSigner() by guardian", async () => {
@@ -346,16 +356,16 @@ describe("Argent account", () => {
 
         const escapeBefore = await account.escape();
         expect(escapeBefore.activeAt).to.equal(0n);
-        expect(escapeBefore.escapeType).to.equal(await account.noEscape());
+        expect(escapeBefore.escapeType).to.equal(noEscape);
 
         const { response, receipt } = await sender.waitForTransaction(transaction, [guardian]);
         const { timestamp } = await provider.getBlock(receipt.blockHash);
-        const activeAtExpected = timestamp + oneWeek;
+        const activeAtExpected = timestamp + escapeSecurityPeriod;
         await expect(response).to.emit(account, "EscapeSignerTriggerred").withArgs(activeAtExpected);
 
         const escapeAfter = await account.escape();
         expect(escapeAfter.activeAt).to.equal(activeAtExpected);
-        expect(escapeAfter.escapeType).to.equal(await account.signerEscape());
+        expect(escapeAfter.escapeType).to.equal(signerEscape);
       });
 
       it("should run triggerEscapeSigner() by guardian backup", async () => {
@@ -365,17 +375,91 @@ describe("Argent account", () => {
 
         const escapeBefore = await account.escape();
         expect(escapeBefore.activeAt).to.equal(0n);
-        expect(escapeBefore.escapeType).to.equal(await account.noEscape());
+        expect(escapeBefore.escapeType).to.equal(noEscape);
 
         const transaction = await account.populateTransaction.triggerEscapeSigner();
         const { response, receipt } = await sender.waitForTransaction(transaction, [0, newGuardianBackup]);
         const { timestamp } = await provider.getBlock(receipt.blockHash);
-        const activeAtExpected = timestamp + oneWeek;
+        const activeAtExpected = timestamp + escapeSecurityPeriod;
         await expect(response).to.emit(account, "EscapeSignerTriggerred").withArgs(activeAtExpected);
 
         const escapeAfter = await account.escape();
         expect(escapeAfter.activeAt).to.equal(activeAtExpected);
-        expect(escapeAfter.escapeType).to.equal(await account.signerEscape());
+        expect(escapeAfter.escapeType).to.equal(signerEscape);
+      });
+    });
+
+    describe("Escaping", () => {
+      if (escapeSecurityPeriod > 60) {
+        throw new Error("These tests require an escape security period of less than 60 seconds");
+      }
+
+      it("should escape guardian", async () => {
+        const [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
+        const triggerTransaction = await account.populateTransaction.triggerEscapeGuardian();
+        const escapeTransaction = await account.populateTransaction.escapeGuardian(newGuardian.address);
+
+        // trigger escape
+        const { response: triggerResponse } = await sender.waitForTransaction(triggerTransaction, [signer]);
+        await expect(triggerResponse).to.emit(account, "EscapeGuardianTriggerred");
+
+        const escape = await account.escape();
+        expect(escape.activeAt).to.be.greaterThan(0n);
+        expect(escape.escapeType).to.equal(guardianEscape);
+
+        // should fail to escape before the end of the period
+        const promise = sender.waitForTransaction(escapeTransaction, [signer]);
+        expect(promise).to.be.rejectedWith("argent/inactive-escape");
+
+        // wait security period
+        await waitForTimestamp(escape.activeAt.toNumber(), provider);
+
+        expect(await account.guardian()).to.equal(guardian.address);
+
+        // should escape after the security period
+        const { response: escapeResponse } = await sender.waitForTransaction(escapeTransaction, [signer]);
+        await expect(escapeResponse).to.emit(account, "GuardianEscaped").withArgs(newGuardian.address);
+
+        expect(await account.guardian()).to.equal(newGuardian.address);
+
+        // escape should be cleared
+        const postEscape = await account.escape();
+        expect(postEscape.activeAt).to.equal(0n);
+        expect(postEscape.escapeType).to.equal(noEscape);
+      });
+
+      it("should escape signer", async () => {
+        const [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
+        const triggerTransaction = await account.populateTransaction.triggerEscapeSigner();
+        const escapeTransaction = await account.populateTransaction.escapeSigner(newSigner.address);
+
+        // trigger escape
+        const { response: triggerResponse } = await sender.waitForTransaction(triggerTransaction, [guardian]);
+        await expect(triggerResponse).to.emit(account, "EscapeSignerTriggerred");
+
+        const escape = await account.escape();
+        expect(escape.activeAt).to.be.greaterThan(0n);
+        expect(escape.escapeType).to.equal(signerEscape);
+
+        // should fail to escape before the end of the period
+        const promise = sender.waitForTransaction(escapeTransaction, [guardian]);
+        expect(promise).to.be.rejectedWith("argent/inactive-escape");
+
+        // wait security period
+        await waitForTimestamp(escape.activeAt.toNumber(), provider);
+
+        expect(await account.callStatic.signer()).to.equal(signer.address);
+
+        // should escape after the security period
+        const { response: escapeResponse } = await sender.waitForTransaction(escapeTransaction, [guardian]);
+        await expect(escapeResponse).to.emit(account, "SignerEscaped").withArgs(newSigner.address);
+
+        expect(await account.callStatic.signer()).to.equal(newSigner.address);
+
+        // escape should be cleared
+        const postEscape = await account.escape();
+        expect(postEscape.activeAt).to.equal(0n);
+        expect(postEscape.escapeType).to.equal(noEscape);
       });
     });
   });

@@ -23,11 +23,16 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     }
 
     string public constant version = "0.0.1";
+    address public constant noGuardian = address(0);
+
     uint8 public constant noEscape = uint8(EscapeType.None);
     uint8 public constant guardianEscape = uint8(EscapeType.Guardian);
     uint8 public constant signerEscape = uint8(EscapeType.Signer);
-    address public constant missingGuardian = address(0);
-    uint96 public constant escapeSecurityPeriod = 1 weeks;
+
+    // FIXME: using short period for testing on goerli, switch back to 1 week when local testing is available
+    // uint96 public constant escapeSecurityPeriod = 1 weeks;
+    uint96 public constant escapeSecurityPeriod = 10 seconds;
+
     bytes4 constant eip1271SuccessReturnValue = 0x1626ba7e;
     bytes32 constant zeroSignatureHash = keccak256(new bytes(65));
 
@@ -173,7 +178,7 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     }
 
     function validateGuardianSignature(bytes32 _hash, bytes calldata _signature) internal view {
-        if (guardian == missingGuardian) {
+        if (guardian == noGuardian) {
             return;
         }
         if (_signature.length == 65) {
