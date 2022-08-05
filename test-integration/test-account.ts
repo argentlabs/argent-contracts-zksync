@@ -3,10 +3,9 @@ import { PopulatedTransaction } from "ethers";
 import * as zksync from "zksync-web3";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { expect } from "chai";
-import { ArgentArtifacts, ArgentContext, deployAccount, deployFundedAccount } from "./account.service";
+import { ArgentArtifacts, ArgentContext, deployAccount, deployFundedAccount, logBalance } from "./account.service";
 import { TransactionSender, waitForTransaction } from "./transaction.service";
 import { waitForTimestamp } from "./provider.service";
-import { _TypedDataEncoder } from "ethers/lib/utils";
 
 const signer = new zksync.Wallet(process.env.PRIVATE_KEY as string);
 const guardian = new zksync.Wallet(process.env.GUARDIAN_PRIVATE_KEY as string);
@@ -25,10 +24,10 @@ describe("Argent account", () => {
   let factory: zksync.Contract;
   let argent: ArgentContext;
 
-  let escapeSecurityPeriod: number; // in seconds
   let noEscape: number;
   let signerEscape: number;
   let guardianEscape: number;
+  let escapeSecurityPeriod: number; // in seconds
 
   describe("Infrastructure deployment", () => {
     before(async () => {
@@ -37,18 +36,18 @@ describe("Argent account", () => {
         factory: await deployer.loadArtifact("AccountFactory"),
         proxy: await deployer.loadArtifact("Proxy"),
       };
-      const balance = await provider.getBalance(signer.address);
-      console.log(`Signer ETH L2 balance is ${ethers.utils.formatEther(balance)}`);
+      await logBalance(signer.address, provider, "Signer");
     });
 
     it("Should deploy a new ArgentAccount implementation", async () => {
       implementation = await deployer.deploy(artifacts.implementation, []);
       console.log(`        Account implementation deployed to ${implementation.address}`);
+
       const contract = await ethers.getContractAt("ArgentAccount", implementation.address);
-      escapeSecurityPeriod = (await contract.escapeSecurityPeriod()).toNumber();
       noEscape = await contract.noEscape();
       signerEscape = await contract.signerEscape();
       guardianEscape = await contract.guardianEscape();
+      escapeSecurityPeriod = (await contract.escapeSecurityPeriod()).toNumber();
     });
 
     it("Should deploy a new AccountFactory", async () => {
@@ -58,7 +57,7 @@ describe("Argent account", () => {
       console.log(`        Account factory deployed to ${factory.address}`);
     });
 
-    after(async () => {
+    after(() => {
       argent = { deployer, artifacts, implementation, factory };
     });
   });
@@ -77,12 +76,9 @@ describe("Argent account", () => {
     });
 
     it("Should refuse to be initialized twice", async () => {
-      const eoaAccount = new zksync.Contract(account.address, artifacts.implementation.abi, deployer.zkWallet);
-      const promise = async () => {
-        const response = await eoaAccount.initialize(signer.address, guardian.address);
-        return response.wait();
-      };
-      await expect(promise()).to.be.rejectedWith("argent/already-init");
+      const accountFromEoa = new zksync.Contract(account.address, artifacts.implementation.abi, deployer.zkWallet);
+      const promise = accountFromEoa.initialize(signer.address, guardian.address);
+      await expect(promise).to.be.rejectedWith("argent/already-init");
     });
   });
 
@@ -540,7 +536,7 @@ describe("Argent account", () => {
     });
   });
 
-  describe("EIP-1271 signature validation of an EIP-712 typed message", () => {
+  describe("EIP-1271 signature verification of EIP-712 typed messages", () => {
     const domain = {
       name: "Ether Mail",
       version: "1",
@@ -561,18 +557,12 @@ describe("Argent account", () => {
     };
 
     const value = {
-      from: {
-        name: "Cow",
-        wallet: "0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826",
-      },
-      to: {
-        name: "Bob",
-        wallet: "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB",
-      },
+      from: { name: "Cow", wallet: "0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826" },
+      to: { name: "Bob", wallet: "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB" },
       contents: "Hello, Bob!",
     };
 
-    const hash = _TypedDataEncoder.hash(domain, types, value);
+    const hash = ethers.utils._TypedDataEncoder.hash(domain, types, value);
     const eip1271SuccessReturnValue = "0x1626ba7e";
     const signWith = (signatory: zksync.Wallet) => signatory._signTypedData(domain, types, value);
 
@@ -587,6 +577,12 @@ describe("Argent account", () => {
       expect(await account.isValidSignature(hash, signature)).to.equal(eip1271SuccessReturnValue);
     });
 
+    it("Should verify with a single signature when not using a guardian", async () => {
+      const accountNoGuardian = await deployAccount(argent, signer.address, ethers.constants.AddressZero);
+      const signature = await signWith(signer);
+      expect(await accountNoGuardian.isValidSignature(hash, signature)).to.equal(eip1271SuccessReturnValue);
+    });
+
     it("Should fail to verify using incorrect signers", async () => {
       let signature = ethers.utils.concat([await signWith(signer), await signWith(wrongGuardian)]);
       await expect(account.isValidSignature(hash, signature)).to.be.rejected;
@@ -598,7 +594,7 @@ describe("Argent account", () => {
       await expect(account.isValidSignature(hash, signature)).to.be.rejected;
     });
 
-    it("Should fail to verify using zeros in any place", async () => {
+    it("Should fail to verify using zeros in any position", async () => {
       let signature = ethers.utils.concat([new Uint8Array(65), await signWith(guardian)]);
       await expect(account.isValidSignature(hash, signature)).to.be.rejected;
 
@@ -607,12 +603,6 @@ describe("Argent account", () => {
 
       signature = new Uint8Array(130);
       await expect(account.isValidSignature(hash, signature)).to.be.rejected;
-    });
-
-    it("Should verify with a single signature when not using a guardian", async () => {
-      const account = await deployAccount(argent, signer.address, ethers.constants.AddressZero);
-      const signature = await signWith(signer);
-      expect(await account.isValidSignature(hash, signature)).to.equal(eip1271SuccessReturnValue);
     });
   });
 });

@@ -89,7 +89,7 @@ const getAccountAddressFromFactory = async (
   return await factory.callStatic.computeCreate2Address(salt, implementation.address, signerAddress, guardianAddress);
 };
 
-export const logBalance = async (provider: zksync.Provider, address: string) => {
+export const logBalance = async (address: string, provider: zksync.Provider, name?: string) => {
   const balance = await provider.getBalance(address);
-  console.log(`${address} ETH L2 balance is ${ethers.utils.formatEther(balance)}`);
+  console.log(`${name || address} ETH L2 balance is ${ethers.utils.formatEther(balance)}`);
 };
