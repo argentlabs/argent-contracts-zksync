@@ -5,6 +5,8 @@ import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { expect } from "chai";
 import { ArgentArtifacts, ArgentContext, deployAccount, deployFundedAccount } from "./account.service";
 import { TransactionSender, waitForTransaction } from "./transaction.service";
+import { waitForTimestamp } from "./provider.service";
+import { _TypedDataEncoder } from "ethers/lib/utils";
 
 const signer = new zksync.Wallet(process.env.PRIVATE_KEY as string);
 const guardian = new zksync.Wallet(process.env.GUARDIAN_PRIVATE_KEY as string);
@@ -13,15 +15,20 @@ const newGuardian = zksync.Wallet.createRandom();
 const newGuardianBackup = zksync.Wallet.createRandom();
 const wrongSigner = zksync.Wallet.createRandom();
 const wrongGuardian = zksync.Wallet.createRandom();
+
 const deployer = new Deployer(hre, signer);
 const provider = (ethers.provider = deployer.zkWallet.provider); // needed for hardhat-ethers's .getContractAt(...)
-const oneWeek = 7 * 24 * 60 * 60;
 
 describe("Argent account", () => {
   let artifacts: ArgentArtifacts;
   let implementation: zksync.Contract;
   let factory: zksync.Contract;
   let argent: ArgentContext;
+
+  let escapeSecurityPeriod: number; // in seconds
+  let noEscape: number;
+  let signerEscape: number;
+  let guardianEscape: number;
 
   describe("Infrastructure deployment", () => {
     before(async () => {
@@ -37,6 +44,11 @@ describe("Argent account", () => {
     it("Should deploy a new ArgentAccount implementation", async () => {
       implementation = await deployer.deploy(artifacts.implementation, []);
       console.log(`        Account implementation deployed to ${implementation.address}`);
+      const contract = await ethers.getContractAt("ArgentAccount", implementation.address);
+      escapeSecurityPeriod = (await contract.escapeSecurityPeriod()).toNumber();
+      noEscape = await contract.noEscape();
+      signerEscape = await contract.signerEscape();
+      guardianEscape = await contract.guardianEscape();
     });
 
     it("Should deploy a new AccountFactory", async () => {
@@ -70,7 +82,7 @@ describe("Argent account", () => {
         const response = await eoaAccount.initialize(signer.address, guardian.address);
         return response.wait();
       };
-      expect(promise()).to.be.rejectedWith("argent/already-init");
+      await expect(promise()).to.be.rejectedWith("argent/already-init");
     });
   });
 
@@ -105,7 +117,7 @@ describe("Argent account", () => {
       const balanceBefore2 = await provider.getBalance(account2.address);
 
       const transaction = { to: account2.address, value: amount };
-      await waitForTransaction(transaction, account1.address, provider, [signer, guardian]);
+      await waitForTransaction(transaction, [signer, guardian], account1, provider);
 
       const balanceAfter1 = await provider.getBalance(account1.address);
       const balanceAfter2 = await provider.getBalance(account2.address);
@@ -121,7 +133,7 @@ describe("Argent account", () => {
         value: ethers.utils.parseEther("0.00000668"),
       };
 
-      const promise = waitForTransaction(transaction, account2.address, provider, [signer, guardian]);
+      const promise = waitForTransaction(transaction, [signer, guardian], account2, provider);
       expect(promise).to.be.rejectedWith(/transaction failed|invalid hash/);
     });
   });
@@ -151,28 +163,28 @@ describe("Argent account", () => {
         [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
       });
 
-      it("should revert with bad nonce", async () => {
+      it("Should revert with bad nonce", async () => {
         const transaction = { ...dappTransaction, nonce: 999 };
         const promise = sender.waitForTransaction(transaction, [signer, guardian]);
         await expect(promise).to.be.rejectedWith("Tx nonce is incorrect");
       });
 
-      it("should revert with bad signer", async () => {
+      it("Should revert with bad signer", async () => {
         const promise = sender.waitForTransaction(dappTransaction, [wrongSigner, guardian]);
         await expect(promise).to.be.rejectedWith("argent/invalid-signer-signature");
       });
 
-      it("should revert with bad guardian", async () => {
+      it("Should revert with bad guardian", async () => {
         const promise = sender.waitForTransaction(dappTransaction, [signer, wrongGuardian]);
         await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
       });
 
-      it("should revert with just 1 signer", async () => {
+      it("Should revert with just 1 signer", async () => {
         const promise = sender.waitForTransaction(dappTransaction, [signer]);
-        await expect(promise).to.be.rejectedWith("argent/invalid-signature-length");
+        await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature-length");
       });
 
-      it("should successfully call the dapp", async () => {
+      it("Should successfully call the dapp", async () => {
         expect(await dapp.userNumbers(account.address)).to.equal(0n);
         await sender.waitForTransaction(dappTransaction, [signer, guardian]);
         expect(await dapp.userNumbers(account.address)).to.equal(69n);
@@ -187,34 +199,34 @@ describe("Argent account", () => {
         [account, sender] = await deployFundedAccount(argent, signer.address, ethers.constants.AddressZero);
       });
 
-      it("should successfully call the dapp", async () => {
+      it("Should successfully call the dapp", async () => {
         expect(await dapp.userNumbers(account.address)).to.equal(0n);
-        await sender.waitForTransaction(dappTransaction, [signer, 0]);
+        await sender.waitForTransaction(dappTransaction, [signer]);
         expect(await dapp.userNumbers(account.address)).to.equal(69n);
       });
 
-      it("should change the signer", async () => {
+      it("Should change the signer", async () => {
         expect(await account.callStatic.signer()).to.equal(signer.address);
 
         const transaction = await account.populateTransaction.changeSigner(newSigner.address);
-        const { response } = await sender.waitForTransaction(transaction, [signer, 0]);
+        const { response } = await sender.waitForTransaction(transaction, [signer]);
 
         await expect(response).to.emit(account, "SignerChanged").withArgs(newSigner.address);
         expect(await account.callStatic.signer()).to.equal(newSigner.address);
       });
 
-      it("should revert calls that require the guardian to be set", async () => {
+      it("Should revert calls that require the guardian to be set", async () => {
         const transaction = await account.populateTransaction.changeGuardianBackup(wrongGuardian.address);
         const promise = sender.waitForTransaction(transaction, [newSigner, 0]);
         // FIXME: investigate why the correct error reason doesn't bubble up
         await expect(promise).to.be.rejectedWith(/transaction failed|invalid hash/);
       });
 
-      it("should add a guardian", async () => {
+      it("Should add a guardian", async () => {
         expect(await account.guardian()).to.equal(ethers.constants.AddressZero);
 
         const transaction = await account.populateTransaction.changeGuardian(guardian.address);
-        const { response } = await sender.waitForTransaction(transaction, [newSigner, 0]);
+        const { response } = await sender.waitForTransaction(transaction, [newSigner]);
 
         await expect(response).to.emit(account, "GuardianChanged").withArgs(guardian.address);
         expect(await account.guardian()).to.equal(guardian.address);
@@ -233,17 +245,17 @@ describe("Argent account", () => {
         transaction = await account.populateTransaction.changeSigner(newSigner.address);
       });
 
-      it("should revert with the wrong signer signature", async () => {
+      it("Should revert with the wrong signer signature", async () => {
         const promise = sender.sendTransaction(transaction, [wrongSigner, guardian]);
-        expect(promise).to.be.rejectedWith("argent/invalid-signer-signature");
+        await expect(promise).to.be.rejectedWith("argent/invalid-signer-signature");
       });
 
-      it("should revert with the wrong guardian signature", async () => {
+      it("Should revert with the wrong guardian signature", async () => {
         const promise = sender.sendTransaction(transaction, [signer, wrongGuardian]);
-        expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
+        await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
       });
 
-      it("should work with the correct signatures", async () => {
+      it("Should work with the correct signatures", async () => {
         expect(await account.callStatic.signer()).to.equal(signer.address);
 
         const { response } = await sender.waitForTransaction(transaction, [signer, guardian]);
@@ -263,17 +275,17 @@ describe("Argent account", () => {
         transaction = await account.populateTransaction.changeGuardian(newGuardian.address);
       });
 
-      it("should revert with the wrong signer signature", async () => {
+      it("Should revert with the wrong signer signature", async () => {
         const promise = sender.sendTransaction(transaction, [wrongSigner, guardian]);
-        expect(promise).to.be.rejectedWith("argent/invalid-signer-signature");
+        await expect(promise).to.be.rejectedWith("argent/invalid-signer-signature");
       });
 
-      it("should revert with the wrong guardian signature", async () => {
+      it("Should revert with the wrong guardian signature", async () => {
         const promise = sender.sendTransaction(transaction, [signer, wrongGuardian]);
-        expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
+        await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
       });
 
-      it("should work with the correct signatures", async () => {
+      it("Should work with the correct signatures", async () => {
         expect(await account.guardian()).to.equal(guardian.address);
 
         const { response } = await sender.waitForTransaction(transaction, [signer, guardian]);
@@ -293,17 +305,17 @@ describe("Argent account", () => {
         transaction = await account.populateTransaction.changeGuardianBackup(newGuardianBackup.address);
       });
 
-      it("should revert with the wrong signer signature", async () => {
+      it("Should revert with the wrong signer signature", async () => {
         const promise = sender.sendTransaction(transaction, [wrongSigner, guardian]);
-        expect(promise).to.be.rejectedWith("argent/invalid-signer-signature");
+        await expect(promise).to.be.rejectedWith("argent/invalid-signer-signature");
       });
 
-      it("should revert with the wrong guardian signature", async () => {
+      it("Should revert with the wrong guardian signature", async () => {
         const promise = sender.sendTransaction(transaction, [signer, wrongGuardian]);
-        expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
+        await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
       });
 
-      it("should work with the correct signatures", async () => {
+      it("Should work with the correct signatures", async () => {
         expect(await account.guardianBackup()).to.equal(ethers.constants.AddressZero);
 
         const { response } = await sender.waitForTransaction(transaction, [signer, guardian]);
@@ -312,7 +324,7 @@ describe("Argent account", () => {
         expect(await account.guardianBackup()).to.equal(newGuardianBackup.address);
       });
 
-      it("should fail when no guardian", async () => {
+      it("Should fail when no guardian", async () => {
         const [, senderNoGuardian] = await deployFundedAccount(argent, signer.address, ethers.constants.AddressZero);
 
         const promise = senderNoGuardian.waitForTransaction(transaction, [signer, 0]);
@@ -321,62 +333,286 @@ describe("Argent account", () => {
       });
     });
 
-    describe("Escape trigerring", () => {
-      it("should run triggerEscapeGuardian() by signer", async () => {
+    describe("Escape triggering", () => {
+      it("Should run triggerEscapeGuardian() by signer", async () => {
         const [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
         const transaction = await account.populateTransaction.triggerEscapeGuardian();
 
         const escapeBefore = await account.escape();
         expect(escapeBefore.activeAt).to.equal(0n);
-        expect(escapeBefore.escapeType).to.equal(await account.noEscape());
+        expect(escapeBefore.escapeType).to.equal(noEscape);
 
-        const { response, receipt } = await sender.waitForTransaction(transaction, [signer, 0]);
+        const { response, receipt } = await sender.waitForTransaction(transaction, [signer]);
         const { timestamp } = await provider.getBlock(receipt.blockHash);
-        const activeAtExpected = timestamp + oneWeek;
+        const activeAtExpected = timestamp + escapeSecurityPeriod;
         await expect(response).to.emit(account, "EscapeGuardianTriggerred").withArgs(activeAtExpected);
 
         const escapeAfter = await account.escape();
         expect(escapeAfter.activeAt).to.equal(activeAtExpected);
-        expect(escapeAfter.escapeType).to.equal(await account.guardianEscape());
+        expect(escapeAfter.escapeType).to.equal(guardianEscape);
       });
 
-      it("should run triggerEscapeSigner() by guardian", async () => {
+      it("Should run triggerEscapeSigner() by guardian", async () => {
         const [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
         const transaction = await account.populateTransaction.triggerEscapeSigner();
 
         const escapeBefore = await account.escape();
         expect(escapeBefore.activeAt).to.equal(0n);
-        expect(escapeBefore.escapeType).to.equal(await account.noEscape());
+        expect(escapeBefore.escapeType).to.equal(noEscape);
 
-        const { response, receipt } = await sender.waitForTransaction(transaction, [0, guardian]);
+        const { response, receipt } = await sender.waitForTransaction(transaction, [guardian]);
         const { timestamp } = await provider.getBlock(receipt.blockHash);
-        const activeAtExpected = timestamp + oneWeek;
+        const activeAtExpected = timestamp + escapeSecurityPeriod;
         await expect(response).to.emit(account, "EscapeSignerTriggerred").withArgs(activeAtExpected);
 
         const escapeAfter = await account.escape();
         expect(escapeAfter.activeAt).to.equal(activeAtExpected);
-        expect(escapeAfter.escapeType).to.equal(await account.signerEscape());
+        expect(escapeAfter.escapeType).to.equal(signerEscape);
       });
 
-      it.skip("should run triggerEscapeSigner() by guardian backup", async () => {
+      it("Should run triggerEscapeSigner() by guardian backup", async () => {
         const [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
         const backupTransaction = await account.populateTransaction.changeGuardianBackup(newGuardianBackup.address);
         await sender.waitForTransaction(backupTransaction, [signer, guardian]);
 
         const escapeBefore = await account.escape();
         expect(escapeBefore.activeAt).to.equal(0n);
-        expect(escapeBefore.escapeType).to.equal(await account.noEscape());
+        expect(escapeBefore.escapeType).to.equal(noEscape);
 
         const transaction = await account.populateTransaction.triggerEscapeSigner();
         const { response, receipt } = await sender.waitForTransaction(transaction, [0, newGuardianBackup]);
         const { timestamp } = await provider.getBlock(receipt.blockHash);
-        const activeAtExpected = timestamp + oneWeek;
+        const activeAtExpected = timestamp + escapeSecurityPeriod;
         await expect(response).to.emit(account, "EscapeSignerTriggerred").withArgs(activeAtExpected);
 
         const escapeAfter = await account.escape();
         expect(escapeAfter.activeAt).to.equal(activeAtExpected);
-        expect(escapeAfter.escapeType).to.equal(await account.signerEscape());
+        expect(escapeAfter.escapeType).to.equal(signerEscape);
       });
+    });
+
+    describe("Escaping", () => {
+      if (escapeSecurityPeriod > 60) {
+        throw new Error("These tests require an escape security period of less than 60 seconds");
+      }
+
+      it("Should escape guardian", async () => {
+        const [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
+        const triggerTransaction = await account.populateTransaction.triggerEscapeGuardian();
+        const escapeTransaction = await account.populateTransaction.escapeGuardian(newGuardian.address);
+
+        // trigger escape
+        const { response: triggerResponse } = await sender.waitForTransaction(triggerTransaction, [signer]);
+        await expect(triggerResponse).to.emit(account, "EscapeGuardianTriggerred");
+
+        const escape = await account.escape();
+        expect(escape.activeAt).to.be.greaterThan(0n);
+        expect(escape.escapeType).to.equal(guardianEscape);
+
+        // should fail to escape before the end of the period
+        const promise = sender.waitForTransaction(escapeTransaction, [signer]);
+        // await expect(promise).to.be.rejectedWith("argent/inactive-escape");
+        await expect(promise).to.be.rejectedWith(/transaction failed|invalid hash/);
+
+        // wait security period
+        await waitForTimestamp(escape.activeAt.toNumber(), provider);
+
+        expect(await account.guardian()).to.equal(guardian.address);
+
+        // should escape after the security period
+        const { response: escapeResponse } = await sender.waitForTransaction(escapeTransaction, [signer]);
+        await expect(escapeResponse).to.emit(account, "GuardianEscaped").withArgs(newGuardian.address);
+
+        expect(await account.guardian()).to.equal(newGuardian.address);
+
+        // escape should be cleared
+        const postEscape = await account.escape();
+        expect(postEscape.activeAt).to.equal(0n);
+        expect(postEscape.escapeType).to.equal(noEscape);
+      });
+
+      it("Should escape signer", async () => {
+        const [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
+        const triggerTransaction = await account.populateTransaction.triggerEscapeSigner();
+        const escapeTransaction = await account.populateTransaction.escapeSigner(newSigner.address);
+
+        // trigger escape
+        const { response: triggerResponse } = await sender.waitForTransaction(triggerTransaction, [guardian]);
+        await expect(triggerResponse).to.emit(account, "EscapeSignerTriggerred");
+
+        const escape = await account.escape();
+        expect(escape.activeAt).to.be.greaterThan(0n);
+        expect(escape.escapeType).to.equal(signerEscape);
+
+        // should fail to escape before the end of the period
+        const promise = sender.waitForTransaction(escapeTransaction, [guardian]);
+        // await expect(promise).to.be.rejectedWith("argent/inactive-escape");
+        await expect(promise).to.be.rejectedWith(/transaction failed|invalid hash/);
+
+        // wait security period
+        await waitForTimestamp(escape.activeAt.toNumber(), provider);
+
+        expect(await account.callStatic.signer()).to.equal(signer.address);
+
+        // should escape after the security period
+        const { response: escapeResponse } = await sender.waitForTransaction(escapeTransaction, [guardian]);
+        await expect(escapeResponse).to.emit(account, "SignerEscaped").withArgs(newSigner.address);
+
+        expect(await account.callStatic.signer()).to.equal(newSigner.address);
+
+        // escape should be cleared
+        const postEscape = await account.escape();
+        expect(postEscape.activeAt).to.equal(0n);
+        expect(postEscape.escapeType).to.equal(noEscape);
+      });
+    });
+
+    describe("Escape overriding", () => {
+      it("Should allow signer to override a signer escape", async () => {
+        const [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
+        const guardianTransaction = await account.populateTransaction.triggerEscapeSigner();
+        const signerTransaction = await account.populateTransaction.triggerEscapeGuardian();
+
+        // guardian triggers a signer escape
+        await sender.waitForTransaction(guardianTransaction, [guardian]);
+
+        const firstEscape = await account.escape();
+        expect(firstEscape.activeAt).to.be.greaterThan(0n);
+        expect(firstEscape.escapeType).to.equal(signerEscape);
+
+        // TODO: insert an evm_mine here when testing locally
+
+        // signer overrides the guardian's escape
+        await sender.waitForTransaction(signerTransaction, [signer]);
+
+        const secondEscape = await account.escape();
+        expect(secondEscape.activeAt).to.be.greaterThan(firstEscape.activeAt);
+        expect(secondEscape.escapeType).to.equal(guardianEscape);
+      });
+
+      it("Should forbid guardian to override a guardian escape", async () => {
+        const [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
+        const guardianTransaction = await account.populateTransaction.triggerEscapeSigner();
+        const signerTransaction = await account.populateTransaction.triggerEscapeGuardian();
+
+        // signer triggers a guardian escape
+        await sender.waitForTransaction(signerTransaction, [signer]);
+
+        const escape = await account.escape();
+        expect(escape.activeAt).to.be.greaterThan(0n);
+        expect(escape.escapeType).to.equal(guardianEscape);
+
+        // TODO: insert an evm_mine here when testing locally
+
+        // guardian cannot override
+        const promise = sender.waitForTransaction(guardianTransaction, [guardian]);
+        // await expect(promise).to.be.rejectedWith("argent/cannot-override-signer-escape");
+        await expect(promise).to.be.rejectedWith(/transaction failed|invalid hash/);
+
+        const secondEscape = await account.escape();
+        expect(secondEscape.activeAt).to.equal(escape.activeAt);
+        expect(secondEscape.escapeType).to.equal(guardianEscape);
+      });
+    });
+
+    it("Should cancel an escape", async () => {
+      const [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
+      const triggerTransaction = await account.populateTransaction.triggerEscapeSigner();
+      const cancelTransaction = await account.populateTransaction.cancelEscape();
+
+      // guardian triggers a signer escape
+      await sender.waitForTransaction(triggerTransaction, [guardian]);
+
+      const escape = await account.escape();
+      expect(escape.activeAt).to.be.greaterThan(0n);
+      expect(escape.escapeType).to.equal(signerEscape);
+
+      // should fail to cancel with only the signer signature
+      const promise = sender.waitForTransaction(cancelTransaction, [signer]);
+      await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
+
+      const { response } = await sender.waitForTransaction(cancelTransaction, [signer, guardian]);
+      await expect(response).to.emit(account, "EscapeCancelled");
+
+      const secondEscape = await account.escape();
+      expect(secondEscape.activeAt).to.equal(0n);
+      expect(secondEscape.escapeType).to.equal(noEscape);
+    });
+  });
+
+  describe("EIP-1271 signature validation of an EIP-712 typed message", () => {
+    const domain = {
+      name: "Ether Mail",
+      version: "1",
+      chainId: 1,
+      verifyingContract: "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC",
+    };
+
+    const types = {
+      Person: [
+        { name: "name", type: "string" },
+        { name: "wallet", type: "address" },
+      ],
+      Mail: [
+        { name: "from", type: "Person" },
+        { name: "to", type: "Person" },
+        { name: "contents", type: "string" },
+      ],
+    };
+
+    const value = {
+      from: {
+        name: "Cow",
+        wallet: "0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826",
+      },
+      to: {
+        name: "Bob",
+        wallet: "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB",
+      },
+      contents: "Hello, Bob!",
+    };
+
+    const hash = _TypedDataEncoder.hash(domain, types, value);
+    const eip1271SuccessReturnValue = "0x1626ba7e";
+    const signWith = (signatory: zksync.Wallet) => signatory._signTypedData(domain, types, value);
+
+    let account: zksync.Contract;
+
+    before(async () => {
+      account = await deployAccount(argent, signer.address, guardian.address);
+    });
+
+    it("Should verify on the account", async () => {
+      const signature = ethers.utils.concat([await signWith(signer), await signWith(guardian)]);
+      expect(await account.isValidSignature(hash, signature)).to.equal(eip1271SuccessReturnValue);
+    });
+
+    it("Should fail to verify using incorrect signers", async () => {
+      let signature = ethers.utils.concat([await signWith(signer), await signWith(wrongGuardian)]);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+
+      signature = ethers.utils.concat([await signWith(signer), await signWith(signer)]);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+
+      signature = ethers.utils.concat([await signWith(guardian), await signWith(guardian)]);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+    });
+
+    it("Should fail to verify using zeros in any place", async () => {
+      let signature = ethers.utils.concat([new Uint8Array(65), await signWith(guardian)]);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+
+      signature = ethers.utils.concat([await signWith(signer), new Uint8Array(65)]);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+
+      signature = new Uint8Array(130);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+    });
+
+    it("Should verify with a single signature when not using a guardian", async () => {
+      const account = await deployAccount(argent, signer.address, ethers.constants.AddressZero);
+      const signature = await signWith(signer);
+      expect(await account.isValidSignature(hash, signature)).to.equal(eip1271SuccessReturnValue);
     });
   });
 });

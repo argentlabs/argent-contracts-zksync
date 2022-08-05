@@ -23,12 +23,18 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     }
 
     string public constant version = "0.0.1";
+    address public constant noGuardian = address(0);
+
     uint8 public constant noEscape = uint8(EscapeType.None);
     uint8 public constant guardianEscape = uint8(EscapeType.Guardian);
     uint8 public constant signerEscape = uint8(EscapeType.Signer);
-    address public constant missingGuardian = address(0);
-    uint96 public constant escapeSecurityPeriod = 1 weeks;
-    bytes4 constant eip1271SuccessReturnValue = 0x1626ba7e;
+
+    // FIXME: using short period for testing on goerli, switch back to 1 week when local testing is available
+    // uint96 public constant escapeSecurityPeriod = 1 weeks;
+    uint96 public constant escapeSecurityPeriod = 10 seconds;
+
+    bytes32 public constant zeroSignatureHash = keccak256(new bytes(65));
+    bytes4 public constant eip1271SuccessReturnValue = bytes4(keccak256("isValidSignature(bytes32,bytes)"));
 
     address public signer;
     address public guardian;
@@ -129,7 +135,7 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
         emit SignerEscaped(_newSigner);
     }
 
-    function escapeGuardian(address _newGuardian) public onlySelf {
+    function escapeGuardian(address _newGuardian) public onlySelf requireGuardian {
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
         require(escape.escapeType == guardianEscape, "argent/invalid-escape-type");
@@ -148,8 +154,6 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     }
 
     function _validateTransaction(Transaction calldata _transaction) internal {
-        require(_transaction.signature.length == 130, "argent/invalid-signature-length");
-
         NONCE_HOLDER_SYSTEM_CONTRACT.incrementNonceIfEquals(_transaction.reserved[0]);
         bytes32 txHash = _transaction.encodeHash();
         bytes4 selector = bytes4(_transaction.data);
@@ -163,21 +167,30 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     }
 
     function validateSignatures(bytes32 _hash, bytes calldata _signature) internal view {
-        validateSignerSignature(_hash, _signature);
-        validateGuardianSignature(_hash, _signature);
+        validateSignerSignature(_hash, _signature[:65]);
+        validateGuardianSignature(_hash, _signature[65:]);
     }
 
     function validateSignerSignature(bytes32 _hash, bytes calldata _signature) internal view {
-        address recovered = ECDSA.recover(_hash, _signature[:65]);
+        require(_signature.length == 65, "argent/invalid-signer-signature-length");
+        address recovered = ECDSA.recover(_hash, _signature);
         require(recovered == signer, "argent/invalid-signer-signature");
     }
 
     function validateGuardianSignature(bytes32 _hash, bytes calldata _signature) internal view {
-        if (guardian == missingGuardian) {
+        if (guardian == noGuardian) {
             return;
         }
-        address recovered = ECDSA.recover(_hash, _signature[65:]);
-        require(recovered == guardian, "argent/invalid-guardian-signature");
+        if (_signature.length == 65) {
+            address recovered = ECDSA.recover(_hash, _signature);
+            require(recovered == guardian, "argent/invalid-guardian-signature");
+        } else if (_signature.length == 130) {
+            require(keccak256(_signature[:65]) == zeroSignatureHash, "argent/invalid-zero-signature");
+            address recovered = ECDSA.recover(_hash, _signature[65:]);
+            require(recovered == guardianBackup, "argent/invalid-guardian-backup-signature");
+        } else {
+            revert("argent/invalid-guardian-signature-length");
+        }
     }
 
     function executeTransaction(Transaction calldata _transaction) external payable override onlyBootloader {
@@ -202,10 +215,7 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     }
 
     function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4) {
-        require(_signature.length == 130, "argent/invalid-signature-length");
-
         validateSignatures(_hash, _signature);
-
         return eip1271SuccessReturnValue;
     }
 
