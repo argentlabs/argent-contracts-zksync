@@ -475,11 +475,11 @@ describe("Argent account", () => {
         // guardian triggers a signer escape
         await sender.waitForTransaction(guardianTransaction, [guardian]);
 
-        // TODO: insert an evm_mine here when testing locally
-
         const firstEscape = await account.escape();
         expect(firstEscape.activeAt).to.be.greaterThan(0n);
         expect(firstEscape.escapeType).to.equal(signerEscape);
+
+        // TODO: insert an evm_mine here when testing locally
 
         // signer overrides the guardian's escape
         await sender.waitForTransaction(signerTransaction, [signer]);
@@ -497,11 +497,11 @@ describe("Argent account", () => {
         // signer triggers a guardian escape
         await sender.waitForTransaction(signerTransaction, [signer]);
 
-        // TODO: insert an evm_mine here when testing locally
-
         const escape = await account.escape();
         expect(escape.activeAt).to.be.greaterThan(0n);
         expect(escape.escapeType).to.equal(guardianEscape);
+
+        // TODO: insert an evm_mine here when testing locally
 
         // guardian cannot override
         const promise = sender.waitForTransaction(guardianTransaction, [guardian]);
@@ -512,6 +512,30 @@ describe("Argent account", () => {
         expect(secondEscape.activeAt).to.equal(escape.activeAt);
         expect(secondEscape.escapeType).to.equal(guardianEscape);
       });
+    });
+
+    it("Should cancel an escape", async () => {
+      const [account, sender] = await deployFundedAccount(argent, signer.address, guardian.address);
+      const triggerTransaction = await account.populateTransaction.triggerEscapeSigner();
+      const cancelTransaction = await account.populateTransaction.cancelEscape();
+
+      // guardian triggers a signer escape
+      await sender.waitForTransaction(triggerTransaction, [guardian]);
+
+      const escape = await account.escape();
+      expect(escape.activeAt).to.be.greaterThan(0n);
+      expect(escape.escapeType).to.equal(signerEscape);
+
+      // should fail to cancel with only the signer signature
+      const promise = sender.waitForTransaction(cancelTransaction, [signer]);
+      await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
+
+      const { response } = await sender.waitForTransaction(cancelTransaction, [signer, guardian]);
+      await expect(response).to.emit(account, "EscapeCancelled");
+
+      const secondEscape = await account.escape();
+      expect(secondEscape.activeAt).to.equal(0n);
+      expect(secondEscape.escapeType).to.equal(noEscape);
     });
   });
 });
