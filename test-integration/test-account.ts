@@ -117,7 +117,7 @@ describe("Argent account", () => {
       const balanceBefore2 = await provider.getBalance(account2.address);
 
       const transaction = { to: account2.address, value: amount };
-      await waitForTransaction(transaction, account1, provider, [signer, guardian]);
+      await waitForTransaction(transaction, [signer, guardian], account1, provider);
 
       const balanceAfter1 = await provider.getBalance(account1.address);
       const balanceAfter2 = await provider.getBalance(account2.address);
@@ -133,7 +133,7 @@ describe("Argent account", () => {
         value: ethers.utils.parseEther("0.00000668"),
       };
 
-      const promise = waitForTransaction(transaction, account2, provider, [signer, guardian]);
+      const promise = waitForTransaction(transaction, [signer, guardian], account2, provider);
       expect(promise).to.be.rejectedWith(/transaction failed|invalid hash/);
     });
   });

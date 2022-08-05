@@ -6,9 +6,9 @@ type TransactionRequest = zksync.types.TransactionRequest;
 
 export const sendTransaction = async (
   transaction: TransactionRequest,
+  signatories: Signatories,
   from: string | zksync.Contract,
   provider: zksync.Provider,
-  signatories: Signatories,
 ) => {
   from = typeof from === "string" ? from : from.address;
 
@@ -50,9 +50,9 @@ export const waitForTransaction = async (...args: Parameters<typeof sendTransact
 
 export const makeTransactionSender = (from: string | zksync.Contract, provider: zksync.Provider) => ({
   sendTransaction: (transaction: TransactionRequest, signatories: Signatories) =>
-    sendTransaction(transaction, from, provider, signatories),
+    sendTransaction(transaction, signatories, from, provider),
   waitForTransaction: (transaction: TransactionRequest, signatories: Signatories) =>
-    waitForTransaction(transaction, from, provider, signatories),
+    waitForTransaction(transaction, signatories, from, provider),
 });
 
 export type TransactionSender = ReturnType<typeof makeTransactionSender>;
