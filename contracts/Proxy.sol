@@ -8,7 +8,7 @@ contract Proxy {
         implementation = _implementation;
 
         (bool success, ) = _implementation.delegatecall(_data);
-        require(success == true, "argent/proxy-init-failed");
+        require(success, "argent/proxy-init-failed");
     }
 
     fallback() external payable {
