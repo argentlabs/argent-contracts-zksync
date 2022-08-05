@@ -6,6 +6,7 @@ import { expect } from "chai";
 import { ArgentArtifacts, ArgentContext, deployAccount, deployFundedAccount } from "./account.service";
 import { TransactionSender, waitForTransaction } from "./transaction.service";
 import { waitForTimestamp } from "./provider.service";
+import { _TypedDataEncoder } from "ethers/lib/utils";
 
 const signer = new zksync.Wallet(process.env.PRIVATE_KEY as string);
 const guardian = new zksync.Wallet(process.env.GUARDIAN_PRIVATE_KEY as string);
@@ -116,7 +117,7 @@ describe("Argent account", () => {
       const balanceBefore2 = await provider.getBalance(account2.address);
 
       const transaction = { to: account2.address, value: amount };
-      await waitForTransaction(transaction, account1.address, provider, [signer, guardian]);
+      await waitForTransaction(transaction, account1, provider, [signer, guardian]);
 
       const balanceAfter1 = await provider.getBalance(account1.address);
       const balanceAfter2 = await provider.getBalance(account2.address);
@@ -132,7 +133,7 @@ describe("Argent account", () => {
         value: ethers.utils.parseEther("0.00000668"),
       };
 
-      const promise = waitForTransaction(transaction, account2.address, provider, [signer, guardian]);
+      const promise = waitForTransaction(transaction, account2, provider, [signer, guardian]);
       expect(promise).to.be.rejectedWith(/transaction failed|invalid hash/);
     });
   });
@@ -536,6 +537,82 @@ describe("Argent account", () => {
       const secondEscape = await account.escape();
       expect(secondEscape.activeAt).to.equal(0n);
       expect(secondEscape.escapeType).to.equal(noEscape);
+    });
+  });
+
+  describe("EIP-1271 signature validation of an EIP-712 typed message", () => {
+    const domain = {
+      name: "Ether Mail",
+      version: "1",
+      chainId: 1,
+      verifyingContract: "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC",
+    };
+
+    const types = {
+      Person: [
+        { name: "name", type: "string" },
+        { name: "wallet", type: "address" },
+      ],
+      Mail: [
+        { name: "from", type: "Person" },
+        { name: "to", type: "Person" },
+        { name: "contents", type: "string" },
+      ],
+    };
+
+    const value = {
+      from: {
+        name: "Cow",
+        wallet: "0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826",
+      },
+      to: {
+        name: "Bob",
+        wallet: "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB",
+      },
+      contents: "Hello, Bob!",
+    };
+
+    const hash = _TypedDataEncoder.hash(domain, types, value);
+    const eip1271SuccessReturnValue = "0x1626ba7e";
+    const signWith = (signatory: zksync.Wallet) => signatory._signTypedData(domain, types, value);
+
+    let account: zksync.Contract;
+
+    before(async () => {
+      account = await deployAccount(argent, signer.address, guardian.address);
+    });
+
+    it("Should verify on the account", async () => {
+      const signature = ethers.utils.concat([await signWith(signer), await signWith(guardian)]);
+      expect(await account.isValidSignature(hash, signature)).to.equal(eip1271SuccessReturnValue);
+    });
+
+    it("Should fail to verify using incorrect signers", async () => {
+      let signature = ethers.utils.concat([await signWith(signer), await signWith(wrongGuardian)]);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+
+      signature = ethers.utils.concat([await signWith(signer), await signWith(signer)]);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+
+      signature = ethers.utils.concat([await signWith(guardian), await signWith(guardian)]);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+    });
+
+    it("Should fail to verify using zeros in any place", async () => {
+      let signature = ethers.utils.concat([new Uint8Array(65), await signWith(guardian)]);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+
+      signature = ethers.utils.concat([await signWith(signer), new Uint8Array(65)]);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+
+      signature = new Uint8Array(130);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+    });
+
+    it("Should verify with a single signature when not using a guardian", async () => {
+      const account = await deployAccount(argent, signer.address, ethers.constants.AddressZero);
+      const signature = await signWith(signer);
+      expect(await account.isValidSignature(hash, signature)).to.equal(eip1271SuccessReturnValue);
     });
   });
 });

@@ -1,11 +1,14 @@
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 
+type Signatories = Array<zksync.Wallet | 0>;
+type TransactionRequest = zksync.types.TransactionRequest;
+
 export const sendTransaction = async (
-  transaction: zksync.types.TransactionRequest,
+  transaction: TransactionRequest,
   from: string | zksync.Contract,
   provider: zksync.Provider,
-  signatories: Array<zksync.Wallet | 0>,
+  signatories: Signatories,
 ) => {
   from = typeof from === "string" ? from : from.address;
 
@@ -25,12 +28,7 @@ export const sendTransaction = async (
     },
   };
 
-  const signaturePromises = signatories.map((signatory) =>
-    signatory === 0
-      ? Promise.resolve(new Uint8Array(65))
-      : new zksync.EIP712Signer(signatory, chainId).sign(unsignedTransaction),
-  );
-  const signature = ethers.utils.concat(await Promise.all(signaturePromises));
+  const signature = await signTransaction(unsignedTransaction, signatories, chainId);
 
   const transactionRequest = {
     ...unsignedTransaction,
@@ -51,10 +49,20 @@ export const waitForTransaction = async (...args: Parameters<typeof sendTransact
 };
 
 export const makeTransactionSender = (from: string | zksync.Contract, provider: zksync.Provider) => ({
-  sendTransaction: (transaction: zksync.types.TransactionRequest, signatories: Array<zksync.Wallet | 0>) =>
+  sendTransaction: (transaction: TransactionRequest, signatories: Signatories) =>
     sendTransaction(transaction, from, provider, signatories),
-  waitForTransaction: (transaction: zksync.types.TransactionRequest, signatories: Array<zksync.Wallet | 0>) =>
+  waitForTransaction: (transaction: TransactionRequest, signatories: Signatories) =>
     waitForTransaction(transaction, from, provider, signatories),
 });
 
 export type TransactionSender = ReturnType<typeof makeTransactionSender>;
+
+export const signTransaction = async (transaction: TransactionRequest, signatories: Signatories, chainId: number) => {
+  const signaturePromises = signatories.map((signatory) =>
+    signatory === 0
+      ? Promise.resolve(new Uint8Array(65))
+      : new zksync.EIP712Signer(signatory, chainId).sign(transaction),
+  );
+  const signature = ethers.utils.concat(await Promise.all(signaturePromises));
+  return ethers.utils.hexlify(signature);
+};

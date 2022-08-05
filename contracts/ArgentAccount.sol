@@ -33,8 +33,8 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     // uint96 public constant escapeSecurityPeriod = 1 weeks;
     uint96 public constant escapeSecurityPeriod = 10 seconds;
 
-    bytes4 constant eip1271SuccessReturnValue = 0x1626ba7e;
-    bytes32 constant zeroSignatureHash = keccak256(new bytes(65));
+    bytes32 public constant zeroSignatureHash = keccak256(new bytes(65));
+    bytes4 public constant eip1271SuccessReturnValue = bytes4(keccak256("isValidSignature(bytes32,bytes)"));
 
     address public signer;
     address public guardian;
@@ -135,7 +135,7 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
         emit SignerEscaped(_newSigner);
     }
 
-    function escapeGuardian(address _newGuardian) public onlySelf {
+    function escapeGuardian(address _newGuardian) public onlySelf requireGuardian {
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
         require(escape.escapeType == guardianEscape, "argent/invalid-escape-type");
@@ -215,10 +215,7 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     }
 
     function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4) {
-        require(_signature.length == 130, "argent/invalid-signature-length");
-
         validateSignatures(_hash, _signature);
-
         return eip1271SuccessReturnValue;
     }
 
