@@ -13,6 +13,8 @@ export const sendTransaction = async (
   from = typeof from === "string" ? from : from.address;
 
   const { chainId } = await provider.getNetwork();
+  // always estimate gasLimit to predict correct revert reasons
+  const gasLimit = await provider.estimateGas({ ...transaction, from });
   const unsignedTransaction = {
     type: zksync.utils.EIP712_TX_TYPE,
     to: transaction.to,
@@ -20,7 +22,7 @@ export const sendTransaction = async (
     value: transaction.value ?? "0x0",
     chainId: transaction.chainId ?? chainId,
     gasPrice: transaction.gasPrice ?? (await provider.getGasPrice()),
-    gasLimit: transaction.gasLimit ?? (await provider.estimateGas(transaction)),
+    gasLimit: transaction.gasLimit ?? gasLimit,
     nonce: transaction.nonce ?? (await provider.getTransactionCount(from)),
     customData: {
       ergsPerPubdata: transaction.customData?.ergsPerPubData ?? 0,

@@ -1,3 +1,5 @@
+import "@nomiclabs/hardhat-ethers";
+import "@nomicfoundation/hardhat-chai-matchers";
 import hre, { ethers } from "hardhat";
 import { PopulatedTransaction } from "ethers";
 import * as zksync from "zksync-web3";
@@ -212,10 +214,9 @@ describe("Argent account", () => {
       });
 
       it("Should revert calls that require the guardian to be set", async () => {
-        const transaction = await account.populateTransaction.changeGuardianBackup(wrongGuardian.address);
-        const promise = sender.waitForTransaction(transaction, [newSigner, 0]);
-        // FIXME: investigate why the correct error reason doesn't bubble up
-        await expect(promise).to.be.rejectedWith(/transaction failed|invalid hash/);
+        const transaction = await account.populateTransaction.triggerEscapeGuardian();
+        const promise = sender.waitForTransaction(transaction, [newSigner]);
+        await expect(promise).to.be.rejectedWith("argent/guardian-required");
       });
 
       it("Should add a guardian", async () => {
@@ -321,11 +322,11 @@ describe("Argent account", () => {
       });
 
       it("Should fail when no guardian", async () => {
-        const [, senderNoGuardian] = await deployFundedAccount(argent, signer.address, ethers.constants.AddressZero);
+        const [account, sender] = await deployFundedAccount(argent, signer.address, ethers.constants.AddressZero);
+        const transaction = await account.populateTransaction.changeGuardianBackup(newGuardianBackup.address);
 
-        const promise = senderNoGuardian.waitForTransaction(transaction, [signer, 0]);
-        // FIXME: investigate why the correct error reason doesn't bubble up
-        await expect(promise).to.be.rejectedWith(/transaction failed|invalid hash/);
+        const promise = sender.waitForTransaction(transaction, [signer]);
+        await expect(promise).to.be.rejectedWith("argent/guardian-required");
       });
     });
 
@@ -407,8 +408,7 @@ describe("Argent account", () => {
 
         // should fail to escape before the end of the period
         const promise = sender.waitForTransaction(escapeTransaction, [signer]);
-        // await expect(promise).to.be.rejectedWith("argent/inactive-escape");
-        await expect(promise).to.be.rejectedWith(/transaction failed|invalid hash/);
+        await expect(promise).to.be.rejectedWith("argent/inactive-escape");
 
         // wait security period
         await waitForTimestamp(escape.activeAt.toNumber(), provider);
@@ -442,8 +442,7 @@ describe("Argent account", () => {
 
         // should fail to escape before the end of the period
         const promise = sender.waitForTransaction(escapeTransaction, [guardian]);
-        // await expect(promise).to.be.rejectedWith("argent/inactive-escape");
-        await expect(promise).to.be.rejectedWith(/transaction failed|invalid hash/);
+        await expect(promise).to.be.rejectedWith("argent/inactive-escape");
 
         // wait security period
         await waitForTimestamp(escape.activeAt.toNumber(), provider);
@@ -476,7 +475,7 @@ describe("Argent account", () => {
         expect(firstEscape.activeAt).to.be.greaterThan(0n);
         expect(firstEscape.escapeType).to.equal(signerEscape);
 
-        // TODO: insert an evm_mine here when testing locally
+        // TODO: do evm_increaseTime + evm_mine here when testing locally
 
         // signer overrides the guardian's escape
         await sender.waitForTransaction(signerTransaction, [signer]);
@@ -498,12 +497,11 @@ describe("Argent account", () => {
         expect(escape.activeAt).to.be.greaterThan(0n);
         expect(escape.escapeType).to.equal(guardianEscape);
 
-        // TODO: insert an evm_mine here when testing locally
+        // TODO: do evm_increaseTime + evm_mine here when testing locally
 
         // guardian cannot override
         const promise = sender.waitForTransaction(guardianTransaction, [guardian]);
-        // await expect(promise).to.be.rejectedWith("argent/cannot-override-signer-escape");
-        await expect(promise).to.be.rejectedWith(/transaction failed|invalid hash/);
+        await expect(promise).to.be.rejectedWith("argent/cannot-override-signer-escape");
 
         const secondEscape = await account.escape();
         expect(secondEscape.activeAt).to.equal(escape.activeAt);
@@ -523,7 +521,7 @@ describe("Argent account", () => {
       expect(escape.activeAt).to.be.greaterThan(0n);
       expect(escape.escapeType).to.equal(signerEscape);
 
-      // should fail to cancel with only the signer signature
+      // should fail to cancel with just the signer signature
       const promise = sender.waitForTransaction(cancelTransaction, [signer]);
       await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
 
