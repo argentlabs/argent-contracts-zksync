@@ -5,7 +5,7 @@
   "author": "Argent Labs",
   "license": "MIT",
   "scripts": {
-    "test-integration": "hardhat test ./test-integration/*"
+    "test-integration": "hardhat test ./test-integration/test-*"
   },
   "devDependencies": {
     "@matterlabs/hardhat-zksync-deploy": "^0.3.6",
