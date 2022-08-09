@@ -1,13 +1,13 @@
 import { ethers } from "hardhat";
 import { Signer } from "ethers";
-import * as zksync from "zksync-web3";
 import { Bytes } from "ethers/lib/utils";
+import * as zksync from "zksync-web3";
 import { Provider } from "@ethersproject/providers";
 
 type TransactionRequest = zksync.types.TransactionRequest;
 export type Signatories = Array<zksync.Wallet | 0>;
 
-export const getSignature = async (transaction: TransactionRequest, signatories: Signatories, chainId: number) => {
+const concatSignatures = async (transaction: TransactionRequest, signatories: Signatories, chainId: number) => {
   const signaturePromises = signatories.map((signatory) =>
     signatory === 0
       ? Promise.resolve(new Uint8Array(65))
@@ -17,7 +17,7 @@ export const getSignature = async (transaction: TransactionRequest, signatories:
 };
 
 // TODO: make a BackendArgentSigner that fetches the guardian signature from the backend.
-export class LocalArgentSigner extends Signer {
+export class MultiSigner extends Signer {
   constructor(readonly address: string, readonly signatories: Signatories, readonly provider: Provider) {
     super();
   }
@@ -49,7 +49,7 @@ export class LocalArgentSigner extends Signer {
       },
     };
 
-    const signature = await getSignature(unsignedTransaction, this.signatories, chainId);
+    const signature = await concatSignatures(unsignedTransaction, this.signatories, chainId);
 
     const transactionRequest = {
       ...unsignedTransaction,
@@ -73,7 +73,7 @@ export class LocalArgentSigner extends Signer {
   }
   */
 
-  connect(provider: zksync.Provider): LocalArgentSigner {
-    return new LocalArgentSigner(this.address, this.signatories, provider);
+  connect(provider: zksync.Provider): MultiSigner {
+    return new MultiSigner(this.address, this.signatories, provider);
   }
 }

@@ -3,7 +3,7 @@ import { BytesLike } from "ethers";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
 import * as zksync from "zksync-web3";
-import { LocalArgentSigner, Signatories } from "./signer.service";
+import { MultiSigner, Signatories } from "./signer.service";
 
 export interface ArgentContext {
   deployer: Deployer;
@@ -71,23 +71,6 @@ export const deployAccount = async ({
   return account;
 };
 
-// export const deployFundedAccount = async (
-//   argent: ArgentContext,
-//   signerAddress: string,
-//   guardianAddress: string,
-//   salt?: BytesLike,
-// ): Promise<ArgentAccount> => {
-//   const account = await deployAccount({ argent, signerAddress, guardianAddress, salt, funded: false });
-
-//   const response = await argent.deployer.zkWallet.transfer({
-//     to: account.address,
-//     amount: ethers.utils.parseEther("0.0001"),
-//   });
-//   await response.wait();
-
-//   return account;
-// };
-
 const getAccountAddressFromCreate2 = async (
   { factory, implementation, artifacts }: ArgentContext,
   salt: BytesLike,
@@ -119,7 +102,7 @@ export const logBalance = async (address: string, provider: zksync.Provider, nam
 
 export class ArgentAccount extends zksync.Contract {
   connectSigners(...signatories: Signatories) {
-    const signer = new LocalArgentSigner(this.address, signatories, this.provider);
-    return new ArgentAccount(this.address, this.interface, signer);
+    const signer = new MultiSigner(this.address, signatories, this.provider);
+    return this.connect(signer) as this;
   }
 }
