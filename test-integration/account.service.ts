@@ -1,9 +1,9 @@
-import { ethers } from "hardhat";
+import hre, { ethers } from "hardhat";
 import { BytesLike } from "ethers";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
 import * as zksync from "zksync-web3";
-import { makeTransactionSender, TransactionSender } from "./transaction.service";
+import { LocalArgentSigner, Signatories } from "./transaction.service";
 
 export interface ArgentContext {
   deployer: Deployer;
@@ -23,7 +23,7 @@ export const deployAccount = async (
   signerAddress: string,
   guardianAddress: string,
   salt?: BytesLike,
-): Promise<zksync.Contract> => {
+): Promise<ArgentAccount> => {
   salt ??= ethers.utils.randomBytes(32);
   const { factory, implementation } = argent;
 
@@ -42,8 +42,9 @@ export const deployAccount = async (
     throw new Error(`Deployed address (${deployedAddress}) != address predicted from factory (${factoryAddress})`);
   }
 
-  const account = await ethers.getContractAt("ArgentAccount", deployedAddress);
-  return account;
+  // make sure account doesn't have a signer if not explicitely set
+  const provider = new zksync.Provider(hre.config.zkSyncDeploy.zkSyncNetwork);
+  return new ArgentAccount(deployedAddress, argent.implementation.interface, provider);
 };
 
 export const deployFundedAccount = async (
@@ -51,7 +52,7 @@ export const deployFundedAccount = async (
   signerAddress: string,
   guardianAddress: string,
   salt?: BytesLike,
-): Promise<[zksync.Contract, TransactionSender]> => {
+): Promise<ArgentAccount> => {
   const account = await deployAccount(argent, signerAddress, guardianAddress, salt);
 
   const response = await argent.deployer.zkWallet.transfer({
@@ -60,9 +61,7 @@ export const deployFundedAccount = async (
   });
   await response.wait();
 
-  const sender = makeTransactionSender(account, argent.deployer.zkWallet.provider);
-
-  return [account, sender];
+  return account;
 };
 
 const getAccountAddressFromCreate2 = async (
@@ -93,3 +92,10 @@ export const logBalance = async (address: string, provider: zksync.Provider, nam
   const balance = await provider.getBalance(address);
   console.log(`${name || address} ETH L2 balance is ${ethers.utils.formatEther(balance)}`);
 };
+
+export class ArgentAccount extends zksync.Contract {
+  connectSigners(...signatories: Signatories) {
+    const signer = new LocalArgentSigner(this.address, signatories, this.provider);
+    return new ArgentAccount(this.address, this.interface, signer);
+  }
+}

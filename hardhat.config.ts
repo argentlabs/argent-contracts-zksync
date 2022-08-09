@@ -29,4 +29,7 @@ module.exports = {
   solidity: {
     version: "0.8.10",
   },
+  mocha: {
+    timeout: 60_000,
+  },
 };
