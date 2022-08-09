@@ -4,15 +4,10 @@ import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { expect } from "chai";
-import {
-  ArgentAccount,
-  ArgentArtifacts,
-  ArgentContext,
-  deployAccount,
-  deployFundedAccount,
-  logBalance,
-} from "./account.service";
+import { ArgentAccount, ArgentArtifacts, ArgentContext, deployAccount, logBalance } from "./account.service";
 import { waitForTimestamp } from "./provider.service";
+
+const { AddressZero } = ethers.constants;
 
 const signer = new zksync.Wallet(process.env.PRIVATE_KEY as string);
 const guardian = new zksync.Wallet(process.env.GUARDIAN_PRIVATE_KEY as string);
@@ -22,6 +17,8 @@ const newGuardianBackup = zksync.Wallet.createRandom();
 const wrongSigner = zksync.Wallet.createRandom();
 const wrongGuardian = zksync.Wallet.createRandom();
 
+const signerAddress = signer.address;
+const guardianAddress = guardian.address;
 const deployer = new Deployer(hre, signer);
 const provider = (ethers.provider = deployer.zkWallet.provider); // needed for hardhat-ethers's .getContractAt(...)
 
@@ -73,7 +70,7 @@ describe("Argent account", () => {
     let account: ArgentAccount;
 
     before(async () => {
-      account = await deployAccount(argent, signer.address, guardian.address);
+      account = await deployAccount({ argent, signerAddress, guardianAddress, funded: false });
     });
 
     it("Should be initialized properly", async () => {
@@ -94,12 +91,14 @@ describe("Argent account", () => {
     let account2: ArgentAccount;
 
     it("Should deploy a new account (1)", async () => {
-      account1 = (await deployAccount(argent, signer.address, guardian.address)).connectSigners(signer, guardian);
+      const signers = [signer, guardian];
+      account1 = await deployAccount({ argent, signerAddress, guardianAddress, signers, funded: false });
       console.log(`        Account 1 deployed to ${account1.address}`);
     });
 
     it("Should deploy a new account (2)", async () => {
-      account2 = await deployAccount(argent, "0xEA674fdDe714fd979de3EdF0F56AA9716B898ec8", guardian.address);
+      const signerAddress = "0xEA674fdDe714fd979de3EdF0F56AA9716B898ec8";
+      account2 = await deployAccount({ argent, signerAddress, guardianAddress, funded: false });
       console.log(`        Account 2 deployed to ${account2.address}`);
     });
 
@@ -141,6 +140,7 @@ describe("Argent account", () => {
   });
 
   describe("Using a dapp", () => {
+    let account: ArgentAccount;
     let testDapp: zksync.Contract;
 
     before(async () => {
@@ -158,11 +158,8 @@ describe("Argent account", () => {
     });
 
     describe("Calling the dapp using a guardian", () => {
-      let account: ArgentAccount;
-
       before(async () => {
-        account = await deployFundedAccount(argent, signer.address, guardian.address);
-        account = account.connectSigners(signer, guardian);
+        account = await deployAccount({ argent, signerAddress, guardianAddress, signers: [signer, guardian] });
       });
 
       it("Should revert with bad nonce", async () => {
@@ -197,11 +194,8 @@ describe("Argent account", () => {
     });
 
     describe("Calling the dapp without using a guardian", () => {
-      let account: ArgentAccount;
-
       before(async () => {
-        account = await deployFundedAccount(argent, signer.address, ethers.constants.AddressZero);
-        account = account.connectSigners(signer);
+        account = await deployAccount({ argent, signerAddress, guardianAddress: AddressZero, signers: [signer] });
       });
 
       it("Should successfully call the dapp", async () => {
@@ -228,7 +222,7 @@ describe("Argent account", () => {
       });
 
       it("Should add a guardian", async () => {
-        expect(await account.guardian()).to.equal(ethers.constants.AddressZero);
+        expect(await account.guardian()).to.equal(AddressZero);
 
         const promise = account.changeGuardian(guardian.address);
 
@@ -239,12 +233,11 @@ describe("Argent account", () => {
   });
 
   describe("Recovery", () => {
-    describe("Changing signer", () => {
-      let account: ArgentAccount;
+    let account: ArgentAccount;
 
+    describe("Changing signer", () => {
       before(async () => {
-        account = await deployFundedAccount(argent, signer.address, guardian.address);
-        account = account.connectSigners(signer, guardian);
+        account = await deployAccount({ argent, signerAddress, guardianAddress, signers: [signer, guardian] });
       });
 
       it("Should revert with the wrong signer signature", async () => {
@@ -268,11 +261,8 @@ describe("Argent account", () => {
     });
 
     describe("Changing guardian", () => {
-      let account: ArgentAccount;
-
       before(async () => {
-        account = await deployFundedAccount(argent, signer.address, guardian.address);
-        account = account.connectSigners(signer, guardian);
+        account = await deployAccount({ argent, signerAddress, guardianAddress, signers: [signer, guardian] });
       });
 
       it("Should revert with the wrong signer signature", async () => {
@@ -296,11 +286,8 @@ describe("Argent account", () => {
     });
 
     describe("Changing guardian backup", () => {
-      let account: ArgentAccount;
-
       before(async () => {
-        account = await deployFundedAccount(argent, signer.address, guardian.address);
-        account = account.connectSigners(signer, guardian);
+        account = await deployAccount({ argent, signerAddress, guardianAddress, signers: [signer, guardian] });
       });
 
       it("Should revert with the wrong signer signature", async () => {
@@ -314,7 +301,7 @@ describe("Argent account", () => {
       });
 
       it("Should work with the correct signatures", async () => {
-        expect(await account.guardianBackup()).to.equal(ethers.constants.AddressZero);
+        expect(await account.guardianBackup()).to.equal(AddressZero);
 
         const promise = account.changeGuardianBackup(newGuardianBackup.address);
 
@@ -323,15 +310,15 @@ describe("Argent account", () => {
       });
 
       it("Should fail when no guardian", async () => {
-        const account = await deployFundedAccount(argent, signer.address, ethers.constants.AddressZero);
-        const promise = account.connectSigners(signer).changeGuardianBackup(newGuardianBackup.address);
+        const account = await deployAccount({ argent, signerAddress, guardianAddress: AddressZero, signers: [signer] });
+        const promise = account.changeGuardianBackup(newGuardianBackup.address);
         await expect(promise).to.be.rejectedWith("argent/guardian-required");
       });
     });
 
     describe("Escape triggering", () => {
       it("Should run triggerEscapeGuardian() by signer", async () => {
-        const account = (await deployFundedAccount(argent, signer.address, guardian.address)).connectSigners(signer);
+        const account = await deployAccount({ argent, signerAddress, guardianAddress, signers: [signer] });
 
         const escapeBefore = await account.escape();
         expect(escapeBefore.activeAt).to.equal(0n);
@@ -349,7 +336,7 @@ describe("Argent account", () => {
       });
 
       it("Should run triggerEscapeSigner() by guardian", async () => {
-        const account = (await deployFundedAccount(argent, signer.address, guardian.address)).connectSigners(guardian);
+        const account = await deployAccount({ argent, signerAddress, guardianAddress, signers: [guardian] });
 
         const escapeBefore = await account.escape();
         expect(escapeBefore.activeAt).to.equal(0n);
@@ -367,7 +354,7 @@ describe("Argent account", () => {
       });
 
       it("Should run triggerEscapeSigner() by guardian backup", async () => {
-        const account = await deployFundedAccount(argent, signer.address, guardian.address);
+        const account = await deployAccount({ argent, signerAddress, guardianAddress });
         const backupResponse = await account
           .connectSigners(signer, guardian)
           .changeGuardianBackup(newGuardianBackup.address);
@@ -395,7 +382,7 @@ describe("Argent account", () => {
       }
 
       it("Should escape guardian", async () => {
-        const account = (await deployFundedAccount(argent, signer.address, guardian.address)).connectSigners(signer);
+        const account = await deployAccount({ argent, signerAddress, guardianAddress, signers: [signer] });
 
         // trigger escape
         await expect(account.triggerEscapeGuardian()).to.emit(account, "EscapeGuardianTriggerred");
@@ -425,7 +412,7 @@ describe("Argent account", () => {
       });
 
       it("Should escape signer", async () => {
-        const account = (await deployFundedAccount(argent, signer.address, guardian.address)).connectSigners(guardian);
+        const account = await deployAccount({ argent, signerAddress, guardianAddress, signers: [guardian] });
 
         // trigger escape
         await expect(account.triggerEscapeSigner()).to.emit(account, "EscapeSignerTriggerred");
@@ -457,7 +444,7 @@ describe("Argent account", () => {
 
     describe("Escape overriding", () => {
       it("Should allow signer to override a signer escape", async () => {
-        const account = await deployFundedAccount(argent, signer.address, guardian.address);
+        const account = await deployAccount({ argent, signerAddress, guardianAddress });
 
         // guardian triggers a signer escape
         const guardianResponse = await account.connectSigners(guardian).triggerEscapeSigner();
@@ -479,7 +466,7 @@ describe("Argent account", () => {
       });
 
       it("Should forbid guardian to override a guardian escape", async () => {
-        const account = await deployFundedAccount(argent, signer.address, guardian.address);
+        const account = await deployAccount({ argent, signerAddress, guardianAddress });
 
         // signer triggers a guardian escape
         const response = await account.connectSigners(signer).triggerEscapeGuardian();
@@ -502,7 +489,7 @@ describe("Argent account", () => {
     });
 
     it("Should cancel an escape", async () => {
-      const account = await deployFundedAccount(argent, signer.address, guardian.address);
+      const account = await deployAccount({ argent, signerAddress, guardianAddress });
 
       // guardian triggers a signer escape
       const response = await account.connectSigners(guardian).triggerEscapeSigner();
@@ -558,7 +545,7 @@ describe("Argent account", () => {
     let account: ArgentAccount;
 
     before(async () => {
-      account = await deployAccount(argent, signer.address, guardian.address);
+      account = await deployAccount({ argent, signerAddress, guardianAddress, funded: false });
     });
 
     it("Should verify on the account", async () => {
@@ -567,7 +554,7 @@ describe("Argent account", () => {
     });
 
     it("Should verify with a single signature when not using a guardian", async () => {
-      const accountNoGuardian = await deployAccount(argent, signer.address, ethers.constants.AddressZero);
+      const accountNoGuardian = await deployAccount({ argent, signerAddress, guardianAddress: AddressZero });
       const signature = await signWith(signer);
       expect(await accountNoGuardian.isValidSignature(hash, signature)).to.equal(eip1271SuccessReturnValue);
     });

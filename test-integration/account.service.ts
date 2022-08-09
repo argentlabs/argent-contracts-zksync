@@ -3,7 +3,7 @@ import { BytesLike } from "ethers";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
 import * as zksync from "zksync-web3";
-import { LocalArgentSigner, Signatories } from "./transaction.service";
+import { LocalArgentSigner, Signatories } from "./signer.service";
 
 export interface ArgentContext {
   deployer: Deployer;
@@ -18,14 +18,24 @@ export interface ArgentArtifacts {
   proxy: ZkSyncArtifact;
 }
 
-export const deployAccount = async (
-  argent: ArgentContext,
-  signerAddress: string,
-  guardianAddress: string,
-  salt?: BytesLike,
-): Promise<ArgentAccount> => {
-  salt ??= ethers.utils.randomBytes(32);
-  const { factory, implementation } = argent;
+interface AccountDeploymentParams {
+  argent: ArgentContext;
+  signerAddress: string;
+  guardianAddress: string;
+  signers?: Signatories;
+  funded?: boolean;
+  salt?: BytesLike;
+}
+
+export const deployAccount = async ({
+  argent,
+  signerAddress,
+  guardianAddress,
+  signers,
+  funded = true,
+  salt = ethers.utils.randomBytes(32),
+}: AccountDeploymentParams): Promise<ArgentAccount> => {
+  const { deployer, factory, implementation } = argent;
 
   const create2Address = await getAccountAddressFromCreate2(argent, salt, signerAddress, guardianAddress);
   const factoryAddress = await getAccountAddressFromFactory(argent, salt, signerAddress, guardianAddress);
@@ -42,27 +52,41 @@ export const deployAccount = async (
     throw new Error(`Deployed address (${deployedAddress}) != address predicted from factory (${factoryAddress})`);
   }
 
-  // make sure account doesn't have a signer if not explicitely set
+  // make sure account doesn't have a signer by default
   const provider = new zksync.Provider(hre.config.zkSyncDeploy.zkSyncNetwork);
-  return new ArgentAccount(deployedAddress, argent.implementation.interface, provider);
-};
+  const account = new ArgentAccount(deployedAddress, argent.implementation.interface, provider);
 
-export const deployFundedAccount = async (
-  argent: ArgentContext,
-  signerAddress: string,
-  guardianAddress: string,
-  salt?: BytesLike,
-): Promise<ArgentAccount> => {
-  const account = await deployAccount(argent, signerAddress, guardianAddress, salt);
+  if (funded) {
+    const response = await deployer.zkWallet.transfer({
+      to: account.address,
+      amount: ethers.utils.parseEther("0.0001"),
+    });
+    await response.wait();
+  }
 
-  const response = await argent.deployer.zkWallet.transfer({
-    to: account.address,
-    amount: ethers.utils.parseEther("0.0001"),
-  });
-  await response.wait();
+  if (signers) {
+    return account.connectSigners(...signers);
+  }
 
   return account;
 };
+
+// export const deployFundedAccount = async (
+//   argent: ArgentContext,
+//   signerAddress: string,
+//   guardianAddress: string,
+//   salt?: BytesLike,
+// ): Promise<ArgentAccount> => {
+//   const account = await deployAccount({ argent, signerAddress, guardianAddress, salt, funded: false });
+
+//   const response = await argent.deployer.zkWallet.transfer({
+//     to: account.address,
+//     amount: ethers.utils.parseEther("0.0001"),
+//   });
+//   await response.wait();
+
+//   return account;
+// };
 
 const getAccountAddressFromCreate2 = async (
   { factory, implementation, artifacts }: ArgentContext,
