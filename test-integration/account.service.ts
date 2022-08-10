@@ -22,7 +22,7 @@ interface AccountDeploymentParams {
   argent: ArgentContext;
   signerAddress: string;
   guardianAddress: string;
-  signers?: Signatories;
+  connect?: Signatories;
   funded?: boolean;
   salt?: BytesLike;
 }
@@ -31,7 +31,7 @@ export const deployAccount = async ({
   argent,
   signerAddress,
   guardianAddress,
-  signers,
+  connect,
   funded = true,
   salt = ethers.utils.randomBytes(32),
 }: AccountDeploymentParams): Promise<ArgentAccount> => {
@@ -64,8 +64,8 @@ export const deployAccount = async ({
     await response.wait();
   }
 
-  if (signers) {
-    return account.connectSigners(...signers);
+  if (connect) {
+    return account.connect(connect);
   }
 
   return account;
@@ -101,8 +101,11 @@ export const logBalance = async (address: string, provider: zksync.Provider, nam
 };
 
 export class ArgentAccount extends zksync.Contract {
-  connectSigners(...signatories: Signatories) {
-    const signer = new MultiSigner(this.address, signatories, this.provider);
-    return this.connect(signer) as this;
+  connect(signerOrSignersOrProvider: any) {
+    if (Array.isArray(signerOrSignersOrProvider)) {
+      const signer = new MultiSigner(this.address, signerOrSignersOrProvider, this.provider);
+      return super.connect(signer) as this;
+    }
+    return super.connect(signerOrSignersOrProvider) as this;
   }
 }

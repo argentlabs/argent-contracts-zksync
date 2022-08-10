@@ -91,8 +91,8 @@ describe("Argent account", () => {
     let account2: ArgentAccount;
 
     it("Should deploy a new account (1)", async () => {
-      const signers = [signer, guardian];
-      account1 = await deployAccount({ argent, signerAddress, guardianAddress, signers, funded: false });
+      const connect = [signer, guardian];
+      account1 = await deployAccount({ argent, signerAddress, guardianAddress, connect, funded: false });
       console.log(`        Account 1 deployed to ${account1.address}`);
     });
 
@@ -130,7 +130,7 @@ describe("Argent account", () => {
     });
 
     it("Should fail to transfer ETH from account 2 to account 1", async () => {
-      const promise = account2.connectSigners(signer, guardian).signer.sendTransaction({
+      const promise = account2.connect([signer, guardian]).signer.sendTransaction({
         to: account1.address,
         value: ethers.utils.parseEther("0.00000668"),
       });
@@ -159,7 +159,7 @@ describe("Argent account", () => {
 
     describe("Calling the dapp using a guardian", () => {
       before(async () => {
-        account = await deployAccount({ argent, signerAddress, guardianAddress, signers: [signer, guardian] });
+        account = await deployAccount({ argent, signerAddress, guardianAddress, connect: [signer, guardian] });
       });
 
       it("Should revert with bad nonce", async () => {
@@ -168,17 +168,17 @@ describe("Argent account", () => {
       });
 
       it("Should revert with bad signer", async () => {
-        const dapp = testDapp.connect(account.connectSigners(wrongGuardian, guardian).signer);
+        const dapp = testDapp.connect(account.connect([wrongGuardian, guardian]).signer);
         await expect(dapp.setNumber(69)).to.be.rejectedWith("argent/invalid-signer-signature");
       });
 
       it("Should revert with bad guardian", async () => {
-        const dapp = testDapp.connect(account.connectSigners(signer, wrongGuardian).signer);
+        const dapp = testDapp.connect(account.connect([signer, wrongGuardian]).signer);
         await expect(dapp.setNumber(69)).to.be.rejectedWith("argent/invalid-guardian-signature");
       });
 
       it("Should revert with just 1 signer", async () => {
-        const dapp = testDapp.connect(account.connectSigners(signer).signer);
+        const dapp = testDapp.connect(account.connect([signer]).signer);
         await expect(dapp.setNumber(69)).to.be.rejectedWith("argent/invalid-guardian-signature-length");
       });
 
@@ -195,7 +195,7 @@ describe("Argent account", () => {
 
     describe("Calling the dapp without using a guardian", () => {
       before(async () => {
-        account = await deployAccount({ argent, signerAddress, guardianAddress: AddressZero, signers: [signer] });
+        account = await deployAccount({ argent, signerAddress, guardianAddress: AddressZero, connect: [signer] });
       });
 
       it("Should successfully call the dapp", async () => {
@@ -217,7 +217,7 @@ describe("Argent account", () => {
       });
 
       it("Should revert calls that require the guardian to be set", async () => {
-        account = account.connectSigners(newSigner);
+        account = account.connect([newSigner]);
         await expect(account.triggerEscapeGuardian()).to.be.rejectedWith("argent/guardian-required");
       });
 
@@ -237,16 +237,16 @@ describe("Argent account", () => {
 
     describe("Changing signer", () => {
       before(async () => {
-        account = await deployAccount({ argent, signerAddress, guardianAddress, signers: [signer, guardian] });
+        account = await deployAccount({ argent, signerAddress, guardianAddress, connect: [signer, guardian] });
       });
 
       it("Should revert with the wrong signer signature", async () => {
-        const promise = account.connectSigners(wrongSigner, guardian).changeSigner(newSigner.address);
+        const promise = account.connect([wrongSigner, guardian]).changeSigner(newSigner.address);
         await expect(promise).to.be.rejectedWith("argent/invalid-signer-signature");
       });
 
       it("Should revert with the wrong guardian signature", async () => {
-        const promise = account.connectSigners(signer, wrongGuardian).changeSigner(newSigner.address);
+        const promise = account.connect([signer, wrongGuardian]).changeSigner(newSigner.address);
         await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
       });
 
@@ -262,16 +262,16 @@ describe("Argent account", () => {
 
     describe("Changing guardian", () => {
       before(async () => {
-        account = await deployAccount({ argent, signerAddress, guardianAddress, signers: [signer, guardian] });
+        account = await deployAccount({ argent, signerAddress, guardianAddress, connect: [signer, guardian] });
       });
 
       it("Should revert with the wrong signer signature", async () => {
-        const promise = account.connectSigners(wrongSigner, guardian).changeGuardian(newGuardian.address);
+        const promise = account.connect([wrongSigner, guardian]).changeGuardian(newGuardian.address);
         await expect(promise).to.be.rejectedWith("argent/invalid-signer-signature");
       });
 
       it("Should revert with the wrong guardian signature", async () => {
-        const promise = account.connectSigners(signer, wrongGuardian).changeGuardian(newGuardian.address);
+        const promise = account.connect([signer, wrongGuardian]).changeGuardian(newGuardian.address);
         await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
       });
 
@@ -287,16 +287,16 @@ describe("Argent account", () => {
 
     describe("Changing guardian backup", () => {
       before(async () => {
-        account = await deployAccount({ argent, signerAddress, guardianAddress, signers: [signer, guardian] });
+        account = await deployAccount({ argent, signerAddress, guardianAddress, connect: [signer, guardian] });
       });
 
       it("Should revert with the wrong signer signature", async () => {
-        const promise = account.connectSigners(wrongSigner, guardian).changeGuardianBackup(newGuardianBackup.address);
+        const promise = account.connect([wrongSigner, guardian]).changeGuardianBackup(newGuardianBackup.address);
         await expect(promise).to.be.rejectedWith("argent/invalid-signer-signature");
       });
 
       it("Should revert with the wrong guardian signature", async () => {
-        const promise = account.connectSigners(signer, wrongGuardian).changeGuardianBackup(newGuardianBackup.address);
+        const promise = account.connect([signer, wrongGuardian]).changeGuardianBackup(newGuardianBackup.address);
         await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
       });
 
@@ -310,7 +310,7 @@ describe("Argent account", () => {
       });
 
       it("Should fail when no guardian", async () => {
-        const account = await deployAccount({ argent, signerAddress, guardianAddress: AddressZero, signers: [signer] });
+        const account = await deployAccount({ argent, signerAddress, guardianAddress: AddressZero, connect: [signer] });
         const promise = account.changeGuardianBackup(newGuardianBackup.address);
         await expect(promise).to.be.rejectedWith("argent/guardian-required");
       });
@@ -318,7 +318,7 @@ describe("Argent account", () => {
 
     describe("Escape triggering", () => {
       it("Should run triggerEscapeGuardian() by signer", async () => {
-        const account = await deployAccount({ argent, signerAddress, guardianAddress, signers: [signer] });
+        const account = await deployAccount({ argent, signerAddress, guardianAddress, connect: [signer] });
 
         const escapeBefore = await account.escape();
         expect(escapeBefore.activeAt).to.equal(0n);
@@ -336,7 +336,7 @@ describe("Argent account", () => {
       });
 
       it("Should run triggerEscapeSigner() by guardian", async () => {
-        const account = await deployAccount({ argent, signerAddress, guardianAddress, signers: [guardian] });
+        const account = await deployAccount({ argent, signerAddress, guardianAddress, connect: [guardian] });
 
         const escapeBefore = await account.escape();
         expect(escapeBefore.activeAt).to.equal(0n);
@@ -356,7 +356,7 @@ describe("Argent account", () => {
       it("Should run triggerEscapeSigner() by guardian backup", async () => {
         const account = await deployAccount({ argent, signerAddress, guardianAddress });
         const backupResponse = await account
-          .connectSigners(signer, guardian)
+          .connect([signer, guardian])
           .changeGuardianBackup(newGuardianBackup.address);
         await backupResponse.wait();
 
@@ -364,7 +364,7 @@ describe("Argent account", () => {
         expect(escapeBefore.activeAt).to.equal(0n);
         expect(escapeBefore.escapeType).to.equal(noEscape);
 
-        const response = await account.connectSigners(0, newGuardianBackup).triggerEscapeSigner();
+        const response = await account.connect([0, newGuardianBackup]).triggerEscapeSigner();
         const receipt = await response.wait();
         const { timestamp } = await provider.getBlock(receipt.blockHash);
         const activeAtExpected = timestamp + escapeSecurityPeriod;
@@ -382,7 +382,7 @@ describe("Argent account", () => {
       }
 
       it("Should escape guardian", async () => {
-        const account = await deployAccount({ argent, signerAddress, guardianAddress, signers: [signer] });
+        const account = await deployAccount({ argent, signerAddress, guardianAddress, connect: [signer] });
 
         // trigger escape
         await expect(account.triggerEscapeGuardian()).to.emit(account, "EscapeGuardianTriggerred");
@@ -412,7 +412,7 @@ describe("Argent account", () => {
       });
 
       it("Should escape signer", async () => {
-        const account = await deployAccount({ argent, signerAddress, guardianAddress, signers: [guardian] });
+        const account = await deployAccount({ argent, signerAddress, guardianAddress, connect: [guardian] });
 
         // trigger escape
         await expect(account.triggerEscapeSigner()).to.emit(account, "EscapeSignerTriggerred");
@@ -447,7 +447,7 @@ describe("Argent account", () => {
         const account = await deployAccount({ argent, signerAddress, guardianAddress });
 
         // guardian triggers a signer escape
-        const guardianResponse = await account.connectSigners(guardian).triggerEscapeSigner();
+        const guardianResponse = await account.connect([guardian]).triggerEscapeSigner();
         await guardianResponse.wait();
 
         const firstEscape = await account.escape();
@@ -457,7 +457,7 @@ describe("Argent account", () => {
         // TODO: do evm_increaseTime + evm_mine here when testing locally
 
         // signer overrides the guardian's escape
-        const signerResponse = await account.connectSigners(signer).triggerEscapeGuardian();
+        const signerResponse = await account.connect([signer]).triggerEscapeGuardian();
         await signerResponse.wait();
 
         const secondEscape = await account.escape();
@@ -469,7 +469,7 @@ describe("Argent account", () => {
         const account = await deployAccount({ argent, signerAddress, guardianAddress });
 
         // signer triggers a guardian escape
-        const response = await account.connectSigners(signer).triggerEscapeGuardian();
+        const response = await account.connect([signer]).triggerEscapeGuardian();
         await response.wait();
 
         const escape = await account.escape();
@@ -479,7 +479,7 @@ describe("Argent account", () => {
         // TODO: do evm_increaseTime + evm_mine here when testing locally
 
         // guardian cannot override
-        const promise = account.connectSigners(guardian).triggerEscapeSigner();
+        const promise = account.connect([guardian]).triggerEscapeSigner();
         await expect(promise).to.be.rejectedWith("argent/cannot-override-signer-escape");
 
         const secondEscape = await account.escape();
@@ -492,7 +492,7 @@ describe("Argent account", () => {
       const account = await deployAccount({ argent, signerAddress, guardianAddress });
 
       // guardian triggers a signer escape
-      const response = await account.connectSigners(guardian).triggerEscapeSigner();
+      const response = await account.connect([guardian]).triggerEscapeSigner();
       await response.wait();
 
       const escape = await account.escape();
@@ -500,10 +500,10 @@ describe("Argent account", () => {
       expect(escape.escapeType).to.equal(signerEscape);
 
       // should fail to cancel with just the signer signature
-      const rejectingPromise = account.connectSigners(signer).cancelEscape();
+      const rejectingPromise = account.connect([signer]).cancelEscape();
       await expect(rejectingPromise).to.be.rejectedWith("argent/invalid-guardian-signature");
 
-      const resolvingPromise = account.connectSigners(signer, guardian).cancelEscape();
+      const resolvingPromise = account.connect([signer, guardian]).cancelEscape();
       await expect(resolvingPromise).to.emit(account, "EscapeCancelled");
 
       const secondEscape = await account.escape();
