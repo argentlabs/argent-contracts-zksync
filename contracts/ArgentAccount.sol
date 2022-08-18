@@ -18,7 +18,7 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     }
 
     struct Escape {
-        uint96 activeAt; // timestamp for activation of escape mode, 0 otherwise
+        uint32 activeAt; // timestamp for activation of escape mode, 0 otherwise
         uint8 escapeType; // packed EscapeType enum
     }
 
@@ -30,8 +30,8 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     uint8 public constant signerEscape = uint8(EscapeType.Signer);
 
     // FIXME: using short period for testing on goerli, switch back to 1 week when local testing is available
-    // uint96 public constant escapeSecurityPeriod = 1 weeks;
-    uint96 public constant escapeSecurityPeriod = 10 seconds;
+    // uint32 public constant escapeSecurityPeriod = 1 weeks;
+    uint32 public constant escapeSecurityPeriod = 10 seconds;
 
     bytes32 public constant zeroSignatureHash = keccak256(new bytes(65));
     bytes4 public constant eip1271SuccessReturnValue = bytes4(keccak256("isValidSignature(bytes32,bytes)"));
@@ -49,8 +49,8 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     event GuardianChanged(address newGuardian);
     event GuardianBackupChanged(address newGuardianBackup);
 
-    event EscapeSignerTriggerred(uint96 activeAt);
-    event EscapeGuardianTriggerred(uint96 activeAt);
+    event EscapeSignerTriggerred(uint32 activeAt);
+    event EscapeGuardianTriggerred(uint32 activeAt);
     event SignerEscaped(address newSigner);
     event GuardianEscaped(address newGuardian);
     event EscapeCancelled();
@@ -105,13 +105,13 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
             require(escape.escapeType == signerEscape, "argent/cannot-override-signer-escape");
         }
 
-        uint96 activeAt = uint96(block.timestamp) + escapeSecurityPeriod;
+        uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(activeAt, signerEscape);
         emit EscapeSignerTriggerred(activeAt);
     }
 
     function triggerEscapeGuardian() public onlySelf requireGuardian {
-        uint96 activeAt = uint96(block.timestamp) + escapeSecurityPeriod;
+        uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(activeAt, guardianEscape);
         emit EscapeGuardianTriggerred(activeAt);
     }
