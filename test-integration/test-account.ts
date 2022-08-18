@@ -51,7 +51,7 @@ describe("Argent account", () => {
       noEscape = await contract.noEscape();
       signerEscape = await contract.signerEscape();
       guardianEscape = await contract.guardianEscape();
-      escapeSecurityPeriod = (await contract.escapeSecurityPeriod()).toNumber();
+      escapeSecurityPeriod = await contract.escapeSecurityPeriod();
     });
 
     it("Should deploy a new AccountFactory", async () => {
@@ -395,7 +395,7 @@ describe("Argent account", () => {
         await expect(account.escapeGuardian(newGuardian.address)).to.be.rejectedWith("argent/inactive-escape");
 
         // wait security period
-        await waitForTimestamp(escape.activeAt.toNumber(), provider);
+        await waitForTimestamp(escape.activeAt, provider);
 
         expect(await account.guardian()).to.equal(guardian.address);
 
@@ -425,7 +425,7 @@ describe("Argent account", () => {
         await expect(account.escapeSigner(newSigner.address)).to.be.rejectedWith("argent/inactive-escape");
 
         // wait security period
-        await waitForTimestamp(escape.activeAt.toNumber(), provider);
+        await waitForTimestamp(escape.activeAt, provider);
 
         expect(await account.callStatic.signer()).to.equal(signer.address);
 
