@@ -1,8 +1,8 @@
 //SPDX-License-Identifier: Unlicense
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.10;
 
 contract TestDapp {
-    mapping (address => uint256) public userNumbers;
+    mapping(address => uint256) public userNumbers;
 
     function setNumber(uint256 _number) external {
         userNumbers[msg.sender] = _number;
