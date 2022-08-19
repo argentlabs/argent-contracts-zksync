@@ -14,7 +14,7 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     enum EscapeType {
         None,
         Guardian,
-        Signer
+        Owner
     }
 
     struct Escape {
@@ -27,7 +27,7 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
 
     uint8 public constant noEscape = uint8(EscapeType.None);
     uint8 public constant guardianEscape = uint8(EscapeType.Guardian);
-    uint8 public constant signerEscape = uint8(EscapeType.Signer);
+    uint8 public constant ownerEscape = uint8(EscapeType.Owner);
 
     // FIXME: using short period for testing on goerli, switch back to 1 week when local testing is available
     // uint32 public constant escapeSecurityPeriod = 1 weeks;
@@ -36,31 +36,31 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     bytes32 public constant zeroSignatureHash = keccak256(new bytes(65));
     bytes4 public constant eip1271SuccessReturnValue = bytes4(keccak256("isValidSignature(bytes32,bytes)"));
 
-    address public signer;
+    address public owner;
     address public guardian;
     address public guardianBackup;
     Escape public escape;
 
-    event AccountCreated(address account, address signer, address guardian);
+    event AccountCreated(address account, address owner, address guardian);
     event AccountUpgraded(address newImplementation);
     event TransactionExecuted(bytes32 hashed, bytes response);
 
-    event SignerChanged(address newSigner);
+    event OwnerChanged(address newOwner);
     event GuardianChanged(address newGuardian);
     event GuardianBackupChanged(address newGuardianBackup);
 
-    event EscapeSignerTriggerred(uint32 activeAt);
+    event EscapeOwnerTriggerred(uint32 activeAt);
     event EscapeGuardianTriggerred(uint32 activeAt);
-    event SignerEscaped(address newSigner);
+    event OwnerEscaped(address newOwner);
     event GuardianEscaped(address newGuardian);
     event EscapeCancelled();
 
-    function initialize(address _signer, address _guardian) external {
-        require(signer == address(0), "argent/already-init");
-        require(_signer != address(0), "argent/invalid-signer");
-        signer = _signer;
+    function initialize(address _owner, address _guardian) external {
+        require(owner == address(0), "argent/already-init");
+        require(_owner != address(0), "argent/invalid-owner");
+        owner = _owner;
         guardian = _guardian;
-        emit AccountCreated(address(this), signer, guardian);
+        emit AccountCreated(address(this), owner, guardian);
     }
 
     modifier onlySelf() {
@@ -81,10 +81,10 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
 
     // Recovery
 
-    function changeSigner(address _newSigner) public onlySelf {
-        require(_newSigner != address(0), "argent/null-signer");
-        signer = _newSigner;
-        emit SignerChanged(_newSigner);
+    function changeOwner(address _newOwner) public onlySelf {
+        require(_newOwner != address(0), "argent/null-owner");
+        owner = _newOwner;
+        emit OwnerChanged(_newOwner);
     }
 
     function changeGuardian(address _newGuardian) public onlySelf {
@@ -99,15 +99,15 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
         emit GuardianBackupChanged(_newGuardianBackup);
     }
 
-    function triggerEscapeSigner() public onlySelf requireGuardian {
-        // no escape if there is an guardian escape triggered by the signer in progress
+    function triggerEscapeOwner() public onlySelf requireGuardian {
+        // no escape if there is an guardian escape triggered by the owner in progress
         if (escape.activeAt != 0) {
-            require(escape.escapeType == signerEscape, "argent/cannot-override-signer-escape");
+            require(escape.escapeType == ownerEscape, "argent/cannot-override-owner-escape");
         }
 
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
-        escape = Escape(activeAt, signerEscape);
-        emit EscapeSignerTriggerred(activeAt);
+        escape = Escape(activeAt, ownerEscape);
+        emit EscapeOwnerTriggerred(activeAt);
     }
 
     function triggerEscapeGuardian() public onlySelf requireGuardian {
@@ -123,16 +123,16 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
         emit EscapeCancelled();
     }
 
-    function escapeSigner(address _newSigner) public onlySelf requireGuardian {
+    function escapeOwner(address _newOwner) public onlySelf requireGuardian {
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
-        require(escape.escapeType == signerEscape, "argent/invalid-escape-type");
+        require(escape.escapeType == ownerEscape, "argent/invalid-escape-type");
         delete escape;
 
-        require(_newSigner != address(0), "argent/null-signer");
-        signer = _newSigner;
+        require(_newOwner != address(0), "argent/null-owner");
+        owner = _newOwner;
 
-        emit SignerEscaped(_newSigner);
+        emit OwnerEscaped(_newOwner);
     }
 
     function escapeGuardian(address _newGuardian) public onlySelf requireGuardian {
@@ -157,24 +157,24 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
         NONCE_HOLDER_SYSTEM_CONTRACT.incrementNonceIfEquals(_transaction.reserved[0]);
         bytes32 txHash = _transaction.encodeHash();
         bytes4 selector = bytes4(_transaction.data);
-        if (selector == this.escapeSigner.selector || selector == this.triggerEscapeSigner.selector) {
+        if (selector == this.escapeOwner.selector || selector == this.triggerEscapeOwner.selector) {
             validateGuardianSignature(txHash, _transaction.signature);
         } else if (selector == this.escapeGuardian.selector || selector == this.triggerEscapeGuardian.selector) {
-            validateSignerSignature(txHash, _transaction.signature);
+            validateOwnerSignature(txHash, _transaction.signature);
         } else {
             validateSignatures(txHash, _transaction.signature);
         }
     }
 
     function validateSignatures(bytes32 _hash, bytes calldata _signature) internal view {
-        validateSignerSignature(_hash, _signature[:65]);
+        validateOwnerSignature(_hash, _signature[:65]);
         validateGuardianSignature(_hash, _signature[65:]);
     }
 
-    function validateSignerSignature(bytes32 _hash, bytes calldata _signature) internal view {
-        require(_signature.length == 65, "argent/invalid-signer-signature-length");
+    function validateOwnerSignature(bytes32 _hash, bytes calldata _signature) internal view {
+        require(_signature.length == 65, "argent/invalid-owner-signature-length");
         address recovered = ECDSA.recover(_hash, _signature);
-        require(recovered == signer, "argent/invalid-signer-signature");
+        require(recovered == owner, "argent/invalid-owner-signature");
     }
 
     function validateGuardianSignature(bytes32 _hash, bytes calldata _signature) internal view {

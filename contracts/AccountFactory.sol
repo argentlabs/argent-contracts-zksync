@@ -16,20 +16,20 @@ contract AccountFactory {
     function deployProxyAccount(
         bytes32 _salt,
         address _implementation,
-        address _signer,
+        address _owner,
         address _guardian
     ) external returns (address) {
-        bytes memory data = abi.encodeCall(ArgentAccount.initialize, (_signer, _guardian));
+        bytes memory data = abi.encodeCall(ArgentAccount.initialize, (_owner, _guardian));
         return DEPLOYER_SYSTEM_CONTRACT.create2AA(_salt, bytecodeHash, 0, abi.encode(_implementation, data));
     }
 
     function computeCreate2Address(
         bytes32 _salt,
         address _implementation,
-        address _signer,
+        address _owner,
         address _guardian
     ) public view returns (address) {
-        bytes memory initData = abi.encodeCall(ArgentAccount.initialize, (_signer, _guardian));
+        bytes memory initData = abi.encodeCall(ArgentAccount.initialize, (_owner, _guardian));
         bytes memory inputData = abi.encode(_implementation, initData);
 
         bytes32 senderBytes = bytes32(uint256(uint160(address(this))));
