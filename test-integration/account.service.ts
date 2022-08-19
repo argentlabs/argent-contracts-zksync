@@ -20,7 +20,7 @@ export interface ArgentArtifacts {
 
 interface AccountDeploymentParams {
   argent: ArgentContext;
-  signerAddress: string;
+  ownerAddress: string;
   guardianAddress: string;
   connect?: Signatories;
   funded?: boolean;
@@ -29,7 +29,7 @@ interface AccountDeploymentParams {
 
 export const deployAccount = async ({
   argent,
-  signerAddress,
+  ownerAddress,
   guardianAddress,
   connect,
   funded = true,
@@ -37,10 +37,10 @@ export const deployAccount = async ({
 }: AccountDeploymentParams): Promise<ArgentAccount> => {
   const { deployer, factory, implementation } = argent;
 
-  const create2Address = await getAccountAddressFromCreate2(argent, salt, signerAddress, guardianAddress);
-  const factoryAddress = await getAccountAddressFromFactory(argent, salt, signerAddress, guardianAddress);
+  const create2Address = await getAccountAddressFromCreate2(argent, salt, ownerAddress, guardianAddress);
+  const factoryAddress = await getAccountAddressFromFactory(argent, salt, ownerAddress, guardianAddress);
 
-  const tx = await factory.deployProxyAccount(salt, implementation.address, signerAddress, guardianAddress);
+  const tx = await factory.deployProxyAccount(salt, implementation.address, ownerAddress, guardianAddress);
   const receipt = await tx.wait();
   const [{ deployedAddress }] = zksync.utils.getDeployedContracts(receipt);
 
@@ -74,10 +74,10 @@ export const deployAccount = async ({
 const getAccountAddressFromCreate2 = async (
   { factory, implementation, artifacts }: ArgentContext,
   salt: BytesLike,
-  signerAddress: string,
+  ownerAddress: string,
   guardianAddress: string,
 ) => {
-  const initData = implementation.interface.encodeFunctionData("initialize", [signerAddress, guardianAddress]);
+  const initData = implementation.interface.encodeFunctionData("initialize", [ownerAddress, guardianAddress]);
 
   const proxyInterface = new ethers.utils.Interface(artifacts.proxy.abi);
   const constructorData = proxyInterface.encodeDeploy([implementation.address, initData]);
@@ -89,10 +89,10 @@ const getAccountAddressFromCreate2 = async (
 const getAccountAddressFromFactory = async (
   { factory, implementation }: ArgentContext,
   salt: BytesLike,
-  signerAddress: string,
+  ownerAddress: string,
   guardianAddress: string,
 ) => {
-  return await factory.callStatic.computeCreate2Address(salt, implementation.address, signerAddress, guardianAddress);
+  return await factory.callStatic.computeCreate2Address(salt, implementation.address, ownerAddress, guardianAddress);
 };
 
 export const logBalance = async (address: string, provider: zksync.Provider, name?: string) => {
