@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: Unlicense
-pragma solidity ^0.8.10;
+pragma solidity 0.8.15;
 
 contract Proxy {
     address public immutable implementation;
