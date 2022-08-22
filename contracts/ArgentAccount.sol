@@ -56,8 +56,8 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     event EscapeCancelled();
 
     function initialize(address _owner, address _guardian) external {
-        require(owner == address(0), "argent/already-init");
         require(_owner != address(0), "argent/invalid-owner");
+        require(owner == address(0), "argent/already-init");
         owner = _owner;
         guardian = _guardian;
         emit AccountCreated(address(this), owner, guardian);
@@ -124,26 +124,24 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     }
 
     function escapeOwner(address _newOwner) public onlySelf requireGuardian {
+        require(_newOwner != address(0), "argent/null-owner");
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
         require(escape.escapeType == ownerEscape, "argent/invalid-escape-type");
+
         delete escape;
-
-        require(_newOwner != address(0), "argent/null-owner");
         owner = _newOwner;
-
         emit OwnerEscaped(_newOwner);
     }
 
     function escapeGuardian(address _newGuardian) public onlySelf requireGuardian {
+        require(_newGuardian != address(0), "argent/null-guardian");
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
         require(escape.escapeType == guardianEscape, "argent/invalid-escape-type");
+
         delete escape;
-
-        require(_newGuardian != address(0), "argent/null-guardian");
         guardian = _newGuardian;
-
         emit GuardianEscaped(_newGuardian);
     }
 
