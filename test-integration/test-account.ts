@@ -62,6 +62,10 @@ describe("Argent account", () => {
     });
 
     after(() => {
+      if (!implementation || !factory) {
+        console.error("Failed to deploy testing environment.");
+        process.exit(1);
+      }
       argent = { deployer, artifacts, implementation, factory };
     });
   });
