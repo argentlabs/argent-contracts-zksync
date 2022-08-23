@@ -3,6 +3,7 @@ import "@nomicfoundation/hardhat-chai-matchers";
 import "chai-as-promised";
 import "@matterlabs/hardhat-zksync-deploy";
 import "@matterlabs/hardhat-zksync-solc";
+import "solidity-coverage";
 import dotenv from "dotenv";
 
 dotenv.config();
