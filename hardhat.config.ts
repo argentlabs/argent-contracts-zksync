@@ -9,11 +9,12 @@ dotenv.config();
 
 module.exports = {
   zksolc: {
-    version: "0.1.0",
+    version: "1.1.0",
     compilerSource: "docker",
     settings: {
       experimental: {
         dockerImage: "matterlabs/zksolc",
+        tag: "v1.1.0",
       },
     },
   },
@@ -27,7 +28,7 @@ module.exports = {
     },
   },
   solidity: {
-    version: "0.8.15",
+    version: "0.8.12",
   },
   mocha: {
     timeout: 60_000,
