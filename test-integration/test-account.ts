@@ -204,12 +204,7 @@ describe("Argent account", () => {
 
     describe("Calling the dapp without using a guardian", () => {
       before(async () => {
-        account = await deployAccount({
-          argent,
-          ownerAddress,
-          guardianAddress: AddressZero,
-          connect: [owner],
-        });
+        account = await deployAccount({ argent, ownerAddress, guardianAddress: AddressZero, connect: [owner] });
       });
 
       it("Should successfully call the dapp", async () => {
@@ -226,7 +221,9 @@ describe("Argent account", () => {
 
         const promise = account.changeOwner(newOwner.address);
 
-        await expect(promise).to.emit(account, "OwnerChanged").withArgs(newOwner.address);
+        await expect(promise)
+          .to.emit(account, "OwnerChanged")
+          .withArgs(newOwner.address);
         expect(await account.owner()).to.equal(newOwner.address);
       });
 
@@ -240,7 +237,9 @@ describe("Argent account", () => {
 
         const promise = account.changeGuardian(guardian.address);
 
-        await expect(promise).to.emit(account, "GuardianChanged").withArgs(guardian.address);
+        await expect(promise)
+          .to.emit(account, "GuardianChanged")
+          .withArgs(guardian.address);
         expect(await account.guardian()).to.equal(guardian.address);
       });
     });
@@ -251,12 +250,7 @@ describe("Argent account", () => {
 
     describe("Changing owner", () => {
       before(async () => {
-        account = await deployAccount({
-          argent,
-          ownerAddress,
-          guardianAddress,
-          connect: [owner, guardian],
-        });
+        account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
       });
 
       it("Should revert with the wrong owner signature", async () => {
@@ -274,7 +268,9 @@ describe("Argent account", () => {
 
         const promise = account.changeOwner(newOwner.address);
 
-        await expect(promise).to.emit(account, "OwnerChanged").withArgs(newOwner.address);
+        await expect(promise)
+          .to.emit(account, "OwnerChanged")
+          .withArgs(newOwner.address);
         expect(await account.owner()).to.equal(newOwner.address);
       });
     });
@@ -304,7 +300,9 @@ describe("Argent account", () => {
 
         const promise = account.changeGuardian(newGuardian.address);
 
-        await expect(promise).to.emit(account, "GuardianChanged").withArgs(newGuardian.address);
+        await expect(promise)
+          .to.emit(account, "GuardianChanged")
+          .withArgs(newGuardian.address);
         expect(await account.guardian()).to.equal(newGuardian.address);
       });
     });
@@ -334,17 +332,14 @@ describe("Argent account", () => {
 
         const promise = account.changeGuardianBackup(newGuardianBackup.address);
 
-        await expect(promise).to.emit(account, "GuardianBackupChanged").withArgs(newGuardianBackup.address);
+        await expect(promise)
+          .to.emit(account, "GuardianBackupChanged")
+          .withArgs(newGuardianBackup.address);
         expect(await account.guardianBackup()).to.equal(newGuardianBackup.address);
       });
 
       it("Should fail when no guardian", async () => {
-        const account = await deployAccount({
-          argent,
-          ownerAddress,
-          guardianAddress: AddressZero,
-          connect: [owner],
-        });
+        const account = await deployAccount({ argent, ownerAddress, guardianAddress: AddressZero, connect: [owner] });
         const promise = account.changeGuardianBackup(newGuardianBackup.address);
         await expect(promise).to.be.rejectedWith("argent/guardian-required");
       });
@@ -362,7 +357,9 @@ describe("Argent account", () => {
         const receipt = await response.wait();
         const { timestamp } = await provider.getBlock(receipt.blockHash);
         const activeAtExpected = timestamp + escapeSecurityPeriod;
-        await expect(response).to.emit(account, "EscapeGuardianTriggerred").withArgs(activeAtExpected);
+        await expect(response)
+          .to.emit(account, "EscapeGuardianTriggerred")
+          .withArgs(activeAtExpected);
 
         const escapeAfter = await account.escape();
         expect(escapeAfter.activeAt).to.equal(activeAtExpected);
@@ -370,12 +367,7 @@ describe("Argent account", () => {
       });
 
       it("Should run triggerEscapeOwner() by guardian", async () => {
-        const account = await deployAccount({
-          argent,
-          ownerAddress,
-          guardianAddress,
-          connect: [guardian],
-        });
+        const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [guardian] });
 
         const escapeBefore = await account.escape();
         expect(escapeBefore.activeAt).to.equal(0n);
@@ -385,7 +377,9 @@ describe("Argent account", () => {
         const receipt = await response.wait();
         const { timestamp } = await provider.getBlock(receipt.blockHash);
         const activeAtExpected = timestamp + escapeSecurityPeriod;
-        await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAtExpected);
+        await expect(response)
+          .to.emit(account, "EscapeOwnerTriggerred")
+          .withArgs(activeAtExpected);
 
         const escapeAfter = await account.escape();
         expect(escapeAfter.activeAt).to.equal(activeAtExpected);
@@ -405,7 +399,9 @@ describe("Argent account", () => {
         const receipt = await response.wait();
         const { timestamp } = await provider.getBlock(receipt.blockHash);
         const activeAtExpected = timestamp + escapeSecurityPeriod;
-        await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAtExpected);
+        await expect(response)
+          .to.emit(account, "EscapeOwnerTriggerred")
+          .withArgs(activeAtExpected);
 
         const escapeAfter = await account.escape();
         expect(escapeAfter.activeAt).to.equal(activeAtExpected);
@@ -438,7 +434,9 @@ describe("Argent account", () => {
 
         // should escape after the security period
         const promise = account.escapeGuardian(newGuardian.address);
-        await expect(promise).to.emit(account, "GuardianEscaped").withArgs(newGuardian.address);
+        await expect(promise)
+          .to.emit(account, "GuardianEscaped")
+          .withArgs(newGuardian.address);
 
         expect(await account.guardian()).to.equal(newGuardian.address);
 
@@ -449,12 +447,7 @@ describe("Argent account", () => {
       });
 
       it("Should escape owner", async () => {
-        const account = await deployAccount({
-          argent,
-          ownerAddress,
-          guardianAddress,
-          connect: [guardian],
-        });
+        const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [guardian] });
 
         // trigger escape
         await expect(account.triggerEscapeOwner()).to.emit(account, "EscapeOwnerTriggerred");
@@ -473,7 +466,9 @@ describe("Argent account", () => {
 
         // should escape after the security period
         const promise = account.escapeOwner(newOwner.address);
-        await expect(promise).to.emit(account, "OwnerEscaped").withArgs(newOwner.address);
+        await expect(promise)
+          .to.emit(account, "OwnerEscaped")
+          .withArgs(newOwner.address);
 
         expect(await account.owner()).to.equal(newOwner.address);
 
@@ -596,11 +591,7 @@ describe("Argent account", () => {
     });
 
     it("Should verify with a single signature when not using a guardian", async () => {
-      const accountNoGuardian = await deployAccount({
-        argent,
-        ownerAddress,
-        guardianAddress: AddressZero,
-      });
+      const accountNoGuardian = await deployAccount({ argent, ownerAddress, guardianAddress: AddressZero });
       const signature = await signWith(owner);
       expect(await accountNoGuardian.isValidSignature(hash, signature)).to.equal(eip1271SuccessReturnValue);
     });
