@@ -33,7 +33,6 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     // uint32 public constant escapeSecurityPeriod = 1 weeks;
     uint32 public constant escapeSecurityPeriod = 10 seconds;
 
-    bytes32 public constant zeroSignatureHash = keccak256(new bytes(65));
     bytes4 public constant eip1271SuccessReturnValue = bytes4(keccak256("isValidSignature(bytes32,bytes)"));
 
     address public owner;
@@ -179,16 +178,15 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
         if (guardian == noGuardian) {
             return;
         }
-        if (_signature.length == 65) {
-            address recovered = ECDSA.recover(_hash, _signature);
-            require(recovered == guardian, "argent/invalid-guardian-signature");
-        } else if (_signature.length == 130) {
-            require(keccak256(_signature[:65]) == zeroSignatureHash, "argent/invalid-zero-signature");
-            address recovered = ECDSA.recover(_hash, _signature[65:]);
-            require(recovered == guardianBackup, "argent/invalid-guardian-backup-signature");
-        } else {
-            revert("argent/invalid-guardian-signature-length");
+        require(_signature.length == 65, "argent/invalid-guardian-signature-length");
+        address recovered = ECDSA.recover(_hash, _signature);
+        if (recovered == guardian) {
+            return;
         }
+        if (recovered == guardianBackup && guardianBackup != noGuardian) {
+            return;
+        }
+        revert("argent/invalid-guardian-signature");
     }
 
     function executeTransaction(Transaction calldata _transaction) external payable override onlyBootloader {

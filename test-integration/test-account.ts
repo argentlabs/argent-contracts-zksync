@@ -395,7 +395,7 @@ describe("Argent account", () => {
         expect(escapeBefore.activeAt).to.equal(0n);
         expect(escapeBefore.escapeType).to.equal(noEscape);
 
-        const response = await account.connect([0, newGuardianBackup]).triggerEscapeOwner();
+        const response = await account.connect([newGuardianBackup]).triggerEscapeOwner();
         const receipt = await response.wait();
         const { timestamp } = await provider.getBlock(receipt.blockHash);
         const activeAtExpected = timestamp + escapeSecurityPeriod;
