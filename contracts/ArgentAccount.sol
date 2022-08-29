@@ -59,7 +59,7 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
         require(owner == address(0), "argent/already-init");
         owner = _owner;
         guardian = _guardian;
-        emit AccountCreated(address(this), owner, guardian);
+        emit AccountCreated(address(this), _owner, _guardian);
     }
 
     modifier onlySelf() {
