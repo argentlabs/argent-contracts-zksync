@@ -11,7 +11,7 @@
   "devDependencies": {
     "@matterlabs/hardhat-zksync-deploy": "^0.3.6",
     "@matterlabs/hardhat-zksync-solc": "^0.3.6",
-    "@matterlabs/zksync-contracts": "^0.2.4",
+    "@matterlabs/zksync-contracts": "matter-labs/v2-testnet-contracts#sb-prepare-for-paymaster",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.2",
     "@nomiclabs/hardhat-ethers": "^2.1.0",
     "@openzeppelin/contracts": "^4.7.1",

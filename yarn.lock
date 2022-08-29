@@ -473,10 +473,9 @@
     "@nomiclabs/hardhat-docker" "^2.0.0"
     dockerode "^3.3.1"
 
-"@matterlabs/zksync-contracts@^0.2.4":
+"@matterlabs/zksync-contracts@matter-labs/v2-testnet-contracts#sb-prepare-for-paymaster":
   version "0.2.4"
-  resolved "https://registry.yarnpkg.com/@matterlabs/zksync-contracts/-/zksync-contracts-0.2.4.tgz#6bde2e85fde9a8f4acdd9e01a8df158353979a23"
-  integrity sha512-YRCRGyYCNDGpA/MQS5SFYDfrlWf6z+CD80XhvW3FDprVFVRR5/fM1blr90G773cDAoyj0lWMChmXwvQ49y+fZQ==
+  resolved "https://codeload.github.com/matter-labs/v2-testnet-contracts/tar.gz/39040815d7724aec0549af5b41aa93938203595c"
 
 "@metamask/eth-sig-util@^4.0.0":
   version "4.0.1"

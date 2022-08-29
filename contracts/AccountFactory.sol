@@ -20,7 +20,19 @@ contract AccountFactory {
         address _guardian
     ) external returns (address) {
         bytes memory data = abi.encodeCall(ArgentAccount.initialize, (_owner, _guardian));
-        return DEPLOYER_SYSTEM_CONTRACT.create2AA(_salt, bytecodeHash, 0, abi.encode(_implementation, data));
+        (address newAddress, bytes memory revertData) = DEPLOYER_SYSTEM_CONTRACT.create2Account(
+            _salt,
+            bytecodeHash,
+            0,
+            abi.encode(_implementation, data)
+        );
+        if (revertData.length > 0) {
+            assembly {
+                returndatacopy(0, 0, returndatasize())
+                revert(0, returndatasize())
+            }
+        }
+        return newAddress;
     }
 
     function computeCreate2Address(
