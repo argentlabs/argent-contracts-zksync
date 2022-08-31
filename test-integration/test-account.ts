@@ -20,7 +20,7 @@ const wrongGuardian = zksync.Wallet.createRandom();
 const ownerAddress = owner.address;
 const guardianAddress = guardian.address;
 const deployer = new Deployer(hre, owner);
-const provider = (ethers.provider = deployer.zkWallet.provider); // needed for hardhat-ethers's .getContractAt(...)
+const provider = deployer.zkWallet.provider;
 
 describe("Argent account", () => {
   let artifacts: ArgentArtifacts;
@@ -47,11 +47,11 @@ describe("Argent account", () => {
       implementation = await deployer.deploy(artifacts.implementation, []);
       console.log(`        Account implementation deployed to ${implementation.address}`);
 
-      const contract = await ethers.getContractAt("ArgentAccount", implementation.address);
-      noEscape = await contract.noEscape();
-      ownerEscape = await contract.ownerEscape();
-      guardianEscape = await contract.guardianEscape();
-      escapeSecurityPeriod = await contract.escapeSecurityPeriod();
+      const account = new ArgentAccount(implementation.address, implementation.interface, provider);
+      noEscape = await account.noEscape();
+      ownerEscape = await account.ownerEscape();
+      guardianEscape = await account.guardianEscape();
+      escapeSecurityPeriod = await account.escapeSecurityPeriod();
     });
 
     it("Should deploy a new AccountFactory", async () => {
