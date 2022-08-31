@@ -64,7 +64,7 @@ describe("Argent account", () => {
     after(() => {
       if (!implementation || !factory) {
         console.error("Failed to deploy testing environment.");
-        process.exit(1);
+        throw new Error("Failed to deploy testing environment.");
       }
       argent = { deployer, artifacts, implementation, factory };
     });
@@ -163,12 +163,7 @@ describe("Argent account", () => {
 
     describe("Calling the dapp using a guardian", () => {
       before(async () => {
-        account = await deployAccount({
-          argent,
-          ownerAddress,
-          guardianAddress,
-          connect: [owner, guardian],
-        });
+        account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
       });
 
       it("Should revert with bad nonce", async () => {
