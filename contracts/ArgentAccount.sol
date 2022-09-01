@@ -48,8 +48,8 @@ contract ArgentAccount is IAccount, IERC1271 {
     event GuardianChanged(address newGuardian);
     event GuardianBackupChanged(address newGuardianBackup);
 
-    event EscapeOwnerTriggerred(uint32 activeAt);
-    event EscapeGuardianTriggerred(uint32 activeAt);
+    event OwnerEscapeTriggerred(uint32 activeAt);
+    event GuardianEscapeTriggerred(uint32 activeAt);
     event OwnerEscaped(address newOwner);
     event GuardianEscaped(address newGuardian);
     event EscapeCancelled();
@@ -98,7 +98,7 @@ contract ArgentAccount is IAccount, IERC1271 {
         emit GuardianBackupChanged(_newGuardianBackup);
     }
 
-    function triggerEscapeOwner() public onlySelf requireGuardian {
+    function triggerOwnerEscape() public onlySelf requireGuardian {
         // no escape if there is an guardian escape triggered by the owner in progress
         if (escape.activeAt != 0) {
             require(escape.escapeType == ownerEscape, "argent/cannot-override-owner-escape");
@@ -106,13 +106,13 @@ contract ArgentAccount is IAccount, IERC1271 {
 
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(activeAt, ownerEscape);
-        emit EscapeOwnerTriggerred(activeAt);
+        emit OwnerEscapeTriggerred(activeAt);
     }
 
-    function triggerEscapeGuardian() public onlySelf requireGuardian {
+    function triggerGuardianEscape() public onlySelf requireGuardian {
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(activeAt, guardianEscape);
-        emit EscapeGuardianTriggerred(activeAt);
+        emit GuardianEscapeTriggerred(activeAt);
     }
 
     function cancelEscape() public onlySelf {
