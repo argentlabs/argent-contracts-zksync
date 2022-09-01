@@ -9,8 +9,8 @@ import { waitForTimestamp } from "./provider.service";
 
 const { AddressZero } = ethers.constants;
 
-const owner = new zksync.Wallet(process.env.PRIVATE_KEY as string);
-const guardian = new zksync.Wallet(process.env.GUARDIAN_PRIVATE_KEY as string);
+const owner = zksync.Wallet.createRandom();
+const guardian = zksync.Wallet.createRandom();
 const newOwner = zksync.Wallet.createRandom();
 const newGuardian = zksync.Wallet.createRandom();
 const newGuardianBackup = zksync.Wallet.createRandom();
@@ -19,7 +19,7 @@ const wrongGuardian = zksync.Wallet.createRandom();
 
 const ownerAddress = owner.address;
 const guardianAddress = guardian.address;
-const deployer = new Deployer(hre, owner);
+const deployer = new Deployer(hre, new zksync.Wallet(process.env.PRIVATE_KEY as string));
 const provider = deployer.zkWallet.provider;
 
 describe("Argent account", () => {
@@ -40,7 +40,7 @@ describe("Argent account", () => {
         factory: await deployer.loadArtifact("AccountFactory"),
         proxy: await deployer.loadArtifact("Proxy"),
       };
-      await logBalance(owner.address, provider, "Owner");
+      await logBalance(deployer.zkWallet.address, provider, "Deployer");
     });
 
     it("Should deploy a new ArgentAccount implementation", async () => {
@@ -74,7 +74,7 @@ describe("Argent account", () => {
     let account: ArgentAccount;
 
     before(async () => {
-      account = await deployAccount({ argent, ownerAddress, guardianAddress, funded: false });
+      account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: false });
     });
 
     it("Should be initialized properly", async () => {
@@ -96,20 +96,20 @@ describe("Argent account", () => {
 
     it("Should deploy a new account (1)", async () => {
       const connect = [owner, guardian];
-      account1 = await deployAccount({ argent, ownerAddress, guardianAddress, connect, funded: false });
+      account1 = await deployAccount({ argent, ownerAddress, guardianAddress, connect, funds: false });
       console.log(`        Account 1 deployed to ${account1.address}`);
     });
 
     it("Should deploy a new account (2)", async () => {
       const ownerAddress = "0xEA674fdDe714fd979de3EdF0F56AA9716B898ec8";
-      account2 = await deployAccount({ argent, ownerAddress, guardianAddress, funded: false });
+      account2 = await deployAccount({ argent, ownerAddress, guardianAddress, funds: false });
       console.log(`        Account 2 deployed to ${account2.address}`);
     });
 
     it("Should fund account 1 from owner key", async () => {
-      const amount = ethers.utils.parseEther("0.0001");
       const balanceBefore = await provider.getBalance(account1.address);
 
+      const amount = ethers.utils.parseEther("0.0001");
       const response = await deployer.zkWallet.transfer({ to: account1.address, amount });
       await response.wait();
 
@@ -153,12 +153,12 @@ describe("Argent account", () => {
     });
 
     it("Should call the dapp from an EOA", async () => {
-      expect(await testDapp.userNumbers(owner.address)).to.equal(0n);
+      expect(await testDapp.userNumbers(deployer.zkWallet.address)).to.equal(0n);
 
       const response = await testDapp.setNumber(42);
       await response.wait();
 
-      expect(await testDapp.userNumbers(owner.address)).to.equal(42n);
+      expect(await testDapp.userNumbers(deployer.zkWallet.address)).to.equal(42n);
     });
 
     describe("Calling the dapp using a guardian", () => {
@@ -199,7 +199,13 @@ describe("Argent account", () => {
 
     describe("Calling the dapp without using a guardian", () => {
       before(async () => {
-        account = await deployAccount({ argent, ownerAddress, guardianAddress: AddressZero, connect: [owner] });
+        account = await deployAccount({
+          argent,
+          ownerAddress,
+          guardianAddress: AddressZero,
+          connect: [owner],
+          funds: "0.00015",
+        });
       });
 
       it("Should successfully call the dapp", async () => {
@@ -410,7 +416,13 @@ describe("Argent account", () => {
       }
 
       it("Should escape guardian", async () => {
-        const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner] });
+        const account = await deployAccount({
+          argent,
+          ownerAddress,
+          guardianAddress,
+          connect: [owner],
+          funds: "0.00015",
+        });
 
         // trigger escape
         await expect(account.triggerEscapeGuardian()).to.emit(account, "EscapeGuardianTriggerred");
@@ -442,7 +454,13 @@ describe("Argent account", () => {
       });
 
       it("Should escape owner", async () => {
-        const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [guardian] });
+        const account = await deployAccount({
+          argent,
+          ownerAddress,
+          guardianAddress,
+          connect: [guardian],
+          funds: "0.00015",
+        });
 
         // trigger escape
         await expect(account.triggerEscapeOwner()).to.emit(account, "EscapeOwnerTriggerred");
@@ -577,7 +595,7 @@ describe("Argent account", () => {
     let account: ArgentAccount;
 
     before(async () => {
-      account = await deployAccount({ argent, ownerAddress, guardianAddress, funded: false });
+      account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: false });
     });
 
     it("Should verify on the account", async () => {

@@ -23,7 +23,7 @@ interface AccountDeploymentParams {
   ownerAddress: string;
   guardianAddress: string;
   connect?: Signatories;
-  funded?: boolean;
+  funds?: false | string;
   salt?: BytesLike;
 }
 
@@ -32,7 +32,7 @@ export const deployAccount = async ({
   ownerAddress,
   guardianAddress,
   connect,
-  funded = true,
+  funds = "0.0001",
   salt = ethers.utils.randomBytes(32),
 }: AccountDeploymentParams): Promise<ArgentAccount> => {
   const { deployer, factory, implementation } = argent;
@@ -56,10 +56,10 @@ export const deployAccount = async ({
   const provider = new zksync.Provider(hre.config.zkSyncDeploy.zkSyncNetwork);
   const account = new ArgentAccount(deployedAddress, argent.implementation.interface, provider);
 
-  if (funded) {
+  if (funds) {
     const response = await deployer.zkWallet.transfer({
       to: account.address,
-      amount: ethers.utils.parseEther("0.0001"),
+      amount: ethers.utils.parseEther(funds),
     });
     await response.wait();
   }
@@ -97,7 +97,7 @@ const getAccountAddressFromFactory = async (
 
 export const logBalance = async (address: string, provider: zksync.Provider, name?: string) => {
   const balance = await provider.getBalance(address);
-  console.log(`${name || address} ETH L2 balance is ${ethers.utils.formatEther(balance)}`);
+  console.log(name ? `${name} at ${address}` : address, `ETH L2 balance is ${ethers.utils.formatEther(balance)}`);
 };
 
 export class ArgentAccount extends zksync.Contract {
