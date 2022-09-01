@@ -1,14 +1,14 @@
 //SPDX-License-Identifier: Unlicense
-pragma solidity 0.8.12;
+pragma solidity 0.8.16;
 
 import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {Transaction, TransactionHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/TransactionHelper.sol";
-import {IAccountAbstraction} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccountAbstraction.sol";
+import {IAccount} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccount.sol";
 
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-contract ArgentAccount is IAccountAbstraction, IERC1271 {
+contract ArgentAccount is IAccount, IERC1271 {
     using TransactionHelper for Transaction;
 
     enum EscapeType {
@@ -213,6 +213,17 @@ contract ArgentAccount is IAccountAbstraction, IERC1271 {
     function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4) {
         validateSignatures(_hash, _signature);
         return eip1271SuccessReturnValue;
+    }
+
+    function payForTransaction(Transaction calldata _transaction) external payable override onlyBootloader {
+        bool success = _transaction.payToTheBootloader();
+        require(success, "argent/failed-fee-payment");
+    }
+
+    // Here, the user should prepare for the transaction to be paid for by a paymaster
+    // Here, the account should set the allowance for the smart contracts
+    function prePaymaster(Transaction calldata _transaction) external payable override onlyBootloader {
+        _transaction.processPaymasterInput();
     }
 
     receive() external payable {

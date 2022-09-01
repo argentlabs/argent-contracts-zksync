@@ -32,30 +32,26 @@ export class MultiSigner extends Signer {
 
   async signTransaction(transaction: TransactionRequest): Promise<string> {
     const from = this.address;
-    const { chainId } = await this.provider.getNetwork();
+    const chainId = transaction.chainId ?? (await this.provider.getNetwork()).chainId;
     const gasLimit = await this.provider.estimateGas({ ...transaction, from });
     const unsignedTransaction = {
       type: zksync.utils.EIP712_TX_TYPE,
       to: transaction.to,
+      from,
       data: transaction.data ?? "0x",
       value: transaction.value ?? "0x0",
-      chainId: transaction.chainId ?? chainId,
+      chainId,
       gasPrice: transaction.gasPrice ?? (await this.provider.getGasPrice()),
       gasLimit: transaction.gasLimit ?? gasLimit,
       nonce: transaction.nonce ?? (await this.provider.getTransactionCount(from)),
-      customData: {
-        ergsPerPubdata: transaction.customData?.ergsPerPubData ?? 0,
-        feeToken: transaction.customData?.feeToken ?? zksync.utils.ETH_ADDRESS,
-      },
     };
 
-    const signature = await concatSignatures(unsignedTransaction, this.signatories, chainId);
+    const customSignature = await concatSignatures(unsignedTransaction, this.signatories, chainId);
 
     const transactionRequest = {
       ...unsignedTransaction,
       customData: {
-        ...unsignedTransaction.customData,
-        aaParams: { from, signature },
+        customSignature,
       },
     };
 
