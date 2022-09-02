@@ -101,7 +101,7 @@ export const logBalance = async (address: string, provider: zksync.Provider, nam
 };
 
 export class ArgentAccount extends zksync.Contract {
-  connect(signerOrSignersOrProvider: any) {
+  connect(signerOrSignersOrProvider: any): this {
     if (Array.isArray(signerOrSignersOrProvider)) {
       const signer = new MultiSigner(this.address, signerOrSignersOrProvider, this.provider);
       return super.connect(signer) as this;

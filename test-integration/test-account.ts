@@ -20,7 +20,7 @@ const wrongGuardian = zksync.Wallet.createRandom();
 const ownerAddress = owner.address;
 const guardianAddress = guardian.address;
 const deployer = new Deployer(hre, new zksync.Wallet(process.env.PRIVATE_KEY as string));
-const provider = deployer.zkWallet.provider;
+const { provider } = deployer.zkWallet;
 
 describe("Argent account", () => {
   let artifacts: ArgentArtifacts;
