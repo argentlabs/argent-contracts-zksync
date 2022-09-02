@@ -55,10 +55,10 @@ describe("Argent account", () => {
       console.log(`        Account implementation deployed to ${implementation.address}`);
 
       const account = new ArgentAccount(implementation.address, implementation.interface, provider);
-      noEscape = await account.noEscape();
-      ownerEscape = await account.ownerEscape();
-      guardianEscape = await account.guardianEscape();
-      escapeSecurityPeriod = await account.escapeSecurityPeriod();
+      noEscape = await account.NO_ESCAPE();
+      ownerEscape = await account.OWNER_ESCAPE();
+      guardianEscape = await account.GUARDIAN_ESCAPE();
+      escapeSecurityPeriod = await account.ESCAPE_SECURITY_PERIOD();
     });
 
     it("Should deploy a new AccountFactory", async () => {
@@ -97,7 +97,7 @@ describe("Argent account", () => {
     });
 
     it("Should be initialized properly", async () => {
-      expect(await account.version()).to.equal("0.0.1");
+      expect(await account.VERSION()).to.equal("0.0.1");
       expect(await account.owner()).to.equal(owner.address);
       expect(await account.guardian()).to.equal(guardian.address);
     });

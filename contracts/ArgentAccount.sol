@@ -22,16 +22,16 @@ contract ArgentAccount is IAccount, IERC1271 {
         uint8 escapeType; // packed EscapeType enum
     }
 
-    string public constant version = "0.0.1";
-    address public constant noGuardian = address(0);
+    string public constant VERSION = "0.0.1";
+    address public constant NO_GUARDIAN = address(0);
 
-    uint8 public constant noEscape = uint8(EscapeType.None);
-    uint8 public constant guardianEscape = uint8(EscapeType.Guardian);
-    uint8 public constant ownerEscape = uint8(EscapeType.Owner);
+    uint8 public constant NO_ESCAPE = uint8(EscapeType.None);
+    uint8 public constant GUARDIAN_ESCAPE = uint8(EscapeType.Guardian);
+    uint8 public constant OWNER_ESCAPE = uint8(EscapeType.Owner);
 
     // FIXME: using short period for testing on goerli, switch back to 1 week when local testing is available
-    // uint32 public constant escapeSecurityPeriod = 1 weeks;
-    uint32 public constant escapeSecurityPeriod = 10 seconds;
+    // uint32 public constant ESCAPE_SECURITY_PERIOD = 1 weeks;
+    uint32 public constant ESCAPE_SECURITY_PERIOD = 10 seconds;
 
     address public owner;
     address public guardian;
@@ -99,22 +99,22 @@ contract ArgentAccount is IAccount, IERC1271 {
     function triggerEscapeOwner() public onlySelf requireGuardian {
         // no escape if there is an guardian escape triggered by the owner in progress
         if (escape.activeAt != 0) {
-            require(escape.escapeType == ownerEscape, "argent/cannot-override-owner-escape");
+            require(escape.escapeType == OWNER_ESCAPE, "argent/cannot-override-owner-escape");
         }
 
-        uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
-        escape = Escape(activeAt, ownerEscape);
+        uint32 activeAt = uint32(block.timestamp) + ESCAPE_SECURITY_PERIOD;
+        escape = Escape(activeAt, OWNER_ESCAPE);
         emit EscapeOwnerTriggerred(activeAt);
     }
 
     function triggerEscapeGuardian() public onlySelf requireGuardian {
-        uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
-        escape = Escape(activeAt, guardianEscape);
+        uint32 activeAt = uint32(block.timestamp) + ESCAPE_SECURITY_PERIOD;
+        escape = Escape(activeAt, GUARDIAN_ESCAPE);
         emit EscapeGuardianTriggerred(activeAt);
     }
 
     function cancelEscape() public onlySelf {
-        require(escape.activeAt != 0 && escape.escapeType != noEscape, "argent/not-escaping");
+        require(escape.activeAt != 0 && escape.escapeType != NO_ESCAPE, "argent/not-escaping");
 
         delete escape;
         emit EscapeCancelled();
@@ -124,7 +124,7 @@ contract ArgentAccount is IAccount, IERC1271 {
         require(_newOwner != address(0), "argent/null-owner");
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
-        require(escape.escapeType == ownerEscape, "argent/invalid-escape-type");
+        require(escape.escapeType == OWNER_ESCAPE, "argent/invalid-escape-type");
 
         delete escape;
         owner = _newOwner;
@@ -135,7 +135,7 @@ contract ArgentAccount is IAccount, IERC1271 {
         require(_newGuardian != address(0), "argent/null-guardian");
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
-        require(escape.escapeType == guardianEscape, "argent/invalid-escape-type");
+        require(escape.escapeType == GUARDIAN_ESCAPE, "argent/invalid-escape-type");
 
         delete escape;
         guardian = _newGuardian;
@@ -173,7 +173,7 @@ contract ArgentAccount is IAccount, IERC1271 {
     }
 
     function validateGuardianSignature(bytes32 _hash, bytes calldata _signature) internal view {
-        if (guardian == noGuardian) {
+        if (guardian == NO_GUARDIAN) {
             return;
         }
         require(_signature.length == 65, "argent/invalid-guardian-signature-length");
@@ -181,7 +181,7 @@ contract ArgentAccount is IAccount, IERC1271 {
         if (recovered == guardian) {
             return;
         }
-        if (recovered == guardianBackup && guardianBackup != noGuardian) {
+        if (recovered == guardianBackup && guardianBackup != NO_GUARDIAN) {
             return;
         }
         revert("argent/invalid-guardian-signature");
