@@ -64,7 +64,8 @@ describe("Argent account", () => {
     it("Should deploy a new AccountFactory", async () => {
       const { bytecode } = artifacts.proxy;
       const proxyBytecodeHash = zksync.utils.hashBytecode(bytecode);
-      factory = await deployer.deploy(artifacts.factory, [proxyBytecodeHash], undefined, [bytecode]);
+      const constructorArgs = [proxyBytecodeHash, deployerAddress];
+      factory = await deployer.deploy(artifacts.factory, constructorArgs, undefined, [bytecode]);
       console.log(`        Account factory deployed to ${factory.address}`);
     });
 
@@ -94,6 +95,15 @@ describe("Argent account", () => {
     it("Should predict the account address from the factory contract", async () => {
       const address = await factory.computeCreate2Address(salt, implementation.address, ownerAddress, guardianAddress);
       expect(account.address).to.equal(address);
+    });
+
+    it("Should fail to create accounts if not called by manager", async () => {
+      const newSalt = ethers.utils.randomBytes(32);
+      const wrongManager = new zksync.Wallet(zksync.Wallet.createRandom().privateKey, provider);
+      const promise = factory
+        .connect(wrongManager)
+        .deployProxyAccount(newSalt, implementation.address, ownerAddress, guardianAddress);
+      await expect(promise).to.be.rejectedWith("argent/only-manager");
     });
 
     it("Should be initialized properly", async () => {
