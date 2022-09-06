@@ -54,14 +54,6 @@ contract ArgentAccount is IAccount, IERC1271 {
     event GuardianEscaped(address newGuardian);
     event EscapeCancelled();
 
-    function initialize(address _owner, address _guardian) external {
-        require(_owner != address(0), "argent/invalid-owner");
-        require(owner == address(0), "argent/already-init");
-        owner = _owner;
-        guardian = _guardian;
-        emit AccountCreated(address(this), _owner, _guardian);
-    }
-
     modifier onlySelf() {
         require(msg.sender == address(this), "argent/only-self");
         _;
@@ -76,6 +68,14 @@ contract ArgentAccount is IAccount, IERC1271 {
         require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "Only bootloader can call this method");
         // Continue execution if called from the bootloader.
         _;
+    }
+
+    function initialize(address _owner, address _guardian) external {
+        require(_owner != address(0), "argent/invalid-owner");
+        require(owner == address(0), "argent/already-init");
+        owner = _owner;
+        guardian = _guardian;
+        emit AccountCreated(address(this), _owner, _guardian);
     }
 
     // Recovery
