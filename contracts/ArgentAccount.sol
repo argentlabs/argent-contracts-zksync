@@ -33,8 +33,6 @@ contract ArgentAccount is IAccount, IERC1271 {
     // uint32 public constant escapeSecurityPeriod = 1 weeks;
     uint32 public constant escapeSecurityPeriod = 10 seconds;
 
-    bytes4 public constant eip1271SuccessReturnValue = bytes4(keccak256("isValidSignature(bytes32,bytes)"));
-
     address public owner;
     address public guardian;
     address public guardianBackup;
@@ -212,7 +210,7 @@ contract ArgentAccount is IAccount, IERC1271 {
 
     function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4) {
         validateSignatures(_hash, _signature);
-        return eip1271SuccessReturnValue;
+        return IERC1271.isValidSignature.selector;
     }
 
     function payForTransaction(Transaction calldata _transaction) external payable override onlyBootloader {
