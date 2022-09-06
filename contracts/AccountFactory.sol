@@ -8,9 +8,17 @@ import {ArgentAccount} from "./ArgentAccount.sol";
 
 contract AccountFactory {
     bytes32 public proxyBytecodeHash;
+    address public manager;
 
-    constructor(bytes32 _proxyBytecodeHash) {
+    modifier onlyManager() {
+        require(msg.sender == manager, "argent/only-manager");
+        _;
+    }
+
+    constructor(bytes32 _proxyBytecodeHash, address _manager) {
+        require(_manager != address(0), "argent/null-manager");
         proxyBytecodeHash = _proxyBytecodeHash;
+        manager = _manager;
     }
 
     function deployProxyAccount(
@@ -18,7 +26,7 @@ contract AccountFactory {
         address _implementation,
         address _owner,
         address _guardian
-    ) external returns (address _newAddress) {
+    ) external onlyManager returns (address _newAddress) {
         bytes memory input = proxyContructorData(_implementation, _owner, _guardian);
         bytes memory revertData;
         (_newAddress, revertData) = DEPLOYER_SYSTEM_CONTRACT.create2Account(_salt, proxyBytecodeHash, 0, input);
