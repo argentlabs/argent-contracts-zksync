@@ -4,8 +4,8 @@ import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { expect } from "chai";
-import { ArgentAccount, ArgentArtifacts, ArgentContext, deployAccount, logBalance } from "./account.service";
-import { waitForTimestamp } from "./provider.service";
+import { ArgentAccount, ArgentArtifacts, ArgentContext, deployAccount, logBalance } from "../scripts/account.service";
+import { waitForTimestamp } from "../scripts/provider.service";
 
 const { AddressZero } = ethers.constants;
 
