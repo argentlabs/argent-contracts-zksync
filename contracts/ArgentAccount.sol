@@ -33,6 +33,7 @@ contract ArgentAccount is IAccount, IERC1271 {
     // uint32 public constant ESCAPE_SECURITY_PERIOD = 1 weeks;
     uint32 public constant ESCAPE_SECURITY_PERIOD = 10 seconds;
 
+    address public implementation; // !!! storage slot shared with proxy
     address public owner;
     address public guardian;
     address public guardianBackup;
@@ -63,7 +64,7 @@ contract ArgentAccount is IAccount, IERC1271 {
     }
 
     modifier onlyBootloader() {
-        require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "Only bootloader can call this method");
+        require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "argent/only-bootloader");
         // Continue execution if called from the bootloader.
         _;
     }
@@ -85,8 +86,7 @@ contract ArgentAccount is IAccount, IERC1271 {
     }
 
     function changeGuardian(address _newGuardian) public onlySelf {
-        // TODO: next line to be reviewed by Julien
-        require(_newGuardian != address(0) || guardianBackup == address(0), "argent/null-guardian");
+        require(_newGuardian != address(0), "argent/null-guardian");
         guardian = _newGuardian;
         emit GuardianChanged(_newGuardian);
     }
@@ -201,6 +201,7 @@ contract ArgentAccount is IAccount, IERC1271 {
         uint256 value = _transaction.reserved[1];
         bytes memory data = _transaction.data;
 
+        // using assemply saves us a returndatacopy of the entire return data
         bool success;
         assembly {
             success := call(gas(), to, value, add(data, 0x20), mload(data), 0, 0)
