@@ -2,7 +2,7 @@ import "@nomiclabs/hardhat-ethers";
 import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
-import { deployAccount, logBalance } from "../test-integration/account.service";
+import { deployAccount, logBalance } from "./account.service";
 
 (async () => {
   const implementationAddress = "0x95DA55F2C6d9e21CEa31E671b2Dd5a539463e47F";

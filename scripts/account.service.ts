@@ -37,24 +37,13 @@ export const deployAccount = async ({
 }: AccountDeploymentParams): Promise<ArgentAccount> => {
   const { deployer, factory, implementation } = argent;
 
-  const create2Address = await getAccountAddressFromCreate2(argent, salt, ownerAddress, guardianAddress);
-  const factoryAddress = await getAccountAddressFromFactory(argent, salt, ownerAddress, guardianAddress);
-
-  const tx = await factory.deployProxyAccount(salt, implementation.address, ownerAddress, guardianAddress);
-  const receipt = await tx.wait();
+  const response = await factory.deployProxyAccount(salt, implementation.address, ownerAddress, guardianAddress);
+  const receipt = await response.wait();
   const [{ deployedAddress }] = zksync.utils.getDeployedContracts(receipt);
-
-  if (deployedAddress !== create2Address) {
-    throw new Error(`Deployed address (${deployedAddress}) != address predicted from create2 (${create2Address})`);
-  }
-
-  if (deployedAddress !== factoryAddress) {
-    throw new Error(`Deployed address (${deployedAddress}) != address predicted from factory (${factoryAddress})`);
-  }
 
   // make sure account doesn't have a signer by default
   const provider = new zksync.Provider(hre.config.zkSyncDeploy.zkSyncNetwork);
-  const account = new ArgentAccount(deployedAddress, argent.implementation.interface, provider);
+  const account = new ArgentAccount(deployedAddress, implementation.interface, provider);
 
   if (funds) {
     const response = await deployer.zkWallet.transfer({
@@ -71,7 +60,7 @@ export const deployAccount = async ({
   return account;
 };
 
-const getAccountAddressFromCreate2 = async (
+export const computeCreate2AddressFromSdk = (
   { factory, implementation, artifacts }: ArgentContext,
   salt: BytesLike,
   ownerAddress: string,
@@ -84,15 +73,6 @@ const getAccountAddressFromCreate2 = async (
 
   const proxyBytecodeHash = zksync.utils.hashBytecode(artifacts.proxy.bytecode);
   return zksync.utils.create2Address(factory.address, proxyBytecodeHash, salt, constructorData);
-};
-
-const getAccountAddressFromFactory = async (
-  { factory, implementation }: ArgentContext,
-  salt: BytesLike,
-  ownerAddress: string,
-  guardianAddress: string,
-) => {
-  return await factory.callStatic.computeCreate2Address(salt, implementation.address, ownerAddress, guardianAddress);
 };
 
 export const logBalance = async (address: string, provider: zksync.Provider, name?: string) => {

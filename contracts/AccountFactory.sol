@@ -2,11 +2,11 @@
 pragma solidity 0.8.16;
 
 import {DEPLOYER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
+import {L2ContractHelper} from "@matterlabs/zksync-contracts/l2/contracts/L2ContractHelper.sol";
 
 import {ArgentAccount} from "./ArgentAccount.sol";
 
 contract AccountFactory {
-    bytes32 constant create2Prefix = keccak256("zksyncCreate2");
     bytes32 public proxyBytecodeHash;
 
     constructor(bytes32 _proxyBytecodeHash) {
@@ -36,11 +36,8 @@ contract AccountFactory {
         address _owner,
         address _guardian
     ) public view returns (address) {
-        bytes memory input = proxyContructorData(_implementation, _owner, _guardian);
-
-        bytes32 senderBytes = bytes32(uint256(uint160(address(this))));
-        bytes32 data = keccak256(bytes.concat(create2Prefix, senderBytes, _salt, proxyBytecodeHash, keccak256(input)));
-        return address(uint160(uint256(data)));
+        bytes32 inputHash = keccak256(proxyContructorData(_implementation, _owner, _guardian));
+        return L2ContractHelper.computeCreate2Address(address(this), _salt, proxyBytecodeHash, inputHash);
     }
 
     function proxyContructorData(

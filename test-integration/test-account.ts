@@ -4,7 +4,14 @@ import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { expect } from "chai";
-import { ArgentAccount, ArgentArtifacts, ArgentContext, deployAccount, logBalance } from "../scripts/account.service";
+import {
+  ArgentAccount,
+  ArgentArtifacts,
+  ArgentContext,
+  deployAccount,
+  computeCreate2AddressFromSdk,
+  logBalance,
+} from "../scripts/account.service";
 import { waitForTimestamp } from "../scripts/provider.service";
 
 const { AddressZero } = ethers.constants;
@@ -20,7 +27,7 @@ const wrongGuardian = zksync.Wallet.createRandom();
 const ownerAddress = owner.address;
 const guardianAddress = guardian.address;
 const deployer = new Deployer(hre, new zksync.Wallet(process.env.PRIVATE_KEY as string));
-const { provider } = deployer.zkWallet;
+const { provider, address: deployerAddress } = deployer.zkWallet;
 
 describe("Argent account", () => {
   let artifacts: ArgentArtifacts;
@@ -40,7 +47,7 @@ describe("Argent account", () => {
         factory: await deployer.loadArtifact("AccountFactory"),
         proxy: await deployer.loadArtifact("Proxy"),
       };
-      await logBalance(deployer.zkWallet.address, provider, "Deployer");
+      await logBalance(deployerAddress, provider, "Deployer");
     });
 
     it("Should deploy a new ArgentAccount implementation", async () => {
@@ -70,11 +77,23 @@ describe("Argent account", () => {
     });
   });
 
-  describe("Account deployment", () => {
+  describe("AccountFactory", () => {
+    const salt = ethers.utils.randomBytes(32);
+
     let account: ArgentAccount;
 
     before(async () => {
-      account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: false });
+      account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: false, salt });
+    });
+
+    it("Should predict the account address from the JS SDK", async () => {
+      const address = computeCreate2AddressFromSdk(argent, salt, ownerAddress, guardianAddress);
+      expect(account.address).to.equal(address);
+    });
+
+    it("Should predict the account address from the factory contract", async () => {
+      const address = await factory.computeCreate2Address(salt, implementation.address, ownerAddress, guardianAddress);
+      expect(account.address).to.equal(address);
     });
 
     it("Should be initialized properly", async () => {
@@ -153,12 +172,12 @@ describe("Argent account", () => {
     });
 
     it("Should call the dapp from an EOA", async () => {
-      expect(await testDapp.userNumbers(deployer.zkWallet.address)).to.equal(0n);
+      expect(await testDapp.userNumbers(deployerAddress)).to.equal(0n);
 
       const response = await testDapp.setNumber(42);
       await response.wait();
 
-      expect(await testDapp.userNumbers(deployer.zkWallet.address)).to.equal(42n);
+      expect(await testDapp.userNumbers(deployerAddress)).to.equal(42n);
     });
 
     describe("Calling the dapp using a guardian", () => {
