@@ -69,6 +69,13 @@ contract ArgentAccount is IAccount, IERC1271 {
         _;
     }
 
+    receive() external payable {
+        // If the bootloader called the `receive` function, it likely means
+        // that something went wrong and the transaction should be aborted. The bootloader should
+        // only interact through the `validateTransaction`/`executeTransaction` methods.
+        assert(msg.sender != BOOTLOADER_FORMAL_ADDRESS);
+    }
+
     function initialize(address _owner, address _guardian) external {
         require(_owner != address(0), "argent/invalid-owner");
         require(owner == address(0), "argent/already-init");
@@ -142,7 +149,7 @@ contract ArgentAccount is IAccount, IERC1271 {
         emit GuardianEscaped(_newGuardian);
     }
 
-    // Account methods
+    // IAccount implementation
 
     function validateTransaction(Transaction calldata _transaction) external payable override onlyBootloader {
         _validateTransaction(_transaction);
@@ -209,11 +216,6 @@ contract ArgentAccount is IAccount, IERC1271 {
         require(success);
     }
 
-    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4) {
-        validateSignatures(_hash, _signature);
-        return IERC1271.isValidSignature.selector;
-    }
-
     function payForTransaction(Transaction calldata _transaction) external payable override onlyBootloader {
         bool success = _transaction.payToTheBootloader();
         require(success, "argent/failed-fee-payment");
@@ -225,10 +227,10 @@ contract ArgentAccount is IAccount, IERC1271 {
         _transaction.processPaymasterInput();
     }
 
-    receive() external payable {
-        // If the bootloader called the `receive` function, it likely means
-        // that something went wrong and the transaction should be aborted. The bootloader should
-        // only interact through the `validateTransaction`/`executeTransaction` methods.
-        assert(msg.sender != BOOTLOADER_FORMAL_ADDRESS);
+    // IERC1271 implementation
+
+    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4) {
+        validateSignatures(_hash, _signature);
+        return IERC1271.isValidSignature.selector;
     }
 }
