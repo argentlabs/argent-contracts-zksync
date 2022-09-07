@@ -2,11 +2,10 @@
 pragma solidity 0.8.16;
 
 contract Proxy {
-    address public immutable implementation;
+    address public implementation;
 
     constructor(address _implementation, bytes memory _data) {
         implementation = _implementation;
-
         (bool success, ) = _implementation.delegatecall(_data);
         require(success, "argent/proxy-init-failed");
     }
