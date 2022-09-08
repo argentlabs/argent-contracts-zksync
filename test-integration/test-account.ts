@@ -51,7 +51,7 @@ describe("Argent account", () => {
     });
 
     it("Should deploy a new ArgentAccount implementation", async () => {
-      implementation = await deployer.deploy(artifacts.implementation, []);
+      implementation = await deployer.deploy(artifacts.implementation);
       console.log(`        Account implementation deployed to ${implementation.address}`);
 
       const account = new ArgentAccount(implementation.address, implementation.interface, provider);
@@ -70,7 +70,6 @@ describe("Argent account", () => {
 
     after(() => {
       if (!implementation || !factory) {
-        console.error("Failed to deploy testing environment.");
         throw new Error("Failed to deploy testing environment.");
       }
       argent = { deployer, artifacts, implementation, factory };
@@ -106,6 +105,42 @@ describe("Argent account", () => {
       const accountFromEoa = new zksync.Contract(account.address, artifacts.implementation.abi, deployer.zkWallet);
       const promise = accountFromEoa.initialize(owner.address, guardian.address);
       await expect(promise).to.be.rejectedWith("argent/already-init");
+    });
+  });
+
+  describe("Account upgrade", () => {
+    let account: ArgentAccount;
+    let newImplementation: zksync.Contract;
+
+    before(async () => {
+      account = await deployAccount({ argent, ownerAddress, guardianAddress });
+      newImplementation = await deployer.deploy(artifacts.implementation);
+    });
+
+    it("Should revert with the wrong owner", async () => {
+      const promise = account.connect([wrongOwner, guardian]).upgrade(newImplementation.address);
+      await expect(promise).to.be.rejectedWith("argent/invalid-owner-signature");
+    });
+
+    it("Should revert with the wrong guardian", async () => {
+      const promise = account.connect([owner, wrongGuardian]).upgrade(newImplementation.address);
+      await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
+    });
+
+    it("Should revert when new implementation isn't an IAccount", async () => {
+      const promise = account.connect([owner, guardian]).upgrade(wrongGuardian.address);
+      await expect(promise).to.be.rejectedWith("argent/invalid-implementation");
+    });
+
+    it("Should upgrade the account", async () => {
+      expect(await account.implementation()).to.equal(implementation.address);
+
+      const promise = account.connect([owner, guardian]).upgrade(newImplementation.address);
+
+      await expect(promise)
+        .to.emit(account, "AccountUpgraded")
+        .withArgs(newImplementation.address);
+      expect(await account.implementation()).to.equal(newImplementation.address);
     });
   });
 

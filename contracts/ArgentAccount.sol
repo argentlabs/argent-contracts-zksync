@@ -1,15 +1,18 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity 0.8.16;
 
+import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
+import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
+
 import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {Transaction, TransactionHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/TransactionHelper.sol";
 import {IAccount} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccount.sol";
 
-import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-
-contract ArgentAccount is IAccount, IERC1271 {
+contract ArgentAccount is IAccount, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
+    using ERC165Checker for address;
 
     enum EscapeType {
         None,
@@ -77,11 +80,17 @@ contract ArgentAccount is IAccount, IERC1271 {
     }
 
     function initialize(address _owner, address _guardian) external {
-        require(_owner != address(0), "argent/invalid-owner");
+        require(_owner != address(0), "argent/null-owner");
         require(owner == address(0), "argent/already-init");
         owner = _owner;
         guardian = _guardian;
         emit AccountCreated(address(this), _owner, _guardian);
+    }
+
+    function upgrade(address _newImplementation) external onlySelf {
+        require(_newImplementation.supportsInterface(type(IAccount).interfaceId), "argent/invalid-implementation");
+        implementation = _newImplementation;
+        emit AccountUpgraded(_newImplementation);
     }
 
     // Recovery
@@ -225,6 +234,16 @@ contract ArgentAccount is IAccount, IERC1271 {
     // Here, the account should set the allowance for the smart contracts
     function prePaymaster(Transaction calldata _transaction) external payable override onlyBootloader {
         _transaction.processPaymasterInput();
+    }
+
+    // IERC165 implementation
+
+    function supportsInterface(bytes4 _interfaceId) external pure override returns (bool) {
+        // NOTE: it'll be more efficient to use a mapping based implementation if there are more than 3 interfaces
+        return
+            _interfaceId == type(IERC165).interfaceId ||
+            _interfaceId == type(IERC1271).interfaceId ||
+            _interfaceId == type(IAccount).interfaceId;
     }
 
     // IERC1271 implementation
