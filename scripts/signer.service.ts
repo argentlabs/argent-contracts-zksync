@@ -16,7 +16,6 @@ const concatSignatures = async (transaction: TransactionRequest, signatories: Si
   return ethers.utils.concat(await Promise.all(signaturePromises));
 };
 
-// TODO: make a BackendArgentSigner that fetches the guardian signature from the backend.
 export class MultiSigner extends Signer {
   constructor(readonly address: string, readonly signatories: Signatories, readonly provider: Provider) {
     super();

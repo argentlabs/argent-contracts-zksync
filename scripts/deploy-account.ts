@@ -1,5 +1,5 @@
 import "@nomiclabs/hardhat-ethers";
-import hre, { ethers } from "hardhat";
+import hre from "hardhat";
 import * as zksync from "zksync-web3";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { deployAccount, logBalance } from "./account.service";

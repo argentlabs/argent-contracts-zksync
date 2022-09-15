@@ -34,6 +34,7 @@ describe("Argent account", () => {
   let implementation: zksync.Contract;
   let factory: zksync.Contract;
   let argent: ArgentContext;
+  let account: ArgentAccount;
 
   let noEscape: number;
   let ownerEscape: number;
@@ -79,8 +80,6 @@ describe("Argent account", () => {
   describe("AccountFactory", () => {
     const salt = ethers.utils.randomBytes(32);
 
-    let account: ArgentAccount;
-
     before(async () => {
       account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: false, salt });
     });
@@ -109,7 +108,6 @@ describe("Argent account", () => {
   });
 
   describe("Account upgrade", () => {
-    let account: ArgentAccount;
     let newImplementation: zksync.Contract;
 
     before(async () => {
@@ -198,7 +196,6 @@ describe("Argent account", () => {
   });
 
   describe("Using a dapp", () => {
-    let account: ArgentAccount;
     let testDapp: zksync.Contract;
 
     before(async () => {
@@ -645,8 +642,6 @@ describe("Argent account", () => {
     const hash = ethers.utils._TypedDataEncoder.hash(domain, types, value);
     const eip1271SuccessReturnValue = "0x1626ba7e";
     const signWith = (signatory: zksync.Wallet) => signatory._signTypedData(domain, types, value);
-
-    let account: ArgentAccount;
 
     before(async () => {
       account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: false });
