@@ -103,7 +103,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         for (uint256 i = 0; i < _calls.length; i++) {
             Call memory call = _calls[i];
             require(call.to != address(this), "argent/no-multicall-to-self");
-            _execute(uint256(uint160(call.to)), call.value, call.data);
+            _execute(call.to, call.value, call.data);
         }
     }
 
@@ -218,16 +218,16 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     function executeTransaction(Transaction calldata _transaction) external payable override onlyBootloader {
-        _execute(_transaction.to, _transaction.reserved[1], _transaction.data);
+        _execute(address(uint160(_transaction.to)), _transaction.reserved[1], _transaction.data);
     }
 
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override onlyBootloader {
         _validateTransaction(_transaction);
-        _execute(_transaction.to, _transaction.reserved[1], _transaction.data);
+        _execute(address(uint160(_transaction.to)), _transaction.reserved[1], _transaction.data);
     }
 
     function _execute(
-        uint256 to,
+        address to,
         uint256 value,
         bytes memory data
     ) internal {
