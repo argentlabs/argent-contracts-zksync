@@ -7,4 +7,12 @@ contract TestDapp {
     function setNumber(uint256 _number) external {
         userNumbers[msg.sender] = _number;
     }
+
+    function increaseNumber(uint256 _increment) external {
+        userNumbers[msg.sender] += _increment;
+    }
+
+    function doRevert() external pure {
+        revert();
+    }
 }

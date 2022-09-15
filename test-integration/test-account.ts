@@ -1,6 +1,7 @@
 import "@nomiclabs/hardhat-ethers";
 import "@nomicfoundation/hardhat-chai-matchers";
 import hre, { ethers } from "hardhat";
+import { PopulatedTransaction } from "ethers";
 import * as zksync from "zksync-web3";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { expect } from "chai";
@@ -297,9 +298,54 @@ describe("Argent account", () => {
     });
   });
 
-  describe("Recovery", () => {
-    let account: ArgentAccount;
+  describe("Account multicall", () => {
+    let testDapp: zksync.Contract;
 
+    before(async () => {
+      account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
+
+      const dappArtifact = await deployer.loadArtifact("TestDapp");
+      testDapp = await deployer.deploy(dappArtifact);
+    });
+
+    const makeCall = ({ to, data }: PopulatedTransaction) => ({ to, value: 0, data });
+
+    it("Should revert when one of the calls is to the account", async () => {
+      const dappCall = makeCall(await testDapp.populateTransaction.setNumber(42));
+      const recoveryCall = makeCall(await account.populateTransaction.triggerEscapeGuardian());
+
+      let promise = account.multicall([dappCall, recoveryCall]);
+      await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
+
+      promise = account.multicall([recoveryCall, dappCall]);
+      await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
+    });
+
+    it("Should revert when one of the calls reverts", async () => {
+      const dappCall = makeCall(await testDapp.populateTransaction.setNumber(42));
+      const revertingCall = makeCall(await testDapp.populateTransaction.doRevert());
+
+      let promise = account.multicall([dappCall, revertingCall]);
+      await expect(promise).to.be.rejected;
+
+      promise = account.multicall([revertingCall, dappCall]);
+      await expect(promise).to.be.rejected;
+    });
+
+    it("Should successfully execute multiple calls", async () => {
+      expect(await testDapp.userNumbers(account.address)).to.equal(0n);
+
+      const response = await account.multicall([
+        makeCall(await testDapp.populateTransaction.setNumber(59)),
+        makeCall(await testDapp.populateTransaction.increaseNumber(10)),
+      ]);
+      await response.wait();
+
+      expect(await testDapp.userNumbers(account.address)).to.equal(69n);
+    });
+  });
+
+  describe("Recovery", () => {
     describe("Changing owner", () => {
       before(async () => {
         account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });

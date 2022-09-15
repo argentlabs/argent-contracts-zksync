@@ -25,6 +25,12 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         uint8 escapeType; // packed EscapeType enum
     }
 
+    struct Call {
+        address to;
+        uint256 value;
+        bytes data;
+    }
+
     string public constant VERSION = "0.0.1";
     address public constant NO_GUARDIAN = address(0);
 
@@ -91,6 +97,14 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         require(_newImplementation.supportsInterface(type(IAccount).interfaceId), "argent/invalid-implementation");
         implementation = _newImplementation;
         emit AccountUpgraded(_newImplementation);
+    }
+
+    function multicall(Call[] memory _calls) external onlySelf {
+        for (uint256 i = 0; i < _calls.length; i++) {
+            Call memory call = _calls[i];
+            require(call.to != address(this), "argent/no-multicall-to-self");
+            _execute(uint256(uint160(call.to)), call.value, call.data);
+        }
     }
 
     // Recovery
@@ -204,20 +218,20 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     function executeTransaction(Transaction calldata _transaction) external payable override onlyBootloader {
-        _execute(_transaction);
+        _execute(_transaction.to, _transaction.reserved[1], _transaction.data);
     }
 
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override onlyBootloader {
         _validateTransaction(_transaction);
-        _execute(_transaction);
+        _execute(_transaction.to, _transaction.reserved[1], _transaction.data);
     }
 
-    function _execute(Transaction calldata _transaction) internal {
-        uint256 to = _transaction.to;
-        uint256 value = _transaction.reserved[1];
-        bytes memory data = _transaction.data;
-
-        // using assemply saves us a returndatacopy of the entire return data
+    function _execute(
+        uint256 to,
+        uint256 value,
+        bytes memory data
+    ) internal {
+        // using assembly saves us a returndatacopy of the entire return data
         bool success;
         assembly {
             success := call(gas(), to, value, add(data, 0x20), mload(data), 0, 0)
