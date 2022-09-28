@@ -179,12 +179,15 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     function _validateTransaction(Transaction calldata _transaction) internal {
+        require(owner != address(0), "argent/uninitialized");
         NONCE_HOLDER_SYSTEM_CONTRACT.incrementNonceIfEquals(_transaction.reserved[0]);
         bytes32 txHash = _transaction.encodeHash();
         bytes4 selector = bytes4(_transaction.data);
         if (selector == this.escapeOwner.selector || selector == this.triggerEscapeOwner.selector) {
+            require(_transaction.to == uint256(uint160(address(this))), "argent/only-self");
             validateGuardianSignature(txHash, _transaction.signature);
         } else if (selector == this.escapeGuardian.selector || selector == this.triggerEscapeGuardian.selector) {
+            require(_transaction.to == uint256(uint160(address(this))), "argent/only-self");
             validateOwnerSignature(txHash, _transaction.signature);
         } else {
             validateSignatures(txHash, _transaction.signature);
