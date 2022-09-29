@@ -179,7 +179,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     function _validateTransaction(Transaction calldata _transaction) internal {
-        require(owner != address(0), "argent/uninitialized");
+        // no need to check if account is initialized because it's done during proxy deployment
         NONCE_HOLDER_SYSTEM_CONTRACT.incrementNonceIfEquals(_transaction.reserved[0]);
         bytes32 txHash = _transaction.encodeHash();
         bytes4 selector = bytes4(_transaction.data);
