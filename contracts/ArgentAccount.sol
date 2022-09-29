@@ -179,12 +179,16 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     function _validateTransaction(Transaction calldata _transaction) internal {
+        // no need to check if account is initialized because it's done during proxy deployment
         NONCE_HOLDER_SYSTEM_CONTRACT.incrementNonceIfEquals(_transaction.reserved[0]);
         bytes32 txHash = _transaction.encodeHash();
         bytes4 selector = bytes4(_transaction.data);
-        if (selector == this.escapeOwner.selector || selector == this.triggerEscapeOwner.selector) {
+        bool toSelf = _transaction.to == uint256(uint160(address(this)));
+        if (toSelf && (selector == this.escapeOwner.selector || selector == this.triggerEscapeOwner.selector)) {
             validateGuardianSignature(txHash, _transaction.signature);
-        } else if (selector == this.escapeGuardian.selector || selector == this.triggerEscapeGuardian.selector) {
+        } else if (
+            toSelf && (selector == this.escapeGuardian.selector || selector == this.triggerEscapeGuardian.selector)
+        ) {
             validateOwnerSignature(txHash, _transaction.signature);
         } else {
             validateSignatures(txHash, _transaction.signature);
