@@ -6,7 +6,8 @@ import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 
-import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
+import {SystemContractsCaller, INonceHolder} from "@matterlabs/zksync-contracts/l2/system-contracts/SystemContractsCaller.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {Transaction, TransactionHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/TransactionHelper.sol";
 import {IAccount} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccount.sol";
 
@@ -174,14 +175,27 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
 
     // IAccount implementation
 
-    function validateTransaction(Transaction calldata _transaction) external payable override onlyBootloader {
-        _validateTransaction(_transaction);
+    function validateTransaction(
+        bytes32, // _txHash
+        bytes32 _suggestedSignedHash,
+        Transaction calldata _transaction
+    ) external payable override onlyBootloader {
+        _validateTransaction(_suggestedSignedHash, _transaction);
     }
 
-    function _validateTransaction(Transaction calldata _transaction) internal {
+    function _validateTransaction(bytes32 _suggestedSignedHash, Transaction calldata _transaction) internal {
         // no need to check if account is initialized because it's done during proxy deployment
-        NONCE_HOLDER_SYSTEM_CONTRACT.incrementNonceIfEquals(_transaction.reserved[0]);
-        bytes32 txHash = _transaction.encodeHash();
+
+        bytes memory calldata_ = abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.reserved[0]));
+        SystemContractsCaller.systemCall(uint32(gasleft()), address(NONCE_HOLDER_SYSTEM_CONTRACT), 0, calldata_);
+
+        bytes32 txHash;
+        if (_suggestedSignedHash == bytes32(0)) {
+            txHash = _transaction.encodeHash();
+        } else {
+            txHash = _suggestedSignedHash;
+        }
+
         bytes4 selector = bytes4(_transaction.data);
         bool toSelf = _transaction.to == uint256(uint160(address(this)));
         if (toSelf && (selector == this.escapeOwner.selector || selector == this.triggerEscapeOwner.selector)) {
@@ -221,12 +235,16 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         revert("argent/invalid-guardian-signature");
     }
 
-    function executeTransaction(Transaction calldata _transaction) external payable override onlyBootloader {
+    function executeTransaction(
+        bytes32, // _txHash
+        bytes32, // _suggestedSignedHash
+        Transaction calldata _transaction
+    ) external payable override onlyBootloader {
         _execute(address(uint160(_transaction.to)), _transaction.reserved[1], _transaction.data);
     }
 
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override onlyBootloader {
-        _validateTransaction(_transaction);
+        _validateTransaction(bytes32(0), _transaction); // The account recalculates the hash on its own
         _execute(address(uint160(_transaction.to)), _transaction.reserved[1], _transaction.data);
     }
 
@@ -235,22 +253,35 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         uint256 value,
         bytes memory data
     ) internal {
-        // using assembly saves us a returndatacopy of the entire return data
-        bool success;
-        assembly {
-            success := call(gas(), to, value, add(data, 0x20), mload(data), 0, 0)
+        if (to == address(DEPLOYER_SYSTEM_CONTRACT)) {
+            // We allow calling ContractDeployer with any calldata
+            SystemContractsCaller.systemCall(uint32(gasleft()), to, uint128(value), data);
+        } else {
+            // using assembly saves us a returndatacopy of the entire return data
+            bool success;
+            assembly {
+                success := call(gas(), to, value, add(data, 0x20), mload(data), 0, 0)
+            }
+            require(success);
         }
-        require(success);
     }
 
-    function payForTransaction(Transaction calldata _transaction) external payable override onlyBootloader {
+    function payForTransaction(
+        bytes32, // _txHash
+        bytes32, // _suggestedSignedHash
+        Transaction calldata _transaction
+    ) external payable override onlyBootloader {
         bool success = _transaction.payToTheBootloader();
         require(success, "argent/failed-fee-payment");
     }
 
     // Here, the user should prepare for the transaction to be paid for by a paymaster
     // Here, the account should set the allowance for the smart contracts
-    function prePaymaster(Transaction calldata _transaction) external payable override onlyBootloader {
+    function prePaymaster(
+        bytes32, // _txHash
+        bytes32, // _suggestedSignedHash
+        Transaction calldata _transaction
+    ) external payable override onlyBootloader {
         _transaction.processPaymasterInput();
     }
 

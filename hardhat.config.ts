@@ -9,14 +9,9 @@ dotenv.config();
 
 module.exports = {
   zksolc: {
-    version: "1.1.5",
-    compilerSource: "docker",
-    settings: {
-      experimental: {
-        dockerImage: "matterlabs/zksolc",
-        tag: "v1.1.5",
-      },
-    },
+    version: "1.2.0",
+    compilerSource: "binary",
+    settings: {},
   },
   zkSyncDeploy: {
     zkSyncNetwork: "https://zksync2-testnet.zksync.dev",
