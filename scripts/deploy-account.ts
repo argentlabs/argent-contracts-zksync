@@ -20,6 +20,7 @@ import { deployAccount, logBalance } from "./account.service";
     implementation: await deployer.loadArtifact("ArgentAccount"),
     factory: await deployer.loadArtifact("AccountFactory"),
     proxy: await deployer.loadArtifact("Proxy"),
+    testDapp: await deployer.loadArtifact("TestDapp"),
   };
 
   const implementation = new zksync.Contract(implementationAddress, artifacts.implementation.abi);

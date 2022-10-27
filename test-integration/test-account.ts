@@ -48,6 +48,7 @@ describe("Argent account", () => {
         implementation: await deployer.loadArtifact("ArgentAccount"),
         factory: await deployer.loadArtifact("AccountFactory"),
         proxy: await deployer.loadArtifact("Proxy"),
+        testDapp: await deployer.loadArtifact("TestDapp"),
       };
       await logBalance(deployerAddress, provider, "Deployer");
     });
@@ -200,8 +201,8 @@ describe("Argent account", () => {
     let testDapp: zksync.Contract;
 
     before(async () => {
-      const dappArtifact = await deployer.loadArtifact("TestDapp");
-      testDapp = await deployer.deploy(dappArtifact);
+      testDapp = await deployer.deploy(artifacts.testDapp);
+      console.log(`        TestDapp deployed to ${testDapp.address}`);
     });
 
     it("Should call the dapp from an EOA", async () => {
@@ -303,9 +304,7 @@ describe("Argent account", () => {
 
     before(async () => {
       account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
-
-      const dappArtifact = await deployer.loadArtifact("TestDapp");
-      testDapp = await deployer.deploy(dappArtifact);
+      testDapp = await deployer.deploy(artifacts.testDapp);
     });
 
     const makeCall = ({ to, data }: PopulatedTransaction) => ({ to, value: 0, data });

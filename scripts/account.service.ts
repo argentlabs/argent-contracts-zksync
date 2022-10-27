@@ -16,6 +16,7 @@ export interface ArgentArtifacts {
   implementation: ZkSyncArtifact;
   factory: ZkSyncArtifact;
   proxy: ZkSyncArtifact;
+  testDapp: ZkSyncArtifact;
 }
 
 interface AccountDeploymentParams {
