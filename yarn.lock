@@ -673,10 +673,10 @@
     fs-extra "^7.0.1"
     node-fetch "^2.6.0"
 
-"@nomiclabs/hardhat-ethers@^2.2.0":
-  version "2.2.0"
-  resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-ethers/-/hardhat-ethers-2.2.0.tgz#f55ace2752d0effcf583e754960e9fa89fbe12cd"
-  integrity sha512-kKCW7xawuD/lw69Yr1yqUUrF0IKmnLNGf+pTVbJ/ctHaRcPrwKI0EPkO1RNXBHlOOZkv6v4DK2PPvq0lL2ykig==
+"@nomiclabs/hardhat-ethers@^2.2.1":
+  version "2.2.1"
+  resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-ethers/-/hardhat-ethers-2.2.1.tgz#8057b43566a0e41abeb8142064a3c0d3f23dca86"
+  integrity sha512-RHWYwnxryWR8hzRmU4Jm/q4gzvXpetUOJ4OPlwH2YARcDB+j79+yAYCwO0lN1SUOb4++oOTJEe6AWLEc42LIvg==
 
 "@openzeppelin/contracts@^4.7.3":
   version "4.7.3"
@@ -2153,10 +2153,10 @@ graceful-fs@^4.1.2, graceful-fs@^4.1.6, graceful-fs@^4.1.9:
   resolved "https://registry.yarnpkg.com/graceful-fs/-/graceful-fs-4.2.10.tgz#147d3a006da4ca3ce14728c7aefc287c367d7a6c"
   integrity sha512-9ByhssR2fPVsNZj478qUUbKfmL0+t5BDVyjShtyZZLiK7ZDAArFFfopyOTj0M05wE2tJPisA4iTnnXl2YoPvOA==
 
-hardhat@^2.12.0:
-  version "2.12.0"
-  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.12.0.tgz#51e59f1ff4991bcb66d1a380ea807e6c15fcac34"
-  integrity sha512-mNJFbVG479HwOzxiaLxobyvED2M1aEAuPPYhEo1+88yicMDSTrU2JIS7vV+V0GSNQKaDoiHCmV6bcKjiljT/dQ==
+hardhat@^2.12.1:
+  version "2.12.1"
+  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.12.1.tgz#28b0d7979b55eba379e7de5246240c121c399357"
+  integrity sha512-ihqYoaAKMceVWRcc3VddftFM7Q4/WL5Xan8nrklfDRwwST0W1rWWEE8SrxGikW58IJdREsC/HXVHs0zKfYpiCA==
   dependencies:
     "@ethersproject/abi" "^5.1.2"
     "@metamask/eth-sig-util" "^4.0.0"
@@ -3751,7 +3751,7 @@ yocto-queue@^0.1.0:
   resolved "https://registry.yarnpkg.com/yocto-queue/-/yocto-queue-0.1.0.tgz#0294eb3dee05028d31ee1a5fa2c556a6aaf10a1b"
   integrity sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==
 
-zksync-web3@^0.11.0:
-  version "0.11.0"
-  resolved "https://registry.yarnpkg.com/zksync-web3/-/zksync-web3-0.11.0.tgz#316ddd1548d1d994c0b07e3b9dbc859fe49e66e1"
-  integrity sha512-56S7MSzcWUikjMxo/TcGgejEQhmWLfrmMPAxUQTrMCUTWrZG02uCWItRIu7xlWF4TP5pXBYibxWho2FuYcJQOA==
+zksync-web3@^0.11.1:
+  version "0.11.1"
+  resolved "https://registry.yarnpkg.com/zksync-web3/-/zksync-web3-0.11.1.tgz#039e3ec93b77a6908f6ad3819e15ef149e9d9dc6"
+  integrity sha512-8i0t4xYH+9ogwpKA8ztPNkFu86Qi/rNZrM6hDTb6wM3N1Trogttzz3phjkSO/1Z7JL+Hpzsh3fg+C8CtzLT8Rw==
