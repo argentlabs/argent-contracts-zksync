@@ -1,32 +1,8 @@
 import hre, { ethers } from "hardhat";
-import { BytesLike } from "ethers";
-import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
-import { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
+import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import * as zksync from "zksync-web3";
-import { MultiSigner, Signatories } from "./signer.service";
-
-export interface ArgentContext {
-  deployer: Deployer;
-  artifacts: ArgentArtifacts;
-  implementation: zksync.Contract;
-  factory: zksync.Contract;
-}
-
-export interface ArgentArtifacts {
-  implementation: ZkSyncArtifact;
-  factory: ZkSyncArtifact;
-  proxy: ZkSyncArtifact;
-  testDapp: ZkSyncArtifact;
-}
-
-interface AccountDeploymentParams {
-  argent: ArgentContext;
-  ownerAddress: string;
-  guardianAddress: string;
-  connect?: Signatories;
-  funds?: false | string;
-  salt?: BytesLike;
-}
+import { MultiSigner } from "./signer.service";
+import { AccountDeploymentParams, ArgentInfrastructure } from "./model";
 
 export const deployAccount = async ({
   argent,
@@ -62,7 +38,7 @@ export const deployAccount = async ({
 };
 
 export const computeCreate2AddressFromSdk = (
-  { factory, implementation, artifacts }: ArgentContext,
+  { factory, implementation, artifacts }: ArgentInfrastructure,
   salt: BytesLike,
   ownerAddress: string,
   guardianAddress: string,
@@ -76,12 +52,14 @@ export const computeCreate2AddressFromSdk = (
   return zksync.utils.create2Address(factory.address, proxyBytecodeHash, salt, constructorData);
 };
 
-export const logBalance = async (address: string, provider: zksync.Provider, name?: string) => {
-  const balance = await provider.getBalance(address);
-  console.log(name ? `${name} at ${address}` : address, `ETH L2 balance is ${ethers.utils.formatEther(balance)}`);
+export const logBalance = async (address: string, balanceOrProvider: zksync.Provider | BigNumber, name?: string) => {
+  const balance = "getBalance" in balanceOrProvider ? await balanceOrProvider.getBalance(address) : balanceOrProvider;
+  console.log(name ? `${name} at ${address}` : address, `has balance ${ethers.utils.formatEther(balance)}`);
 };
 
 export class ArgentAccount extends zksync.Contract {
+  signer!: zksync.Signer;
+
   connect(signerOrSignersOrProvider: any): this {
     if (Array.isArray(signerOrSignersOrProvider)) {
       const signer = new MultiSigner(this.address, signerOrSignersOrProvider, this.provider);

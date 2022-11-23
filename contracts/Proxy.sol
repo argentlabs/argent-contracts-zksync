@@ -1,7 +1,15 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity 0.8.16;
 
-contract Proxy {
+interface IProxy {
+    /**
+     * @notice Returns the implementation of the account.
+     * @return The account implementation.
+     */
+    function implementation() external view returns (address);
+}
+
+contract Proxy is IProxy {
     address public implementation;
 
     constructor(address _implementation, bytes memory _data) {
