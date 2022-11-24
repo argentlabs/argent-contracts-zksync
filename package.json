@@ -1,11 +1,13 @@
 {
   "name": "argent-contracts-zksync",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "main": "index.js",
   "author": "Argent Labs",
   "license": "MIT",
   "scripts": {
-    "lint": "solhint contracts/**/*.sol"
+    "lint": "solhint contracts/**/*.sol",
+    "start": "cd local-setup && ./start.sh",
+    "postinstall": "./bin/postinstall.sh"
   },
   "devDependencies": {
     "@matterlabs/hardhat-zksync-deploy": "^0.5.2",

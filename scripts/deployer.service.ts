@@ -1,13 +1,20 @@
+import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
-import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
-import { getEnv } from "./config.service";
 import { logBalance } from "./account.service";
+import { getEnv } from "./config.service";
+
+const env = getEnv();
 
 export const getDeployer = () => {
-  const privateKey = process.env[`PRIVATE_KEY_${getEnv()}`.toUpperCase()];
+  let privateKey = process.env[`PRIVATE_KEY_${env}`.toUpperCase()];
+  if (!privateKey && env === "local") {
+    try {
+      [{ privateKey }] = require("../local-setup/rich-wallets.json");
+    } catch {}
+  }
   if (!privateKey) {
-    throw new Error(`Add private key in .env for: ${getEnv()}`);
+    throw new Error(`Add private key in .env for: ${env}`);
   }
   const wallet = new zksync.Wallet(privateKey);
   const deployer = new Deployer(hre, wallet);
@@ -18,7 +25,7 @@ export const getDeployer = () => {
 
 export const checkDeployerBalance = async ({ zkWallet: { provider, address } }: Deployer) => {
   const balance = await provider.getBalance(address);
-  console.log(`Using env "${getEnv()}" and hardhat network "${hre.network.name}"`);
+  console.log(`Using env "${env}" and hardhat network "${hre.network.name}"`);
   await logBalance(address, balance, "Deployer");
 
   if (balance.lt(ethers.utils.parseEther("0.01"))) {

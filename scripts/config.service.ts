@@ -4,10 +4,10 @@ import { IConfig } from "./model";
 export type Env = "local" | "goerli";
 
 export const getEnv = (): Env => {
-  if (process.env.NODE_ENV === "local") {
+  if (!process.env.NODE_ENV) {
     return "local";
   }
-  return "goerli";
+  return process.env.NODE_ENV as Env;
 };
 
 export const loadConfig = async (): Promise<IConfig> => {

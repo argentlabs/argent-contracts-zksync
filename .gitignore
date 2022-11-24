@@ -10,3 +10,4 @@ cache
 artifacts
 artifacts-zk
 cache-zk
+local-setup
