@@ -2,14 +2,11 @@
 
 set -e # stop the script if any subprocess fails
 
-echo XXXXX Starting the node
+echo Starting zkSync node and waiting until it is ready
 
 cd local-setup
-# ./start.sh >/dev/null 2>&1 &
 ./start.sh >/dev/null | grep '^local-setup-zksync' &
 cd ..
-
-echo XXXXX Waiting until the node is up and running
 
 result=""
 until [[ "$result" == *"zkSync"* ]]; do
@@ -23,4 +20,4 @@ until [[ "$result" == *"zkSync"* ]]; do
 done
 
 echo
-echo XXXXX Node ready
+echo Node ready

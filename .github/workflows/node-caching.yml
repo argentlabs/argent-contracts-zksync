@@ -1,4 +1,4 @@
-name: node-cache
+name: Cache node volumes
 on: workflow_dispatch # manual only
 jobs:
   cache-node-volumes:
@@ -18,7 +18,9 @@ jobs:
         run: ./bin/start-local-node.sh
 
       - name: Stop local node
-        run: cd local-setup && docker-compose down
+        run: |
+          cd local-setup && docker-compose down
+          sleep 10
 
       - name: Archive node volumes
         run: tar -cvf volumes.tar ./local-setup/volumes
