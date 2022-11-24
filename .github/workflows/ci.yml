@@ -1,0 +1,36 @@
+name: ci
+on: push
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      # - name: Compile
+      #   run: yarn hardhat compile
+
+      - name: Lint
+        run: yarn lint
+
+      # - name: Check formatting
+      #   run: yarn format:check
+
+      # - name: Checkout matter-labs/local-setup
+      #   uses: actions/checkout@v3
+      #   with:
+      #     repository: matter-labs/local-setup
+      #     path: local-setup
+
+      - name: Start local node
+        run: ./bin/start-local-node.sh
+
+      - name: Tests
+        run: yarn hardhat test test/test-paymaster.ts

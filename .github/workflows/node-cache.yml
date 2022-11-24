@@ -1,0 +1,30 @@
+name: node-cache
+on: workflow_dispatch # manual only
+jobs:
+  cache-node-volumes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Start local node
+        run: ./bin/start-local-node.sh
+
+      - name: Stop local node
+        run: cd local-setup && docker-compose down
+
+      - name: Archive node volumes
+        run: tar -cvf volumes.tar ./local-setup/volumes
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: node-volumes
+          path: volumes.tar

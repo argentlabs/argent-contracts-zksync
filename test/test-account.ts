@@ -1,18 +1,13 @@
-import "@nomiclabs/hardhat-ethers";
 import "@nomicfoundation/hardhat-chai-matchers";
-import hre, { ethers } from "hardhat";
-import { PopulatedTransaction } from "ethers";
-import * as zksync from "zksync-web3";
-import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
+import "@nomiclabs/hardhat-ethers";
 import { expect } from "chai";
-import {
-  ArgentAccount,
-  ArgentArtifacts,
-  ArgentContext,
-  deployAccount,
-  computeCreate2AddressFromSdk,
-  logBalance,
-} from "../scripts/account.service";
+import { PopulatedTransaction } from "ethers";
+import { ethers } from "hardhat";
+import * as zksync from "zksync-web3";
+import { ArgentAccount, computeCreate2AddressFromSdk, deployAccount } from "../scripts/account.service";
+import { checkDeployerBalance, getDeployer } from "../scripts/deployer.service";
+import { getTestInfrastructure } from "../scripts/infrastructure.service";
+import { ArgentArtifacts, ArgentInfrastructure } from "../scripts/model";
 import { waitForTimestamp } from "../scripts/provider.service";
 
 const { AddressZero } = ethers.constants;
@@ -27,14 +22,12 @@ const wrongGuardian = zksync.Wallet.createRandom();
 
 const ownerAddress = owner.address;
 const guardianAddress = guardian.address;
-const deployer = new Deployer(hre, new zksync.Wallet(process.env.PRIVATE_KEY as string));
-const { provider, address: deployerAddress } = deployer.zkWallet;
+const { deployer, deployerAddress, provider } = getDeployer();
 
 describe("Argent account", () => {
+  let argent: ArgentInfrastructure;
   let artifacts: ArgentArtifacts;
   let implementation: zksync.Contract;
-  let factory: zksync.Contract;
-  let argent: ArgentContext;
   let account: ArgentAccount;
 
   let noEscape: number;
@@ -42,41 +35,15 @@ describe("Argent account", () => {
   let guardianEscape: number;
   let escapeSecurityPeriod: number; // in seconds
 
-  describe("Infrastructure deployment", () => {
-    before(async () => {
-      artifacts = {
-        implementation: await deployer.loadArtifact("ArgentAccount"),
-        factory: await deployer.loadArtifact("AccountFactory"),
-        proxy: await deployer.loadArtifact("Proxy"),
-        testDapp: await deployer.loadArtifact("TestDapp"),
-      };
-      await logBalance(deployerAddress, provider, "Deployer");
-    });
+  before(async () => {
+    await checkDeployerBalance(deployer);
+    argent = await getTestInfrastructure(deployer);
+    ({ artifacts, implementation, dummyAccount: account } = argent);
 
-    it("Should deploy a new ArgentAccount implementation", async () => {
-      implementation = await deployer.deploy(artifacts.implementation);
-      console.log(`        Account implementation deployed to ${implementation.address}`);
-
-      const account = new ArgentAccount(implementation.address, implementation.interface, provider);
-      noEscape = await account.NO_ESCAPE();
-      ownerEscape = await account.OWNER_ESCAPE();
-      guardianEscape = await account.GUARDIAN_ESCAPE();
-      escapeSecurityPeriod = await account.ESCAPE_SECURITY_PERIOD();
-    });
-
-    it("Should deploy a new AccountFactory", async () => {
-      const { bytecode } = artifacts.proxy;
-      const proxyBytecodeHash = zksync.utils.hashBytecode(bytecode);
-      factory = await deployer.deploy(artifacts.factory, [proxyBytecodeHash], undefined, [bytecode]);
-      console.log(`        Account factory deployed to ${factory.address}`);
-    });
-
-    after(() => {
-      if (!implementation || !factory) {
-        throw new Error("Failed to deploy testing environment.");
-      }
-      argent = { deployer, artifacts, implementation, factory };
-    });
+    noEscape = await account.NO_ESCAPE();
+    ownerEscape = await account.OWNER_ESCAPE();
+    guardianEscape = await account.GUARDIAN_ESCAPE();
+    escapeSecurityPeriod = await account.ESCAPE_SECURITY_PERIOD();
   });
 
   describe("AccountFactory", () => {
@@ -92,7 +59,12 @@ describe("Argent account", () => {
     });
 
     it("Should predict the account address from the factory contract", async () => {
-      const address = await factory.computeCreate2Address(salt, implementation.address, ownerAddress, guardianAddress);
+      const address = await argent.factory.computeCreate2Address(
+        salt,
+        implementation.address,
+        ownerAddress,
+        guardianAddress,
+      );
       expect(account.address).to.equal(address);
     });
 
@@ -216,7 +188,13 @@ describe("Argent account", () => {
 
     describe("Calling the dapp using a guardian", () => {
       before(async () => {
-        account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
+        account = await deployAccount({
+          argent,
+          ownerAddress,
+          guardianAddress,
+          connect: [owner, guardian],
+          funds: "0.001",
+        });
       });
 
       it("Should revert with bad nonce", async () => {
@@ -257,7 +235,7 @@ describe("Argent account", () => {
           ownerAddress,
           guardianAddress: AddressZero,
           connect: [owner],
-          funds: "0.00015",
+          funds: "0.01000",
         });
       });
 
@@ -341,6 +319,20 @@ describe("Argent account", () => {
       await response.wait();
 
       expect(await testDapp.userNumbers(account.address)).to.equal(69n);
+    });
+  });
+
+  describe.skip("Deploying contracts from account", () => {
+    before(async () => {
+      account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
+    });
+
+    it("Should deploy a contract from the account", async () => {
+      const artifact = artifacts.testDapp;
+      const factory = new zksync.ContractFactory(artifact.abi, artifact.bytecode, account.signer);
+      const transaction = factory.getDeployTransaction();
+      account.signer.sendTransaction;
+      console.log("transaction", transaction);
     });
   });
 
@@ -506,7 +498,8 @@ describe("Argent account", () => {
       });
     });
 
-    describe("Escaping", () => {
+    // TOOD: update security period
+    describe.skip("Escaping", () => {
       if (escapeSecurityPeriod > 60) {
         throw new Error("These tests require an escape security period of less than 60 seconds");
       }
