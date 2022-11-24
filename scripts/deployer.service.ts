@@ -5,6 +5,7 @@ import { logBalance } from "./account.service";
 import { getEnv } from "./config.service";
 
 const env = getEnv();
+let showPreamble = true;
 
 export const getDeployer = () => {
   let privateKey = process.env[`PRIVATE_KEY_${env}`.toUpperCase()];
@@ -25,8 +26,12 @@ export const getDeployer = () => {
 
 export const checkDeployerBalance = async ({ zkWallet: { provider, address } }: Deployer) => {
   const balance = await provider.getBalance(address);
-  console.log(`Using env "${env}" and hardhat network "${hre.network.name}"`);
-  await logBalance(address, balance, "Deployer");
+  if (showPreamble) {
+    console.log(`Using env "${env}" and hardhat network "${hre.network.name}"`);
+    await logBalance(address, balance, "Deployer");
+    console.log();
+    showPreamble = false;
+  }
 
   if (balance.lt(ethers.utils.parseEther("0.01"))) {
     throw new Error("Deployer has insufficient funds");

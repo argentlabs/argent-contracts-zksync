@@ -5,7 +5,7 @@ set -e # stop the script if any subprocess fails
 echo Starting zkSync node and waiting until it is ready
 
 cd local-setup
-./start.sh >/dev/null | grep '^local-setup-zksync' &
+./start.sh | grep '^local-setup-zksync' &
 cd ..
 
 result=""

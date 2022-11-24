@@ -5,8 +5,10 @@
   "author": "Argent Labs",
   "license": "MIT",
   "scripts": {
+    "start": "cd local-setup && ./start.sh | grep --color=always --invert-match '^local-setup-geth'",
+    "stop": "cd local-setup && docker-compose down",
+    "test": "hardhat test",
     "lint": "solhint contracts/**/*.sol",
-    "start": "cd local-setup && ./start.sh",
     "postinstall": "./bin/postinstall.sh"
   },
   "devDependencies": {
