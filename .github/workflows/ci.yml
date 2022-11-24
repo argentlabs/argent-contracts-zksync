@@ -18,7 +18,7 @@ jobs:
         run: yarn lint
 
       - name: Start local node
-        run: ./bin/start-local-node.sh
+        run: ./bin/start-ci-node.sh
 
       - name: Tests
         run: yarn test

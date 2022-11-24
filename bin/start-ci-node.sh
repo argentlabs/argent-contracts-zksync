@@ -1,8 +1,10 @@
 #!/bin/bash
 
+# Starts a local zkSync node and releases control when the RPC endpoint is ready.
+
 set -e # stop the script if any subprocess fails
 
-echo Starting zkSync node and waiting until it is ready
+echo Starting zkSync node...
 
 cd local-setup
 ./start.sh | grep '^local-setup-zksync' &
@@ -16,8 +18,6 @@ until [[ "$result" == *"zkSync"* ]]; do
 		--data '{"jsonrpc": "2.0", "id": "1", "method": "web3_clientVersion", "params": []}' \
 		|| true)
 	sleep 1
-	echo -n .
 done
 
-echo
-echo Node ready
+echo Node ready.
