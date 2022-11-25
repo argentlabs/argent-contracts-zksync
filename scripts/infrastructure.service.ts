@@ -10,7 +10,6 @@ export const deployInfrastructure = async (deployer: Deployer): Promise<ArgentIn
 
   const implementation = await deployer.deploy(artifacts.implementation);
   console.log(`Account implementation deployed to ${implementation.address}`);
-  await logBalance(deployer.zkWallet.address, deployer.zkWallet.provider, "Deployer");
 
   const { bytecode } = artifacts.proxy;
   const proxyBytecodeHash = zksync.utils.hashBytecode(bytecode);

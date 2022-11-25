@@ -13,7 +13,7 @@ const concatSignatures = async (transaction: TransactionRequest, signatories: Si
       ? Promise.resolve(new Uint8Array(65))
       : new zksync.EIP712Signer(signatory, chainId).sign(transaction),
   );
-  return ethers.utils.concat(await Promise.all(signaturePromises));
+  return ethers.utils.hexlify(ethers.utils.concat(await Promise.all(signaturePromises)));
 };
 
 export class MultiSigner extends Signer {
@@ -43,6 +43,7 @@ export class MultiSigner extends Signer {
       gasPrice: transaction.gasPrice ?? (await this.provider.getGasPrice()),
       gasLimit: transaction.gasLimit ?? gasLimit,
       nonce: transaction.nonce ?? (await this.provider.getTransactionCount(from)),
+      customData: transaction.customData,
     };
 
     const customSignature = await concatSignatures(unsignedTransaction, this.signatories, chainId);
@@ -50,6 +51,7 @@ export class MultiSigner extends Signer {
     const transactionRequest = {
       ...unsignedTransaction,
       customData: {
+        ...unsignedTransaction.customData,
         customSignature,
       },
     };

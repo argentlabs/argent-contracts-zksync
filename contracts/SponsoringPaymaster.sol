@@ -34,7 +34,7 @@ contract SponsoringPaymaster is IPaymaster, ArgentAccountDetector {
         }
 
         if (!_isArgentAccount(address(uint160(_transaction.from)))) {
-            revert("Unsponsored wallet");
+            revert("Unsponsored account");
         }
 
         // Note, that while the minimal amount of ETH needed is tx.ergsPrice * tx.ergsLimit,
