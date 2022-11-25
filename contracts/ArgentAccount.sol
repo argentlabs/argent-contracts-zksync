@@ -248,11 +248,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         _execute(address(uint160(_transaction.to)), _transaction.reserved[1], _transaction.data);
     }
 
-    function _execute(
-        address to,
-        uint256 value,
-        bytes memory data
-    ) internal {
+    function _execute(address to, uint256 value, bytes memory data) internal {
         if (to == address(DEPLOYER_SYSTEM_CONTRACT)) {
             // We allow calling ContractDeployer with any calldata
             SystemContractsCaller.systemCall(uint32(gasleft()), to, uint128(value), data);

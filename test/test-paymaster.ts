@@ -3,10 +3,10 @@ import "@nomiclabs/hardhat-ethers";
 import { expect } from "chai";
 import * as zksync from "zksync-web3";
 import { ArgentAccount, deployAccount, logBalance } from "../scripts/account.service";
-import { checkDeployerBalance, getDeployer } from "../scripts/deployer.service";
-import { deployPaymaster } from "../scripts/paymaster.service";
-import { deployInfrastructure, getTestInfrastructure } from "../scripts/infrastructure.service";
+import { getDeployer } from "../scripts/deployer.service";
+import { getTestInfrastructure } from "../scripts/infrastructure.service";
 import { ArgentInfrastructure } from "../scripts/model";
+import { deployPaymaster } from "../scripts/paymaster.service";
 
 const owner = zksync.Wallet.createRandom();
 const guardian = zksync.Wallet.createRandom();
@@ -17,7 +17,6 @@ const { deployer, provider } = getDeployer();
 
 describe("Paymasters", () => {
   let argent: ArgentInfrastructure;
-
   let account: ArgentAccount;
   let paymaster: zksync.Contract;
 

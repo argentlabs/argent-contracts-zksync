@@ -5,14 +5,14 @@ import {Owned} from "./Owned.sol";
 import {IProxy} from "./Proxy.sol";
 
 /**
- * @title ArgentWalletDetector
- * @notice Simple contract to detect if a given address represents an Argent wallet.
- * The `isArgentWallet` method returns true if the codehash matches one of the deployed Proxy
- * and if the target implementation matches one of the deployed BaseWallet.
+ * @title ArgentAccountDetector
+ * @notice Simple contract to detect if a given address represents an Argent account.
+ * The `isArgentAccount` method returns true if the codehash matches one of the deployed Proxy
+ * and if the target implementation matches one of the deployed `ArgentAccount`s.
  * Only the owner of the contract can add code hash and implementations.
  * @author Julien Niset - <julien@argent.xyz>
  */
-contract ArgentWalletDetector is Owned {
+contract ArgentAccountDetector is Owned {
     // The accepted code hashes
     bytes32[] private codes;
     // The accepted implementations
@@ -72,17 +72,17 @@ contract ArgentWalletDetector is Owned {
     }
 
     /**
-     * @notice Adds a new accepted code hash and implementation from a deployed Argent wallet.
-     * @param _argentWallet The deployed Argent wallet.
+     * @notice Adds a new accepted code hash and implementation from a deployed Argent account.
+     * @param _argentAccount The deployed Argent account.
      */
-    function addCodeAndImplementationFromWallet(address _argentWallet) external onlyOwner {
+    function addCodeAndImplementationFromAccount(address _argentAccount) external onlyOwner {
         bytes32 codeHash;
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            codeHash := extcodehash(_argentWallet)
+            codeHash := extcodehash(_argentAccount)
         }
         addCode(codeHash);
-        address implementation = IProxy(_argentWallet).implementation();
+        address implementation = IProxy(_argentAccount).implementation();
         addImplementation(implementation);
     }
 
@@ -101,26 +101,26 @@ contract ArgentWalletDetector is Owned {
     }
 
     /**
-     * @notice Checks if an address is an Argent wallet
-     * @param _wallet The target wallet
+     * @notice Checks if an address is an Argent account
+     * @param _account The target account
      */
-    function isArgentWallet(address _wallet) external view returns (bool) {
+    function isArgentAccount(address _account) external view returns (bool) {
         bytes32 codeHash;
         assembly {
-            codeHash := extcodehash(_wallet)
+            codeHash := extcodehash(_account)
         }
-        return acceptedCodes[codeHash].exists && acceptedImplementations[IProxy(_wallet).implementation()].exists;
+        return acceptedCodes[codeHash].exists && acceptedImplementations[IProxy(_account).implementation()].exists;
     }
 
     /**
-     * @notice Checks if an address is an Argent wallet
-     * @param _wallet The target wallet
+     * @notice Checks if an address is an Argent account
+     * @param _account The target account
      */
-    function _isArgentWallet(address _wallet) internal view returns (bool) {
+    function _isArgentAccount(address _account) internal view returns (bool) {
         bytes32 codeHash;
         assembly {
-            codeHash := extcodehash(_wallet)
+            codeHash := extcodehash(_account)
         }
-        return acceptedCodes[codeHash].exists && acceptedImplementations[IProxy(_wallet).implementation()].exists;
+        return acceptedCodes[codeHash].exists && acceptedImplementations[IProxy(_account).implementation()].exists;
     }
 }

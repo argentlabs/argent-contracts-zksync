@@ -5,7 +5,7 @@ export const deployPaymaster = async ({ deployer, artifacts, dummyAccount }: Arg
   const paymaster = await deployer.deploy(artifacts.sponsoringPaymaster, [[], []]);
   console.log(`Paymaster address: ${paymaster.address}`);
 
-  let response = await paymaster.addCodeAndImplementationFromWallet(dummyAccount.address);
+  let response = await paymaster.addCodeAndImplementationFromAccount(dummyAccount.address);
   await response.wait();
   console.log("Added code and implementation from dummy acount");
 

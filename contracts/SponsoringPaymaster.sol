@@ -7,22 +7,23 @@ import {TransactionHelper, Transaction} from "@matterlabs/zksync-contracts/l2/sy
 import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 
-import {ArgentWalletDetector} from "./ArgentWalletDetector.sol";
+import {ArgentAccountDetector} from "./ArgentAccountDetector.sol";
 
-contract SponsoringPaymaster is IPaymaster, ArgentWalletDetector {
+contract SponsoringPaymaster is IPaymaster, ArgentAccountDetector {
     modifier onlyBootloader() {
         require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "Only bootloader can call this method");
         // Continue execution if called from the bootloader.
         _;
     }
 
-    constructor(bytes32[] memory _codes, address[] memory _implementations)
-        ArgentWalletDetector(_codes, _implementations)
-    {}
+    constructor(
+        bytes32[] memory _codes,
+        address[] memory _implementations
+    ) ArgentAccountDetector(_codes, _implementations) {}
 
     function validateAndPayForPaymasterTransaction(
-        bytes32, /*_txHash*/
-        bytes32, /*_suggestedSignedHash*/
+        bytes32 /*_txHash*/,
+        bytes32 /*_suggestedSignedHash*/,
         Transaction calldata _transaction
     ) external payable override onlyBootloader returns (bytes memory _context) {
         require(_transaction.paymasterInput.length >= 4, "The standard paymaster input must be at least 4 bytes long");
@@ -32,7 +33,7 @@ contract SponsoringPaymaster is IPaymaster, ArgentWalletDetector {
             revert("Unsupported paymaster flow");
         }
 
-        if (!_isArgentWallet(address(uint160(_transaction.from)))) {
+        if (!_isArgentAccount(address(uint160(_transaction.from)))) {
             revert("Unsponsored wallet");
         }
 
