@@ -1,6 +1,6 @@
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import * as zksync from "zksync-web3";
-import { ArgentAccount, deployAccount, logBalance } from "./account.service";
+import { ArgentAccount, deployAccount } from "./account.service";
 import { getEnv, loadConfig } from "./config.service";
 import { checkDeployer, loadArtifacts } from "./deployer.service";
 import { ArgentInfrastructure } from "./model";

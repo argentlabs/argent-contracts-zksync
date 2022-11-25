@@ -63,9 +63,7 @@ describe("Recovery", () => {
 
       const promise = account.changeOwner(newOwner.address);
 
-      await expect(promise)
-        .to.emit(account, "OwnerChanged")
-        .withArgs(newOwner.address);
+      await expect(promise).to.emit(account, "OwnerChanged").withArgs(newOwner.address);
       expect(await account.owner()).to.equal(newOwner.address);
     });
   });
@@ -95,9 +93,7 @@ describe("Recovery", () => {
 
       const promise = account.changeGuardian(newGuardian.address);
 
-      await expect(promise)
-        .to.emit(account, "GuardianChanged")
-        .withArgs(newGuardian.address);
+      await expect(promise).to.emit(account, "GuardianChanged").withArgs(newGuardian.address);
       expect(await account.guardian()).to.equal(newGuardian.address);
     });
   });
@@ -127,9 +123,7 @@ describe("Recovery", () => {
 
       const promise = account.changeGuardianBackup(newGuardianBackup.address);
 
-      await expect(promise)
-        .to.emit(account, "GuardianBackupChanged")
-        .withArgs(newGuardianBackup.address);
+      await expect(promise).to.emit(account, "GuardianBackupChanged").withArgs(newGuardianBackup.address);
       expect(await account.guardianBackup()).to.equal(newGuardianBackup.address);
     });
 
@@ -153,9 +147,7 @@ describe("Recovery", () => {
       const receipt = await response.wait();
       const { timestamp } = await provider.getBlock(receipt.blockHash);
       const activeAtExpected = timestamp + escapeSecurityPeriod;
-      await expect(response)
-        .to.emit(account, "EscapeGuardianTriggerred")
-        .withArgs(activeAtExpected);
+      await expect(response).to.emit(account, "EscapeGuardianTriggerred").withArgs(activeAtExpected);
 
       const escapeAfter = await account.escape();
       expect(escapeAfter.activeAt).to.equal(activeAtExpected);
@@ -173,9 +165,7 @@ describe("Recovery", () => {
       const receipt = await response.wait();
       const { timestamp } = await provider.getBlock(receipt.blockHash);
       const activeAtExpected = timestamp + escapeSecurityPeriod;
-      await expect(response)
-        .to.emit(account, "EscapeOwnerTriggerred")
-        .withArgs(activeAtExpected);
+      await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAtExpected);
 
       const escapeAfter = await account.escape();
       expect(escapeAfter.activeAt).to.equal(activeAtExpected);
@@ -195,9 +185,7 @@ describe("Recovery", () => {
       const receipt = await response.wait();
       const { timestamp } = await provider.getBlock(receipt.blockHash);
       const activeAtExpected = timestamp + escapeSecurityPeriod;
-      await expect(response)
-        .to.emit(account, "EscapeOwnerTriggerred")
-        .withArgs(activeAtExpected);
+      await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAtExpected);
 
       const escapeAfter = await account.escape();
       expect(escapeAfter.activeAt).to.equal(activeAtExpected);
@@ -237,9 +225,7 @@ describe("Recovery", () => {
 
       // should escape after the security period
       const promise = account.escapeGuardian(newGuardian.address);
-      await expect(promise)
-        .to.emit(account, "GuardianEscaped")
-        .withArgs(newGuardian.address);
+      await expect(promise).to.emit(account, "GuardianEscaped").withArgs(newGuardian.address);
 
       expect(await account.guardian()).to.equal(newGuardian.address);
 
@@ -275,9 +261,7 @@ describe("Recovery", () => {
 
       // should escape after the security period
       const promise = account.escapeOwner(newOwner.address);
-      await expect(promise)
-        .to.emit(account, "OwnerEscaped")
-        .withArgs(newOwner.address);
+      await expect(promise).to.emit(account, "OwnerEscaped").withArgs(newOwner.address);
 
       expect(await account.owner()).to.equal(newOwner.address);
 

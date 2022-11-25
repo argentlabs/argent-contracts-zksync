@@ -96,9 +96,7 @@ describe("Argent account", () => {
 
       const promise = account.connect([owner, guardian]).upgrade(newImplementation.address);
 
-      await expect(promise)
-        .to.emit(account, "AccountUpgraded")
-        .withArgs(newImplementation.address);
+      await expect(promise).to.emit(account, "AccountUpgraded").withArgs(newImplementation.address);
       expect(await account.implementation()).to.equal(newImplementation.address);
     });
   });
@@ -240,9 +238,7 @@ describe("Argent account", () => {
 
         const promise = account.changeOwner(newOwner.address);
 
-        await expect(promise)
-          .to.emit(account, "OwnerChanged")
-          .withArgs(newOwner.address);
+        await expect(promise).to.emit(account, "OwnerChanged").withArgs(newOwner.address);
         expect(await account.owner()).to.equal(newOwner.address);
       });
 
@@ -256,9 +252,7 @@ describe("Argent account", () => {
 
         const promise = account.changeGuardian(guardian.address);
 
-        await expect(promise)
-          .to.emit(account, "GuardianChanged")
-          .withArgs(guardian.address);
+        await expect(promise).to.emit(account, "GuardianChanged").withArgs(guardian.address);
         expect(await account.guardian()).to.equal(guardian.address);
       });
     });

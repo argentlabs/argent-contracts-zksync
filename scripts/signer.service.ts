@@ -1,8 +1,8 @@
-import { ethers } from "hardhat";
+import { Provider } from "@ethersproject/providers";
 import { Signer } from "ethers";
 import { Bytes } from "ethers/lib/utils";
+import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
-import { Provider } from "@ethersproject/providers";
 
 type TransactionRequest = zksync.types.TransactionRequest;
 export type Signatories = Array<zksync.Wallet | 0>;

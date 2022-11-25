@@ -1,8 +1,8 @@
+import { BigNumber, BytesLike } from "ethers";
 import hre, { ethers } from "hardhat";
-import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import * as zksync from "zksync-web3";
-import { MultiSigner } from "./signer.service";
 import { AccountDeploymentParams, ArgentInfrastructure } from "./model";
+import { MultiSigner } from "./signer.service";
 
 export const deployAccount = async ({
   argent,
