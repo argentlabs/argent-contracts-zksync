@@ -77,7 +77,6 @@ contract ArgentAccountDetector is Owned {
      */
     function addCodeAndImplementationFromAccount(address _argentAccount) external onlyOwner {
         bytes32 codeHash;
-        // solhint-disable-next-line no-inline-assembly
         assembly {
             codeHash := extcodehash(_argentAccount)
         }
@@ -105,11 +104,7 @@ contract ArgentAccountDetector is Owned {
      * @param _account The target account
      */
     function isArgentAccount(address _account) external view returns (bool) {
-        bytes32 codeHash;
-        assembly {
-            codeHash := extcodehash(_account)
-        }
-        return acceptedCodes[codeHash].exists && acceptedImplementations[IProxy(_account).implementation()].exists;
+        return _isArgentAccount(_account);
     }
 
     /**

@@ -20,7 +20,6 @@ contract Proxy is IProxy {
 
     fallback() external payable {
         address target = implementation;
-        // solhint-disable-next-line no-inline-assembly
         assembly {
             calldatacopy(0, 0, calldatasize())
             let result := delegatecall(gas(), target, 0, calldatasize(), 0, 0)
