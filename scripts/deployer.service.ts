@@ -24,17 +24,27 @@ export const getDeployer = () => {
   return { deployer, deployerAddress: address, provider };
 };
 
-export const checkDeployerBalance = async ({ zkWallet: { provider, address } }: Deployer) => {
-  const balance = await provider.getBalance(address);
-  if (showPreamble) {
-    console.log(`Using env "${env}" and hardhat network "${hre.network.name}"`);
-    await logBalance(address, balance, "Deployer");
-    console.log();
-    showPreamble = false;
-  }
+export const checkDeployer = async ({ zkWallet: { provider, address } }: Deployer) => {
+  try {
+    const balance = await provider.getBalance(address);
 
-  if (balance.lt(ethers.utils.parseEther("0.01"))) {
-    throw new Error("Deployer has insufficient funds");
+    if (showPreamble) {
+      console.log(`Using env "${env}" and hardhat network "${hre.network.name}"`);
+      await logBalance(address, balance, "Deployer");
+      console.log();
+      showPreamble = false;
+    }
+
+    if (balance.lt(ethers.utils.parseEther("0.01"))) {
+      throw new Error("Deployer has insufficient funds");
+    }
+  } catch (error) {
+    if (`${error}`.includes("noNetwork") && getEnv() === "local") {
+      console.error("\nRun `yarn start` to start the local zkSync node.\n");
+      process.exit(1);
+    } else {
+      throw error;
+    }
   }
 };
 

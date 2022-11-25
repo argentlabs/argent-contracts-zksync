@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount, deployAccount } from "../scripts/account.service";
-import { checkDeployerBalance, getDeployer } from "../scripts/deployer.service";
+import { checkDeployer, getDeployer } from "../scripts/deployer.service";
 import { getTestInfrastructure } from "../scripts/infrastructure.service";
 import { ArgentInfrastructure } from "../scripts/model";
 import { waitForTimestamp } from "../scripts/provider.service";
@@ -33,7 +33,7 @@ describe("Recovery", () => {
   let escapeSecurityPeriod: number; // in seconds
 
   before(async () => {
-    await checkDeployerBalance(deployer);
+    await checkDeployer(deployer);
     argent = await getTestInfrastructure(deployer);
     ({ dummyAccount: account } = argent);
 

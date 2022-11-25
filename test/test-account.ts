@@ -5,7 +5,7 @@ import { PopulatedTransaction } from "ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount, computeCreate2AddressFromSdk, deployAccount } from "../scripts/account.service";
-import { checkDeployerBalance, getDeployer } from "../scripts/deployer.service";
+import { checkDeployer, getDeployer } from "../scripts/deployer.service";
 import { getTestInfrastructure } from "../scripts/infrastructure.service";
 import { ArgentArtifacts, ArgentInfrastructure } from "../scripts/model";
 
@@ -28,7 +28,7 @@ describe("Argent account", () => {
   let account: ArgentAccount;
 
   before(async () => {
-    await checkDeployerBalance(deployer);
+    await checkDeployer(deployer);
     argent = await getTestInfrastructure(deployer);
     ({ artifacts, implementation, dummyAccount: account } = argent);
   });
