@@ -73,7 +73,7 @@ describe("Argent account", () => {
 
     before(async () => {
       account = await deployAccount({ argent, ownerAddress, guardianAddress });
-      newImplementation = await deployer.deploy(artifacts.implementation);
+      newImplementation = await deployer.deploy(artifacts.implementation, [10]);
     });
 
     it("Should revert with the wrong owner", async () => {
