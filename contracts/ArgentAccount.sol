@@ -39,9 +39,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     uint8 public constant GUARDIAN_ESCAPE = uint8(EscapeType.Guardian);
     uint8 public constant OWNER_ESCAPE = uint8(EscapeType.Owner);
 
-    // FIXME: using short period for testing on goerli, switch back to 1 week when local testing is available
-    // uint32 public constant ESCAPE_SECURITY_PERIOD = 1 weeks;
-    uint32 public constant ESCAPE_SECURITY_PERIOD = 10 seconds;
+    uint32 public immutable escapeSecurityPeriod;
 
     address public implementation; // !!! storage slot shared with proxy
     address public owner;
@@ -84,6 +82,11 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         // that something went wrong and the transaction should be aborted. The bootloader should
         // only interact through the `validateTransaction`/`executeTransaction` methods.
         assert(msg.sender != BOOTLOADER_FORMAL_ADDRESS);
+    }
+
+    constructor(uint32 _escapeSecurityPeriod) {
+        require(_escapeSecurityPeriod != 0, "argent/null-escape-security-period");
+        escapeSecurityPeriod = _escapeSecurityPeriod;
     }
 
     function initialize(address _owner, address _guardian) external {
@@ -133,13 +136,13 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
             require(escape.escapeType == OWNER_ESCAPE, "argent/cannot-override-owner-escape");
         }
 
-        uint32 activeAt = uint32(block.timestamp) + ESCAPE_SECURITY_PERIOD;
+        uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(activeAt, OWNER_ESCAPE);
         emit EscapeOwnerTriggerred(activeAt);
     }
 
     function triggerEscapeGuardian() public onlySelf requireGuardian {
-        uint32 activeAt = uint32(block.timestamp) + ESCAPE_SECURITY_PERIOD;
+        uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(activeAt, GUARDIAN_ESCAPE);
         emit EscapeGuardianTriggerred(activeAt);
     }
