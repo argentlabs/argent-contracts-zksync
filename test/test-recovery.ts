@@ -7,7 +7,7 @@ import { ArgentAccount, deployAccount } from "../scripts/account.service";
 import { checkDeployer, getDeployer } from "../scripts/deployer.service";
 import { getTestInfrastructure } from "../scripts/infrastructure.service";
 import { ArgentInfrastructure } from "../scripts/model";
-import { waitForTimestamp } from "../scripts/provider.service";
+import { waitForL1BatchBlock, waitForTimestamp } from "../scripts/provider.service";
 
 const { AddressZero } = ethers.constants;
 
@@ -134,8 +134,7 @@ describe("Recovery", () => {
     });
   });
 
-  // TODO: unskip when zkSync allows fetching "L1 batch blocks" instead of just miniblocks
-  describe.skip("Escape triggering", () => {
+  describe("Escape triggering", () => {
     it("Should run triggerEscapeGuardian() by owner", async () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner] });
 
@@ -144,8 +143,7 @@ describe("Recovery", () => {
       expect(escapeBefore.escapeType).to.equal(noEscape);
 
       const response = await account.triggerEscapeGuardian();
-      const receipt = await response.wait();
-      const { timestamp } = await provider.getBlock(receipt.blockHash);
+      const { timestamp } = await waitForL1BatchBlock(response, provider);
       const activeAtExpected = timestamp + escapeSecurityPeriod;
       await expect(response).to.emit(account, "EscapeGuardianTriggerred").withArgs(activeAtExpected);
 
@@ -162,8 +160,7 @@ describe("Recovery", () => {
       expect(escapeBefore.escapeType).to.equal(noEscape);
 
       const response = await account.triggerEscapeOwner();
-      const receipt = await response.wait();
-      const { timestamp } = await provider.getBlock(receipt.blockHash);
+      const { timestamp } = await waitForL1BatchBlock(response, provider);
       const activeAtExpected = timestamp + escapeSecurityPeriod;
       await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAtExpected);
 
@@ -182,8 +179,7 @@ describe("Recovery", () => {
       expect(escapeBefore.escapeType).to.equal(noEscape);
 
       const response = await account.connect([newGuardianBackup]).triggerEscapeOwner();
-      const receipt = await response.wait();
-      const { timestamp } = await provider.getBlock(receipt.blockHash);
+      const { timestamp } = await waitForL1BatchBlock(response, provider);
       const activeAtExpected = timestamp + escapeSecurityPeriod;
       await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAtExpected);
 
@@ -193,8 +189,7 @@ describe("Recovery", () => {
     });
   });
 
-  // TOOD: update waitForTimestamp
-  describe.skip("Escaping", () => {
+  describe("Escaping", () => {
     if (escapeSecurityPeriod > 60) {
       throw new Error("These tests require an escape security period of less than 60 seconds");
     }
