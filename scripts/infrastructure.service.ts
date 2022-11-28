@@ -6,9 +6,10 @@ import { checkDeployer, loadArtifacts } from "./deployer.service";
 import { ArgentInfrastructure } from "./model";
 
 export const deployInfrastructure = async (deployer: Deployer): Promise<ArgentInfrastructure> => {
+  const config = await loadConfig();
   const artifacts = await loadArtifacts(deployer);
 
-  const implementation = await deployer.deploy(artifacts.implementation);
+  const implementation = await deployer.deploy(artifacts.implementation, [config.escapeSecurityPeriodInSeconds]);
   console.log(`Account implementation deployed to ${implementation.address}`);
 
   const { bytecode } = artifacts.proxy;

@@ -6,6 +6,7 @@ import { ArgentAccount } from "./account.service";
 import { Signatories } from "./signer.service";
 
 export interface IConfig {
+  escapeSecurityPeriodInSeconds: number;
   implementation: string;
   factory: string;
   dummyAccount: string;

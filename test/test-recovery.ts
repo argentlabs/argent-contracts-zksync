@@ -40,7 +40,7 @@ describe("Recovery", () => {
     noEscape = await account.NO_ESCAPE();
     ownerEscape = await account.OWNER_ESCAPE();
     guardianEscape = await account.GUARDIAN_ESCAPE();
-    escapeSecurityPeriod = await account.ESCAPE_SECURITY_PERIOD();
+    escapeSecurityPeriod = await account.escapeSecurityPeriod();
   });
 
   describe("Changing owner", () => {
