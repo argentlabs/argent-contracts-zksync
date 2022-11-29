@@ -179,7 +179,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     // IAccount implementation
 
     function validateTransaction(
-        bytes32, // _txHash
+        bytes32, // _transactionHash
         bytes32 _suggestedSignedHash,
         Transaction calldata _transaction
     ) external payable override onlyBootloader {
@@ -239,7 +239,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     function executeTransaction(
-        bytes32, // _txHash
+        bytes32, // _transactionHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
     ) external payable override onlyBootloader {
@@ -266,7 +266,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     function payForTransaction(
-        bytes32, // _txHash
+        bytes32, // _transactionHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
     ) external payable override onlyBootloader {
@@ -277,7 +277,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     // Here, the user should prepare for the transaction to be paid for by a paymaster
     // Here, the account should set the allowance for the smart contracts
     function prePaymaster(
-        bytes32, // _txHash
+        bytes32, // _transactionHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
     ) external payable override onlyBootloader {

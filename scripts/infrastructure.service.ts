@@ -17,18 +17,17 @@ export const deployInfrastructure = async (deployer: Deployer): Promise<ArgentIn
   const factory = await deployer.deploy(artifacts.factory, [proxyBytecodeHash], undefined, [bytecode]);
   console.log(`Account factory deployed to ${factory.address}`);
 
-  const testDapp = await deployer.deploy(artifacts.testDapp);
-  console.log(`TestDapp deployed to: ${testDapp.address}`);
+  const argent = { deployer, artifacts, implementation, factory };
 
-  const argent = { deployer, artifacts, implementation, factory, testDapp };
-
+  // deploying a dummy account here in order pay for L1 data costs here and not
+  // during the deployment of the first actual wallet
   const dummyAccount = await deployAccount({
     argent,
     ownerAddress: zksync.Wallet.createRandom().address,
     guardianAddress: zksync.Wallet.createRandom().address,
     funds: false,
   });
-  console.log(`Dummy account deployed to: ${testDapp.address}`);
+  console.log(`Dummy account deployed to: ${dummyAccount.address}`);
 
   return { ...argent, dummyAccount };
 };

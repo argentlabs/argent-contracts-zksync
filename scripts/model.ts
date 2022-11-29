@@ -11,7 +11,6 @@ export interface IConfig {
   factory: string;
   dummyAccount: string;
   testDapp: string;
-  sponsoringPaymaster: string;
 }
 
 export interface ArgentInfrastructure {
@@ -20,7 +19,6 @@ export interface ArgentInfrastructure {
   implementation: zksync.Contract;
   factory: zksync.Contract;
   dummyAccount: ArgentAccount;
-  testDapp: zksync.Contract;
 }
 
 export interface ArgentArtifacts {
@@ -28,7 +26,6 @@ export interface ArgentArtifacts {
   factory: ZkSyncArtifact;
   proxy: ZkSyncArtifact;
   testDapp: ZkSyncArtifact;
-  sponsoringPaymaster: ZkSyncArtifact;
 }
 
 export interface AccountDeploymentParams {

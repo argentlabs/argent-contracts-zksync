@@ -3,6 +3,7 @@ import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { logBalance } from "./account.service";
 import { getEnv } from "./config.service";
+import { ArgentArtifacts } from "./model";
 
 const env = getEnv();
 let showPreamble = true;
@@ -48,10 +49,9 @@ export const checkDeployer = async ({ zkWallet: { provider, address } }: Deploye
   }
 };
 
-export const loadArtifacts = async (deployer: Deployer) => ({
+export const loadArtifacts = async (deployer: Deployer): Promise<ArgentArtifacts> => ({
   implementation: await deployer.loadArtifact("ArgentAccount"),
   factory: await deployer.loadArtifact("AccountFactory"),
   proxy: await deployer.loadArtifact("Proxy"),
   testDapp: await deployer.loadArtifact("TestDapp"),
-  sponsoringPaymaster: await deployer.loadArtifact("SponsoringPaymaster"),
 });

@@ -1,12 +1,12 @@
 import "@nomiclabs/hardhat-ethers";
 import * as zksync from "zksync-web3";
 import { deployAccount } from "./account.service";
-import { checkDeployerBalance, getDeployer } from "./deployer.service";
+import { checkDeployer, getDeployer } from "./deployer.service";
 import { getInfrastructure } from "./infrastructure.service";
 
 (async () => {
   const { deployer } = getDeployer();
-  await checkDeployerBalance(deployer);
+  await checkDeployer(deployer);
   const argent = await getInfrastructure(deployer);
 
   const owner = zksync.Wallet.createRandom();
