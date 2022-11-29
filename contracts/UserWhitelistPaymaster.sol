@@ -18,7 +18,10 @@ contract UserWhitelistPaymaster is SponsorPaymaster {
         }
     }
 
-    function isSponsoredTransaction(Transaction calldata _transaction) internal view override returns (bool) {
+    function isSponsoredTransaction(
+        Transaction calldata _transaction,
+        bytes calldata /*_generalInput*/
+    ) internal view override returns (bool) {
         return whitelist[address(uint160(_transaction.from))];
     }
 
