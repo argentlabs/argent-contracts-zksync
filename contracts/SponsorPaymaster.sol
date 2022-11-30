@@ -17,13 +17,14 @@ abstract contract SponsorPaymaster is IPaymaster, Owned {
     }
 
     function isSponsoredTransaction(
-        Transaction calldata _transaction,
-        bytes calldata _generalInput
-    ) internal view virtual returns (bool);
+        bytes32 /*_transactionHash*/,
+        bytes32 /*_suggestedSignedHash*/,
+        Transaction calldata _transaction
+    ) internal virtual returns (bool);
 
     function validateAndPayForPaymasterTransaction(
-        bytes32 /*_txHash*/,
-        bytes32 /*_suggestedSignedHash*/,
+        bytes32 _transactionHash,
+        bytes32 _suggestedSignedHash,
         Transaction calldata _transaction
     ) external payable override onlyBootloader returns (bytes memory _context) {
         require(_transaction.paymasterInput.length >= 4, "The standard paymaster input must be at least 4 bytes long");
@@ -33,7 +34,7 @@ abstract contract SponsorPaymaster is IPaymaster, Owned {
             revert("Unsupported paymaster flow");
         }
 
-        if (!isSponsoredTransaction(_transaction, _transaction.paymasterInput[4:])) {
+        if (!isSponsoredTransaction(_transactionHash, _suggestedSignedHash, _transaction)) {
             revert("Unsponsored transaction");
         }
 

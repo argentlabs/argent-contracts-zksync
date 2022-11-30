@@ -19,8 +19,9 @@ contract DappWhitelistPaymaster is SponsorPaymaster {
     }
 
     function isSponsoredTransaction(
-        Transaction calldata _transaction,
-        bytes calldata /*_generalInput*/
+        bytes32 /*_transactionHash*/,
+        bytes32 /*_suggestedSignedHash*/,
+        Transaction calldata _transaction
     ) internal view override returns (bool) {
         return whitelist[address(uint160(_transaction.to))];
     }
