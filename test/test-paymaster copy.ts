@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { BigNumber, BytesLike } from "ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
-import { PaymasterParams, TransactionRequest } from "zksync-web3/build/src/types";
+import { PaymasterParams, TransactionRequest, TransactionResponse } from "zksync-web3/build/src/types";
 import { ArgentAccount, deployAccount } from "../scripts/account.service";
 import { getDeployer } from "../scripts/deployer.service";
 import { getTestInfrastructure } from "../scripts/infrastructure.service";
@@ -191,54 +191,58 @@ describe("Paymasters", () => {
       const response = await deployer.zkWallet.sendTransaction({ to: paymaster.address, value: paymasterBudget });
       await response.wait();
 
-      testDapp = await deployer.deploy(argent.artifacts.testDapp);
+      testDapp = (await deployer.deploy(argent.artifacts.testDapp)).connect(emptyEoa);
     });
 
     it("Should pay or no for given users", async () => {
-      console.log("chainId", await emptyAccount.signer.getChainId());
+      expect(await provider.getBalance(emptyEoa.address)).to.equal(0n);
+      expect(await testDapp.userNumbers(emptyEoa.address)).to.equal(0n);
+
+      console.log("chainId", await deployer.zkWallet.getChainId());
+      console.log("chainId", await emptyEoa.getChainId());
 
       overrides = await getPaymasterOverrides(testDapp);
       // let promise = testDapp.setNumber(42, overrides);
       // await expect(promise).to.be.rejectedWith("invalid signature length");
       // await expect(promise).to.be.rejected;
 
-      // let response: TransactionResponse = await paymaster.changeOwner(emptyEoa.address);
-      // await response.wait();
-      const a = await deployer.zkWallet.sendTransaction({
-        to: emptyEoa.address,
-        value: ethers.utils.parseEther("0.01"),
-      });
-      await a.wait();
+      let response: TransactionResponse = await paymaster.changeOwner(emptyEoa.address);
+      await response.wait();
 
-      // const { signer } = emptyAccount;
-      const signer = emptyEoa;
-      testDapp = testDapp.connect(signer);
-
-      // console.log("overrides", overrides);
-      let transaction: TransactionRequest = await testDapp.populateTransaction.setNumber(42);
-      transaction = { type: 113, ...transaction };
+      console.log("overrides", overrides);
+      overrides = {
+        maxFeePerGas: overrides.maxFeePerGas,
+        maxPriorityFeePerGas: overrides.maxPriorityFeePerGas,
+        gasLimit: overrides.gasLimit,
+        customData: { paymasterParams: { paymaster: paymaster.address, paymasterInput: "0x" } },
+      };
+      let transaction: TransactionRequest = await testDapp.populateTransaction.setNumber(42, overrides);
+      transaction = {
+        ...transaction,
+        type: 113,
+        value: 0,
+        nonce: await provider.getTransactionCount(emptyEoa.address),
+      };
       console.log("transaction", transaction);
-      transaction = await signer.populateTransaction(transaction);
-      console.log("transaction 2", transaction);
-      let signedTransaction = await signer.signTransaction(transaction);
+      let signedTransaction = await emptyEoa.signTransaction(transaction);
       console.log("signed");
       let transactionHash = ethers.utils.keccak256(signedTransaction);
       // let message = ethers.utils.arrayify(transactionHash);
       // let signature = await emptyEoa.signMessage(message);
       // overrides = await getPaymasterOverrides(testDapp, signature);
-      console.log("sender", transaction.from);
-      console.log("predicted hash", transactionHash);
+      console.log("eoa", emptyEoa.address);
+      console.log("JS hash", transactionHash);
       // console.log("signature", signature.slice(2).length / 2, signature);
       // console.log("overrides", overrides);
       // console.log("empty overrides", await getPaymasterOverrides(testDapp));
       // response = await testDapp.setNumber(42);
-      let response = await provider.sendTransaction(signedTransaction);
+      response = await provider.sendTransaction(signedTransaction);
       console.log("====");
-      console.log("actual hash", response.hash);
+      console.log("response", response.hash);
       const receipt = await response.wait();
-      // console.log("receipt logs", paymaster.interface.parseLog(receipt.logs[0]).args);
+      console.log("receipt logs", paymaster.interface.parseLog(receipt.logs[0]).args);
 
-      expect(await testDapp.userNumbers(transaction.from)).to.equal(42n);
+      expect(await testDapp.userNumbers(emptyEoa.address)).to.equal(42n);
     });
   });
 
