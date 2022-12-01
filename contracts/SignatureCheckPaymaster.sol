@@ -8,30 +8,51 @@ import {Transaction, TransactionHelper} from "@matterlabs/zksync-contracts/l2/sy
 
 import {SponsorPaymaster} from "./SponsorPaymaster.sol";
 
+library MeaningfulTransaction {
+    /**
+     * Computes a digest of the transaction excluding any signature or paymaster input.
+     */
+    function hashMeaningfulTransaction(Transaction calldata _transaction) internal pure returns (bytes32) {
+        bytes memory encoded = abi.encode(
+            _transaction.txType,
+            _transaction.from,
+            _transaction.to,
+            _transaction.ergsLimit,
+            _transaction.ergsPerPubdataByteLimit,
+            _transaction.maxFeePerErg,
+            _transaction.maxPriorityFeePerErg,
+            _transaction.reserved[0], // nonce
+            _transaction.reserved[1], // value
+            keccak256(_transaction.data),
+            keccak256(abi.encodePacked(_transaction.factoryDeps))
+        );
+        return keccak256(encoded);
+    }
+}
+
 contract SignatureCheckPaymaster is SponsorPaymaster {
     using TransactionHelper for Transaction;
+    using MeaningfulTransaction for Transaction;
     using ERC165Checker for address;
-
-    event Foo(bytes32 _transactionHash, bytes32 _suggestedSignedHash);
+    using ECDSA for bytes32;
 
     constructor() {
-        // require(owner.supportsInterface(type(IERC1271).interfaceId), "non-IERC1271 owner");
+        requireIERC1271Support(owner);
     }
 
-    function isSponsoredTransaction(
-        bytes32 _transactionHash,
-        bytes32 _suggestedSignedHash,
-        Transaction calldata _transaction
-    ) internal override returns (bool) {
-        emit Foo(_transactionHash, _suggestedSignedHash);
-        bytes calldata signature = _transaction.paymasterInput[4:];
-        bytes32 transactionHash = _transaction.encodeHash();
-        if (owner.supportsInterface(type(IERC1271).interfaceId)) {
-            bytes4 result = IERC1271(owner).isValidSignature(transactionHash, signature);
-            return result == IERC1271.isValidSignature.selector;
-        }
-        return true;
-        address recovered = ECDSA.recover(transactionHash, signature[:65]);
-        return recovered == owner;
+    function isSponsoredTransaction(Transaction calldata _transaction) internal view override returns (bool) {
+        bytes32 messageHash = _transaction.hashMeaningfulTransaction().toEthSignedMessageHash();
+        bytes memory signature = abi.decode(_transaction.paymasterInput[4:], (bytes));
+        bytes4 result = IERC1271(owner).isValidSignature(messageHash, signature);
+        return result == IERC1271.isValidSignature.selector;
+    }
+
+    function _changeOwner(address _newOwner) internal override onlyOwner {
+        requireIERC1271Support(_newOwner);
+        super._changeOwner(_newOwner);
+    }
+
+    function requireIERC1271Support(address _owner) internal view {
+        require(_owner.supportsInterface(type(IERC1271).interfaceId), "non-IERC1271 owner");
     }
 }

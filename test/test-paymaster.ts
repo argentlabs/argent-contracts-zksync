@@ -9,6 +9,7 @@ import { ArgentAccount, deployAccount } from "../scripts/account.service";
 import { getDeployer } from "../scripts/deployer.service";
 import { getTestInfrastructure } from "../scripts/infrastructure.service";
 import { ArgentInfrastructure } from "../scripts/model";
+import { hashMeaningfulTransaction } from "../scripts/paymaster.service";
 
 const owner = zksync.Wallet.createRandom();
 const guardian = zksync.Wallet.createRandom();
@@ -180,65 +181,60 @@ describe("Paymasters", () => {
     });
   });
 
-  describe.only("SignatureCheckPaymaster", () => {
+  describe("SignatureCheckPaymaster", () => {
+    // wait to be able to deploy from contract accounts
+  });
+
+  describe("EOASignatureCheckPaymaster", () => {
+    const paymasterOwner = zksync.Wallet.createRandom();
+
     let testDapp: zksync.Contract;
 
     before(async () => {
-      const artifact = await deployer.loadArtifact("SignatureCheckPaymaster");
+      const artifact = await deployer.loadArtifact("EOASignatureCheckPaymaster");
       paymaster = await deployer.deploy(artifact);
-      console.log("Paymaster at", paymaster.address);
 
-      const response = await deployer.zkWallet.sendTransaction({ to: paymaster.address, value: paymasterBudget });
+      let response = await paymaster.changeOwner(paymasterOwner.address);
+      await response.wait();
+      expect(await paymaster.owner()).to.equal(paymasterOwner.address);
+
+      response = await deployer.zkWallet.sendTransaction({ to: paymaster.address, value: paymasterBudget });
       await response.wait();
 
       testDapp = await deployer.deploy(argent.artifacts.testDapp);
     });
 
     it("Should pay or no for given users", async () => {
-      console.log("chainId", await emptyAccount.signer.getChainId());
+      testDapp = testDapp.connect(emptyEoa);
 
       overrides = await getPaymasterOverrides(testDapp);
-      // let promise = testDapp.setNumber(42, overrides);
-      // await expect(promise).to.be.rejectedWith("invalid signature length");
-      // await expect(promise).to.be.rejected;
+      let promise = testDapp.setNumber(42, overrides);
+      await expect(promise).to.be.rejectedWith("invalid signature length");
 
-      // let response: TransactionResponse = await paymaster.changeOwner(emptyEoa.address);
-      // await response.wait();
-      const a = await deployer.zkWallet.sendTransaction({
-        to: emptyEoa.address,
-        value: ethers.utils.parseEther("0.01"),
+      overrides = await getPaymasterOverrides(testDapp, new Uint8Array(65));
+      promise = testDapp.setNumber(42, overrides);
+      await expect(promise).to.be.rejectedWith("ECDSA: invalid signature");
+
+      overrides = await getPaymasterOverrides(testDapp, ethers.utils.randomBytes(65));
+      promise = testDapp.setNumber(42, overrides);
+      await expect(promise).to.be.rejectedWith("ECDSA: invalid signature");
+
+      let transaction: TransactionRequest = await testDapp.populateTransaction.setNumber(42, {
+        type: zksync.utils.EIP712_TX_TYPE,
+        ...overrides,
       });
-      await a.wait();
+      transaction = await emptyEoa.populateTransaction(transaction);
 
-      // const { signer } = emptyAccount;
-      const signer = emptyEoa;
-      testDapp = testDapp.connect(signer);
+      const messageHash = hashMeaningfulTransaction(transaction);
+      const signature = await paymasterOwner.signMessage(ethers.utils.arrayify(messageHash));
 
-      // console.log("overrides", overrides);
-      let transaction: TransactionRequest = await testDapp.populateTransaction.setNumber(42);
-      transaction = { type: 113, ...transaction };
-      console.log("transaction", transaction);
-      transaction = await signer.populateTransaction(transaction);
-      console.log("transaction 2", transaction);
-      let signedTransaction = await signer.signTransaction(transaction);
-      console.log("signed");
-      let transactionHash = ethers.utils.keccak256(signedTransaction);
-      // let message = ethers.utils.arrayify(transactionHash);
-      // let signature = await emptyEoa.signMessage(message);
-      // overrides = await getPaymasterOverrides(testDapp, signature);
-      console.log("sender", transaction.from);
-      console.log("predicted hash", transactionHash);
-      // console.log("signature", signature.slice(2).length / 2, signature);
-      // console.log("overrides", overrides);
-      // console.log("empty overrides", await getPaymasterOverrides(testDapp));
-      // response = await testDapp.setNumber(42);
-      let response = await provider.sendTransaction(signedTransaction);
-      console.log("====");
-      console.log("actual hash", response.hash);
-      const receipt = await response.wait();
-      // console.log("receipt logs", paymaster.interface.parseLog(receipt.logs[0]).args);
+      overrides = await getPaymasterOverrides(testDapp, signature);
+      transaction = { ...transaction, ...overrides };
+      const signedTransaction = await emptyEoa.signTransaction(transaction);
+      const response = await provider.sendTransaction(signedTransaction);
+      await response.wait();
 
-      expect(await testDapp.userNumbers(transaction.from)).to.equal(42n);
+      expect(await testDapp.userNumbers(emptyEoa.address)).to.equal(42n);
     });
   });
 

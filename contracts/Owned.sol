@@ -29,6 +29,10 @@ contract Owned {
      * @param _newOwner The new owner.
      */
     function changeOwner(address _newOwner) external onlyOwner {
+        _changeOwner(_newOwner);
+    }
+
+    function _changeOwner(address _newOwner) internal virtual onlyOwner {
         require(_newOwner != address(0), "Address must not be null");
         owner = _newOwner;
         emit OwnerChanged(_newOwner);
