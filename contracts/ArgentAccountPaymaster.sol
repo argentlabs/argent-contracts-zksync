@@ -22,7 +22,7 @@ contract ArgentAccountPaymaster is IPaymaster, ArgentAccountDetector {
     ) ArgentAccountDetector(_codes, _implementations) {}
 
     function validateAndPayForPaymasterTransaction(
-        bytes32 /*_txHash*/,
+        bytes32 /*_transactionHash*/,
         bytes32 /*_suggestedSignedHash*/,
         Transaction calldata _transaction
     ) external payable override onlyBootloader returns (bytes memory _context) {
@@ -50,9 +50,9 @@ contract ArgentAccountPaymaster is IPaymaster, ArgentAccountDetector {
     function postOp(
         bytes calldata _context,
         Transaction calldata _transaction,
-        bytes32 _txHash,
+        bytes32 _transactionHash,
         bytes32 _suggestedSignedHash,
-        ExecutionResult _txResult,
+        ExecutionResult _transactionResult,
         uint256 _maxRefundedErgs
     ) external payable onlyBootloader {
         // This contract does not support any refunding logic

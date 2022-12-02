@@ -47,9 +47,9 @@ abstract contract SponsorPaymaster is IPaymaster, Owned {
     function postOp(
         bytes calldata _context,
         Transaction calldata _transaction,
-        bytes32 _txHash,
+        bytes32 _transactionHash,
         bytes32 _suggestedSignedHash,
-        ExecutionResult _txResult,
+        ExecutionResult _transactionResult,
         uint256 _maxRefundedErgs
     ) external payable onlyBootloader {
         // This contract does not support any refunding logic
