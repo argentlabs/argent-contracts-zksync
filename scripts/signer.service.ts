@@ -1,4 +1,4 @@
-import { Signer } from "ethers";
+import { Signer, TypedDataDomain, TypedDataField } from "ethers";
 import { Bytes } from "ethers/lib/utils";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
@@ -26,11 +26,11 @@ export class ArgentSigner extends Signer {
     this.provider = account.provider;
   }
 
-  getAddress(): Promise<string> {
-    return Promise.resolve(this.address);
+  async getAddress(): Promise<string> {
+    return this.address;
   }
 
-  signMessage(message: Bytes | string): Promise<string> {
+  async signMessage(message: Bytes | string): Promise<string> {
     throw new Error("signMessage not implemented");
   }
 
@@ -65,15 +65,16 @@ export class ArgentSigner extends Signer {
     return serialized;
   }
 
-  /*
-  _signTypedData(
+  async _signTypedData(
     domain: TypedDataDomain,
     types: Record<string, Array<TypedDataField>>,
     value: Record<string, any>,
   ): Promise<string> {
-    throw new Error("signMessage not implemented");
+    const promises = this.signatories.map((signatory) =>
+      signatory === 0 ? Promise.resolve(new Uint8Array(65)) : signatory._signTypedData(domain, types, value),
+    );
+    return ethers.utils.hexConcat(await Promise.all(promises));
   }
-  */
 
   connect(provider: zksync.Provider): ArgentSigner {
     return new ArgentSigner(this.account.connect(provider), this.signatories);
