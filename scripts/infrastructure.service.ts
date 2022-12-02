@@ -63,3 +63,9 @@ export const getTestInfrastructure: typeof deployInfrastructure = async (deploye
   }
   return testInfrastructure;
 };
+
+export const deployTestDapp = async (deployer: Deployer): Promise<TestDapp> => {
+  const artifact = await deployer.loadArtifact("TestDapp");
+  const testDapp = await deployer.deploy(artifact);
+  return testDapp as TestDapp;
+};
