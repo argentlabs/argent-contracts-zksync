@@ -209,15 +209,15 @@ describe("Paymasters", () => {
 
       overrides = await getPaymasterOverrides(testDapp);
       let promise = testDapp.setNumber(42, overrides);
-      await expect(promise).to.be.rejectedWith("invalid signature length");
+      await expect(promise).to.be.rejectedWith("Unsponsored transaction");
 
       overrides = await getPaymasterOverrides(testDapp, new Uint8Array(65));
       promise = testDapp.setNumber(42, overrides);
-      await expect(promise).to.be.rejectedWith("ECDSA: invalid signature");
+      await expect(promise).to.be.rejectedWith("Unsponsored transaction");
 
       overrides = await getPaymasterOverrides(testDapp, ethers.utils.randomBytes(65));
       promise = testDapp.setNumber(42, overrides);
-      await expect(promise).to.be.rejectedWith("ECDSA: invalid signature");
+      await expect(promise).to.be.rejectedWith("Unsponsored transaction");
 
       let transaction: TransactionRequest = await testDapp.populateTransaction.setNumber(42, {
         type: zksync.utils.EIP712_TX_TYPE,
