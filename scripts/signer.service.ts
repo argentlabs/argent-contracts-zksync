@@ -7,18 +7,10 @@ import { ArgentAccount } from "../typechain-types";
 type TransactionRequest = zksync.types.TransactionRequest;
 export type Signatories = Array<zksync.Wallet | 0>;
 
-const concatSignatures = async (transaction: TransactionRequest, signatories: Signatories, chainId: number) => {
-  const signaturePromises = signatories.map((signatory) =>
-    signatory === 0
-      ? Promise.resolve(new Uint8Array(65))
-      : new zksync.EIP712Signer(signatory, chainId).sign(transaction),
-  );
-  return ethers.utils.hexlify(ethers.utils.concat(await Promise.all(signaturePromises)));
-};
-
 export class ArgentSigner extends Signer {
   public address: string;
   public provider: ArgentAccount["provider"];
+  private _chainId?: number;
 
   constructor(readonly account: ArgentAccount, readonly signatories: Signatories) {
     super();
@@ -29,40 +21,50 @@ export class ArgentSigner extends Signer {
   async getAddress(): Promise<string> {
     return this.address;
   }
+  async getChainId(): Promise<number> {
+    if (this._chainId === undefined) {
+      const { chainId } = await this.provider.getNetwork();
+      this._chainId = chainId;
+    }
+    return this._chainId;
+  }
 
   async signMessage(message: Bytes | string): Promise<string> {
     throw new Error("signMessage not implemented");
   }
 
-  async signTransaction(transaction: TransactionRequest): Promise<string> {
+  async populateTransaction(transaction: TransactionRequest): Promise<TransactionRequest> {
     const from = this.address;
-    const chainId = transaction.chainId ?? (await this.provider.getNetwork()).chainId;
-    const gasLimit = await this.provider.estimateGas({ ...transaction, from });
-    const unsignedTransaction = {
+    return {
+      ...transaction,
       type: zksync.utils.EIP712_TX_TYPE,
-      to: transaction.to,
       from,
       data: transaction.data ?? "0x",
       value: transaction.value ?? "0x0",
-      chainId,
+      chainId: transaction.chainId ?? (await this.getChainId()),
       gasPrice: transaction.gasPrice ?? (await this.provider.getGasPrice()),
-      gasLimit: transaction.gasLimit ?? gasLimit,
+      gasLimit: transaction.gasLimit ?? (await this.provider.estimateGas({ ...transaction, from })),
       nonce: transaction.nonce ?? (await this.provider.getTransactionCount(from)),
-      customData: transaction.customData,
     };
+  }
 
-    const customSignature = await concatSignatures(unsignedTransaction, this.signatories, chainId);
+  async signTransaction(transaction: TransactionRequest): Promise<string> {
+    const chainId = await this.getChainId();
 
-    const transactionRequest = {
-      ...unsignedTransaction,
+    const promises = this.signatories.map((signatory) =>
+      signatory === 0
+        ? Promise.resolve(new Uint8Array(65))
+        : new zksync.EIP712Signer(signatory, chainId).sign(transaction),
+    );
+    const customSignature = ethers.utils.hexConcat(await Promise.all(promises));
+
+    return zksync.utils.serialize({
+      ...transaction,
       customData: {
-        ...unsignedTransaction.customData,
+        ...transaction.customData,
         customSignature,
       },
-    };
-
-    const serialized = zksync.utils.serialize(transactionRequest);
-    return serialized;
+    });
   }
 
   async _signTypedData(
