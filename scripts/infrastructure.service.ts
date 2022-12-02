@@ -1,5 +1,6 @@
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import * as zksync from "zksync-web3";
+import { AccountFactory, TestDapp } from "../typechain-types";
 import { ArgentAccount, deployAccount } from "./account.service";
 import { getEnv, loadConfig } from "./config.service";
 import { checkDeployer, loadArtifacts } from "./deployer.service";
@@ -17,7 +18,7 @@ export const deployInfrastructure = async (deployer: Deployer): Promise<ArgentIn
   const factory = await deployer.deploy(artifacts.factory, [proxyBytecodeHash], undefined, [bytecode]);
   console.log(`Account factory deployed to ${factory.address}`);
 
-  const argent = { deployer, artifacts, implementation, factory };
+  const argent = { deployer, artifacts, implementation, factory: factory as AccountFactory };
 
   // deploying a dummy account here in order pay for L1 data costs here and not
   // during the deployment of the first actual wallet
@@ -41,9 +42,9 @@ export const getInfrastructure: typeof deployInfrastructure = async (deployer) =
   }
 
   const implementation = new zksync.Contract(config.implementation, artifacts.implementation.abi);
-  const factory = new zksync.Contract(config.factory, artifacts.factory.abi, deployer.zkWallet);
+  const factory = new zksync.Contract(config.factory, artifacts.factory.abi, deployer.zkWallet) as AccountFactory;
   const dummyAccount = new ArgentAccount(config.dummyAccount, artifacts.implementation.abi);
-  const testDapp = new zksync.Contract(config.testDapp, artifacts.testDapp.abi, deployer.zkWallet.provider);
+  const testDapp = new zksync.Contract(config.testDapp, artifacts.testDapp.abi, deployer.zkWallet.provider) as TestDapp;
 
   return { deployer, artifacts, implementation, factory, dummyAccount, testDapp };
 };
@@ -61,4 +62,10 @@ export const getTestInfrastructure: typeof deployInfrastructure = async (deploye
     testInfrastructure = await deployInfrastructure(deployer);
   }
   return testInfrastructure;
+};
+
+export const deployTestDapp = async (deployer: Deployer): Promise<TestDapp> => {
+  const artifact = await deployer.loadArtifact("TestDapp");
+  const testDapp = await deployer.deploy(artifact);
+  return testDapp as TestDapp;
 };

@@ -6,8 +6,9 @@ import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount, computeCreate2AddressFromSdk, deployAccount } from "../scripts/account.service";
 import { checkDeployer, getDeployer } from "../scripts/deployer.service";
-import { getTestInfrastructure } from "../scripts/infrastructure.service";
+import { deployTestDapp, getTestInfrastructure } from "../scripts/infrastructure.service";
 import { ArgentArtifacts, ArgentInfrastructure } from "../scripts/model";
+import { TestDapp } from "../typechain-types";
 
 const { AddressZero } = ethers.constants;
 
@@ -155,10 +156,10 @@ describe("Argent account", () => {
   });
 
   describe("Using a dapp", () => {
-    let testDapp: zksync.Contract;
+    let testDapp: TestDapp;
 
     before(async () => {
-      testDapp = await deployer.deploy(artifacts.testDapp);
+      testDapp = await deployTestDapp(deployer);
       console.log(`        TestDapp deployed to ${testDapp.address}`);
     });
 
@@ -259,11 +260,11 @@ describe("Argent account", () => {
   });
 
   describe("Account multicall", () => {
-    let testDapp: zksync.Contract;
+    let testDapp: TestDapp;
 
     before(async () => {
       account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
-      testDapp = await deployer.deploy(artifacts.testDapp);
+      testDapp = await deployTestDapp(deployer);
     });
 
     const makeCall = ({ to, data }: PopulatedTransaction) => ({ to, value: 0, data });
