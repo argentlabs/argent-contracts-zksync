@@ -1,8 +1,8 @@
-import { Provider } from "@ethersproject/providers";
 import { Signer } from "ethers";
 import { Bytes } from "ethers/lib/utils";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
+import { ArgentAccount } from "../typechain-types";
 
 type TransactionRequest = zksync.types.TransactionRequest;
 export type Signatories = Array<zksync.Wallet | 0>;
@@ -16,9 +16,14 @@ const concatSignatures = async (transaction: TransactionRequest, signatories: Si
   return ethers.utils.hexlify(ethers.utils.concat(await Promise.all(signaturePromises)));
 };
 
-export class MultiSigner extends Signer {
-  constructor(readonly address: string, readonly signatories: Signatories, readonly provider: Provider) {
+export class ArgentSigner extends Signer {
+  public address: string;
+  public provider: ArgentAccount["provider"];
+
+  constructor(readonly account: ArgentAccount, readonly signatories: Signatories) {
     super();
+    this.address = account.address;
+    this.provider = account.provider;
   }
 
   getAddress(): Promise<string> {
@@ -70,7 +75,7 @@ export class MultiSigner extends Signer {
   }
   */
 
-  connect(provider: zksync.Provider): MultiSigner {
-    return new MultiSigner(this.address, this.signatories, provider);
+  connect(provider: zksync.Provider): ArgentSigner {
+    return new ArgentSigner(this.account.connect(provider), this.signatories);
   }
 }

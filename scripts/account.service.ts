@@ -3,7 +3,7 @@ import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount } from "../typechain-types";
 import { AccountDeploymentParams, ArgentInfrastructure } from "./model";
-import { MultiSigner, Signatories } from "./signer.service";
+import { ArgentSigner, Signatories } from "./signer.service";
 
 export const deployAccount = async ({
   argent,
@@ -39,7 +39,7 @@ export const deployAccount = async ({
 };
 
 export const connect = (account: ArgentAccount, signatories: Signatories): ArgentAccount =>
-  account.connect(new MultiSigner(account.address, signatories, account.provider));
+  account.connect(new ArgentSigner(account, signatories));
 
 export const computeCreate2AddressFromSdk = (
   { factory, implementation, artifacts }: ArgentInfrastructure,
