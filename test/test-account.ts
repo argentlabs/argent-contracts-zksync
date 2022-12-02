@@ -8,6 +8,7 @@ import { ArgentAccount, computeCreate2AddressFromSdk, deployAccount } from "../s
 import { checkDeployer, getDeployer } from "../scripts/deployer.service";
 import { getTestInfrastructure } from "../scripts/infrastructure.service";
 import { ArgentArtifacts, ArgentInfrastructure } from "../scripts/model";
+import { TestDapp } from "../typechain-types";
 
 const { AddressZero } = ethers.constants;
 
@@ -155,10 +156,10 @@ describe("Argent account", () => {
   });
 
   describe("Using a dapp", () => {
-    let testDapp: zksync.Contract;
+    let testDapp: TestDapp;
 
     before(async () => {
-      testDapp = await deployer.deploy(artifacts.testDapp);
+      testDapp = (await deployer.deploy(artifacts.testDapp)) as TestDapp;
       console.log(`        TestDapp deployed to ${testDapp.address}`);
     });
 
