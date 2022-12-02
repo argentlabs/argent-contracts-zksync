@@ -1,14 +1,15 @@
 import { BigNumber, BytesLike } from "ethers";
 import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
+import { ArgentAccount } from "../typechain-types";
 import { AccountDeploymentParams, ArgentInfrastructure } from "./model";
-import { MultiSigner } from "./signer.service";
+import { MultiSigner, Signatories } from "./signer.service";
 
 export const deployAccount = async ({
   argent,
   ownerAddress,
   guardianAddress,
-  connect,
+  connect: signatories,
   funds = "0.0001",
   salt = ethers.utils.randomBytes(32),
 }: AccountDeploymentParams): Promise<ArgentAccount> => {
@@ -20,7 +21,7 @@ export const deployAccount = async ({
 
   // make sure account doesn't have a signer by default
   const provider = new zksync.Provider(hre.config.zkSyncDeploy.zkSyncNetwork);
-  const account = new ArgentAccount(deployedAddress, implementation.interface, provider);
+  const account = new zksync.Contract(deployedAddress, implementation.interface, provider) as ArgentAccount;
 
   if (funds) {
     const response = await deployer.zkWallet.transfer({
@@ -30,12 +31,15 @@ export const deployAccount = async ({
     await response.wait();
   }
 
-  if (connect) {
-    return account.connect(connect);
+  if (signatories) {
+    return connect(account, signatories);
   }
 
   return account;
 };
+
+export const connect = (account: ArgentAccount, signatories: Signatories): ArgentAccount =>
+  account.connect(new MultiSigner(account.address, signatories, account.provider));
 
 export const computeCreate2AddressFromSdk = (
   { factory, implementation, artifacts }: ArgentInfrastructure,
@@ -56,15 +60,3 @@ export const logBalance = async (address: string, balanceOrProvider: zksync.Prov
   const balance = "getBalance" in balanceOrProvider ? await balanceOrProvider.getBalance(address) : balanceOrProvider;
   console.log(name ? `${name} at ${address}` : address, `has balance ${ethers.utils.formatEther(balance)}`);
 };
-
-export class ArgentAccount extends zksync.Contract {
-  signer!: zksync.Signer;
-
-  connect(signerOrSignersOrProvider: any): this {
-    if (Array.isArray(signerOrSignersOrProvider)) {
-      const signer = new MultiSigner(this.address, signerOrSignersOrProvider, this.provider);
-      return super.connect(signer) as this;
-    }
-    return super.connect(signerOrSignersOrProvider) as this;
-  }
-}

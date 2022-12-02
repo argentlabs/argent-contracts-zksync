@@ -3,11 +3,13 @@ import "@nomiclabs/hardhat-ethers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
-import { ArgentAccount, deployAccount } from "../scripts/account.service";
+import { TransactionResponse } from "zksync-web3/build/src/types";
+import { connect, deployAccount } from "../scripts/account.service";
 import { checkDeployer, getDeployer } from "../scripts/deployer.service";
 import { getTestInfrastructure } from "../scripts/infrastructure.service";
 import { ArgentInfrastructure } from "../scripts/model";
 import { waitForL1BatchBlock, waitForTimestamp } from "../scripts/provider.service";
+import { ArgentAccount } from "../typechain-types";
 
 const { AddressZero } = ethers.constants;
 
@@ -49,12 +51,12 @@ describe("Recovery", () => {
     });
 
     it("Should revert with the wrong owner signature", async () => {
-      const promise = account.connect([wrongOwner, guardian]).changeOwner(newOwner.address);
+      const promise = connect(account, [wrongOwner, guardian]).changeOwner(newOwner.address);
       await expect(promise).to.be.rejectedWith("argent/invalid-owner-signature");
     });
 
     it("Should revert with the wrong guardian signature", async () => {
-      const promise = account.connect([owner, wrongGuardian]).changeOwner(newOwner.address);
+      const promise = connect(account, [owner, wrongGuardian]).changeOwner(newOwner.address);
       await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
     });
 
@@ -79,12 +81,12 @@ describe("Recovery", () => {
     });
 
     it("Should revert with the wrong owner signature", async () => {
-      const promise = account.connect([wrongOwner, guardian]).changeGuardian(newGuardian.address);
+      const promise = connect(account, [wrongOwner, guardian]).changeGuardian(newGuardian.address);
       await expect(promise).to.be.rejectedWith("argent/invalid-owner-signature");
     });
 
     it("Should revert with the wrong guardian signature", async () => {
-      const promise = account.connect([owner, wrongGuardian]).changeGuardian(newGuardian.address);
+      const promise = connect(account, [owner, wrongGuardian]).changeGuardian(newGuardian.address);
       await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
     });
 
@@ -109,12 +111,12 @@ describe("Recovery", () => {
     });
 
     it("Should revert with the wrong owner signature", async () => {
-      const promise = account.connect([wrongOwner, guardian]).changeGuardianBackup(newGuardianBackup.address);
+      const promise = connect(account, [wrongOwner, guardian]).changeGuardianBackup(newGuardianBackup.address);
       await expect(promise).to.be.rejectedWith("argent/invalid-owner-signature");
     });
 
     it("Should revert with the wrong guardian signature", async () => {
-      const promise = account.connect([owner, wrongGuardian]).changeGuardianBackup(newGuardianBackup.address);
+      const promise = connect(account, [owner, wrongGuardian]).changeGuardianBackup(newGuardianBackup.address);
       await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
     });
 
@@ -142,7 +144,7 @@ describe("Recovery", () => {
       expect(escapeBefore.activeAt).to.equal(0n);
       expect(escapeBefore.escapeType).to.equal(noEscape);
 
-      const response = await account.triggerEscapeGuardian();
+      const response = (await account.triggerEscapeGuardian()) as TransactionResponse;
       const { timestamp } = await waitForL1BatchBlock(response, provider);
       const activeAtExpected = timestamp + escapeSecurityPeriod;
       await expect(response).to.emit(account, "EscapeGuardianTriggerred").withArgs(activeAtExpected);
@@ -159,7 +161,7 @@ describe("Recovery", () => {
       expect(escapeBefore.activeAt).to.equal(0n);
       expect(escapeBefore.escapeType).to.equal(noEscape);
 
-      const response = await account.triggerEscapeOwner();
+      const response = (await account.triggerEscapeOwner()) as TransactionResponse;
       const { timestamp } = await waitForL1BatchBlock(response, provider);
       const activeAtExpected = timestamp + escapeSecurityPeriod;
       await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAtExpected);
@@ -171,14 +173,14 @@ describe("Recovery", () => {
 
     it("Should run triggerEscapeOwner() by guardian backup", async () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress });
-      const backupResponse = await account.connect([owner, guardian]).changeGuardianBackup(newGuardianBackup.address);
+      const backupResponse = await connect(account, [owner, guardian]).changeGuardianBackup(newGuardianBackup.address);
       await backupResponse.wait();
 
       const escapeBefore = await account.escape();
       expect(escapeBefore.activeAt).to.equal(0n);
       expect(escapeBefore.escapeType).to.equal(noEscape);
 
-      const response = await account.connect([newGuardianBackup]).triggerEscapeOwner();
+      const response = (await connect(account, [newGuardianBackup]).triggerEscapeOwner()) as TransactionResponse;
       const { timestamp } = await waitForL1BatchBlock(response, provider);
       const activeAtExpected = timestamp + escapeSecurityPeriod;
       await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAtExpected);
@@ -272,7 +274,7 @@ describe("Recovery", () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress });
 
       // guardian triggers a owner escape
-      const guardianResponse = await account.connect([guardian]).triggerEscapeOwner();
+      const guardianResponse = await connect(account, [guardian]).triggerEscapeOwner();
       await guardianResponse.wait();
 
       const firstEscape = await account.escape();
@@ -282,7 +284,7 @@ describe("Recovery", () => {
       // TODO: do evm_increaseTime + evm_mine here when testing locally
 
       // owner overrides the guardian's escape
-      const ownerResponse = await account.connect([owner]).triggerEscapeGuardian();
+      const ownerResponse = await connect(account, [owner]).triggerEscapeGuardian();
       await ownerResponse.wait();
 
       const secondEscape = await account.escape();
@@ -294,7 +296,7 @@ describe("Recovery", () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress });
 
       // owner triggers a guardian escape
-      const response = await account.connect([owner]).triggerEscapeGuardian();
+      const response = await connect(account, [owner]).triggerEscapeGuardian();
       await response.wait();
 
       const escape = await account.escape();
@@ -304,7 +306,7 @@ describe("Recovery", () => {
       // TODO: do evm_increaseTime + evm_mine here when testing locally
 
       // guardian cannot override
-      const promise = account.connect([guardian]).triggerEscapeOwner();
+      const promise = connect(account, [guardian]).triggerEscapeOwner();
       await expect(promise).to.be.rejectedWith("argent/cannot-override-owner-escape");
 
       const secondEscape = await account.escape();
@@ -317,7 +319,7 @@ describe("Recovery", () => {
     const account = await deployAccount({ argent, ownerAddress, guardianAddress });
 
     // guardian triggers a owner escape
-    const response = await account.connect([guardian]).triggerEscapeOwner();
+    const response = await connect(account, [guardian]).triggerEscapeOwner();
     await response.wait();
 
     const escape = await account.escape();
@@ -325,10 +327,10 @@ describe("Recovery", () => {
     expect(escape.escapeType).to.equal(ownerEscape);
 
     // should fail to cancel with just the owner signature
-    const rejectingPromise = account.connect([owner]).cancelEscape();
+    const rejectingPromise = connect(account, [owner]).cancelEscape();
     await expect(rejectingPromise).to.be.rejectedWith("argent/invalid-guardian-signature");
 
-    const resolvingPromise = account.connect([owner, guardian]).cancelEscape();
+    const resolvingPromise = connect(account, [owner, guardian]).cancelEscape();
     await expect(resolvingPromise).to.emit(account, "EscapeCancelled");
 
     const secondEscape = await account.escape();
