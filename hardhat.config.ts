@@ -1,8 +1,9 @@
-import "@nomiclabs/hardhat-ethers";
-import "@nomicfoundation/hardhat-chai-matchers";
-import "chai-as-promised";
 import "@matterlabs/hardhat-zksync-deploy";
 import "@matterlabs/hardhat-zksync-solc";
+import "@nomicfoundation/hardhat-chai-matchers";
+import "@nomiclabs/hardhat-ethers";
+import "@typechain/hardhat";
+import "chai-as-promised";
 import dotenv from "dotenv";
 import { getEnv } from "./scripts/config.service";
 
