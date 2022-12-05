@@ -38,3 +38,4 @@ contract Owned {
         emit OwnerChanged(_newOwner);
     }
 }
+

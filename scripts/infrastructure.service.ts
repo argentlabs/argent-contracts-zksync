@@ -1,7 +1,7 @@
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import * as zksync from "zksync-web3";
-import { AccountFactory, TestDapp } from "../typechain-types";
-import { ArgentAccount, deployAccount } from "./account.service";
+import { AccountFactory, ArgentAccount, TestDapp } from "../typechain-types";
+import { deployAccount } from "./account.service";
 import { getEnv, loadConfig } from "./config.service";
 import { checkDeployer, loadArtifacts } from "./deployer.service";
 import { ArgentInfrastructure } from "./model";
@@ -43,7 +43,7 @@ export const getInfrastructure: typeof deployInfrastructure = async (deployer) =
 
   const implementation = new zksync.Contract(config.implementation, artifacts.implementation.abi);
   const factory = new zksync.Contract(config.factory, artifacts.factory.abi, deployer.zkWallet) as AccountFactory;
-  const dummyAccount = new ArgentAccount(config.dummyAccount, artifacts.implementation.abi);
+  const dummyAccount = new zksync.Contract(config.dummyAccount, artifacts.implementation.abi) as ArgentAccount;
   const testDapp = new zksync.Contract(config.testDapp, artifacts.testDapp.abi, deployer.zkWallet.provider) as TestDapp;
 
   return { deployer, artifacts, implementation, factory, dummyAccount, testDapp };

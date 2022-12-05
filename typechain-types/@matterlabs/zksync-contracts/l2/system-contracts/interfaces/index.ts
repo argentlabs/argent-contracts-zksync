@@ -10,5 +10,6 @@ export type { IImmutableSimulator } from "./IImmutableSimulator";
 export type { IKnownCodesStorage } from "./IKnownCodesStorage";
 export type { IL1Messenger } from "./IL1Messenger";
 export type { INonceHolder } from "./INonceHolder";
+export type { IPaymaster } from "./IPaymaster";
 export type { IPaymasterFlow } from "./IPaymasterFlow";
 export type { ISystemContext } from "./ISystemContext";

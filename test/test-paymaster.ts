@@ -5,11 +5,12 @@ import { BigNumber, BytesLike } from "ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { PaymasterParams, TransactionRequest } from "zksync-web3/build/src/types";
-import { ArgentAccount, deployAccount } from "../scripts/account.service";
+import { deployAccount } from "../scripts/account.service";
 import { getDeployer } from "../scripts/deployer.service";
-import { getTestInfrastructure } from "../scripts/infrastructure.service";
+import { deployTestDapp, getTestInfrastructure } from "../scripts/infrastructure.service";
 import { ArgentInfrastructure } from "../scripts/model";
 import { hashMeaningfulTransaction } from "../scripts/paymaster.service";
+import { ArgentAccount, TestDapp } from "../typechain-types";
 
 const owner = zksync.Wallet.createRandom();
 const guardian = zksync.Wallet.createRandom();
@@ -57,10 +58,10 @@ describe("Paymasters", () => {
   };
 
   describe("DappWhitelistPaymaster", () => {
-    let allowedDapp: zksync.Contract;
+    let allowedDapp: TestDapp;
 
     before(async () => {
-      allowedDapp = await deployer.deploy(argent.artifacts.testDapp);
+      allowedDapp = await deployTestDapp(deployer);
 
       const artifact = await deployer.loadArtifact("DappWhitelistPaymaster");
       paymaster = await deployer.deploy(artifact, [[allowedDapp.address]]);
@@ -145,7 +146,7 @@ describe("Paymasters", () => {
   });
 
   describe("UserWhitelistPaymaster", () => {
-    let testDapp: zksync.Contract;
+    let testDapp: TestDapp;
 
     before(async () => {
       const artifact = await deployer.loadArtifact("UserWhitelistPaymaster");
@@ -154,7 +155,7 @@ describe("Paymasters", () => {
       const response = await deployer.zkWallet.sendTransaction({ to: paymaster.address, value: paymasterBudget });
       await response.wait();
 
-      testDapp = (await deployer.deploy(argent.artifacts.testDapp)).connect(emptyAccount.signer);
+      testDapp = (await deployTestDapp(deployer)).connect(emptyAccount.signer);
       overrides = await getPaymasterOverrides(testDapp);
     });
 
@@ -188,7 +189,7 @@ describe("Paymasters", () => {
   describe("EOASignatureCheckPaymaster", () => {
     const paymasterOwner = zksync.Wallet.createRandom();
 
-    let testDapp: zksync.Contract;
+    let testDapp: TestDapp;
 
     before(async () => {
       const artifact = await deployer.loadArtifact("EOASignatureCheckPaymaster");
@@ -201,7 +202,7 @@ describe("Paymasters", () => {
       response = await deployer.zkWallet.sendTransaction({ to: paymaster.address, value: paymasterBudget });
       await response.wait();
 
-      testDapp = await deployer.deploy(argent.artifacts.testDapp);
+      testDapp = await deployTestDapp(deployer);
     });
 
     it("Should pay or no for given users", async () => {
@@ -239,10 +240,10 @@ describe("Paymasters", () => {
   });
 
   describe("ArgentAccountPaymaster", () => {
-    let testDapp: zksync.Contract;
+    let testDapp: TestDapp;
 
     before(async () => {
-      testDapp = await deployer.deploy(argent.artifacts.testDapp);
+      testDapp = await deployTestDapp(deployer);
 
       const artifact = await deployer.loadArtifact("ArgentAccountPaymaster");
       paymaster = await deployer.deploy(artifact, [[], []]);
