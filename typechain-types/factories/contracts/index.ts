@@ -2,6 +2,12 @@
 /* tslint:disable */
 /* eslint-disable */
 export { AccountFactory__factory } from "./AccountFactory__factory";
+export { ArgentAccountDetector__factory } from "./ArgentAccountDetector__factory";
+export { ArgentAccountPaymaster__factory } from "./ArgentAccountPaymaster__factory";
 export { ArgentAccount__factory } from "./ArgentAccount__factory";
+export { DappWhitelistPaymaster__factory } from "./DappWhitelistPaymaster__factory";
+export { Owned__factory } from "./Owned__factory";
 export * as proxySol from "./Proxy.sol";
+export { SponsorPaymaster__factory } from "./SponsorPaymaster__factory";
 export { TestDapp__factory } from "./TestDapp__factory";
+export { UserWhitelistPaymaster__factory } from "./UserWhitelistPaymaster__factory";

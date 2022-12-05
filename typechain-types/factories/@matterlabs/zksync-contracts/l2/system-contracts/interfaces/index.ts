@@ -11,4 +11,5 @@ export { IKnownCodesStorage__factory } from "./IKnownCodesStorage__factory";
 export { IL1Messenger__factory } from "./IL1Messenger__factory";
 export { INonceHolder__factory } from "./INonceHolder__factory";
 export { IPaymasterFlow__factory } from "./IPaymasterFlow__factory";
+export { IPaymaster__factory } from "./IPaymaster__factory";
 export { ISystemContext__factory } from "./ISystemContext__factory";
