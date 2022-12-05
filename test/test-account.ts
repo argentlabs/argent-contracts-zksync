@@ -1,4 +1,4 @@
-import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
+import { Deployer, SignerWithAddress } from "@matterlabs/hardhat-zksync-deploy";
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomiclabs/hardhat-ethers";
 import { expect } from "chai";
@@ -9,6 +9,7 @@ import { computeCreate2AddressFromSdk, connect, deployAccount } from "../scripts
 import { checkDeployer, getDeployer } from "../scripts/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../scripts/infrastructure.service";
 import { ArgentArtifacts, ArgentInfrastructure } from "../scripts/model";
+import { ArgentSigner } from "../scripts/signer.service";
 import { ArgentAccount, TestDapp } from "../typechain-types";
 
 const { AddressZero } = ethers.constants;
@@ -323,7 +324,8 @@ describe("Argent account", () => {
     });
 
     it("Should deploy a contract from the account", async () => {
-      const customDeployer = new Deployer(hre, account.signer);
+      const signer = new ArgentSigner(account, [owner, guardian]) as unknown as SignerWithAddress;
+      const customDeployer = new Deployer(hre, signer);
       console.log("address", account.address);
       console.log("address", customDeployer.zkWallet.address);
       const testDapp = await customDeployer.deploy(artifacts.testDapp);
