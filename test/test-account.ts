@@ -1,8 +1,9 @@
+import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomiclabs/hardhat-ethers";
 import { expect } from "chai";
 import { PopulatedTransaction } from "ethers";
-import { ethers } from "hardhat";
+import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount, computeCreate2AddressFromSdk, deployAccount } from "../scripts/account.service";
 import { checkDeployer, getDeployer } from "../scripts/deployer.service";
@@ -303,17 +304,28 @@ describe("Argent account", () => {
     });
   });
 
-  describe.skip("Deploying contracts from account", () => {
+  describe.only("Deploying contracts from account", () => {
     before(async () => {
-      account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
+      account = await deployAccount({
+        argent,
+        ownerAddress,
+        guardianAddress,
+        connect: [owner, guardian],
+        funds: "0.01",
+      });
     });
 
     it("Should deploy a contract from the account", async () => {
-      const artifact = artifacts.testDapp;
-      const factory = new zksync.ContractFactory(artifact.abi, artifact.bytecode, account.signer);
-      const transaction = factory.getDeployTransaction();
-      account.signer.sendTransaction;
-      console.log("transaction", transaction);
+      const customDeployer = new Deployer(hre, account.signer);
+      console.log("address", account.address);
+      console.log("address", customDeployer.zkWallet.address);
+      const testDapp = await customDeployer.deploy(artifacts.testDapp);
+      await testDapp.deployed();
+      console.log("contract at", testDapp.address);
+      console.log("number is", await testDapp.userNumbers(account.address));
+      const response = await testDapp.setNumber(52);
+      await response.wait();
+      console.log("number is", await testDapp.userNumbers(account.address));
     });
   });
 

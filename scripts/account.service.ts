@@ -1,3 +1,4 @@
+import { SignerWithAddress } from "@matterlabs/hardhat-zksync-deploy";
 import { BigNumber, BytesLike } from "ethers";
 import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
@@ -58,7 +59,7 @@ export const logBalance = async (address: string, balanceOrProvider: zksync.Prov
 };
 
 export class ArgentAccount extends zksync.Contract {
-  signer!: zksync.Signer;
+  signer!: SignerWithAddress;
 
   connect(signerOrSignersOrProvider: any): this {
     if (Array.isArray(signerOrSignersOrProvider)) {
