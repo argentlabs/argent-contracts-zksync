@@ -5,10 +5,11 @@ import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { PaymasterParams, TransactionRequest } from "zksync-web3/build/src/types";
-import { ArgentAccount, deployAccount } from "../scripts/account.service";
+import { deployAccount } from "../scripts/account.service";
 import { getDeployer } from "../scripts/deployer.service";
 import { getTestInfrastructure } from "../scripts/infrastructure.service";
 import { ArgentInfrastructure } from "../scripts/model";
+import { ArgentAccount } from "../typechain-types";
 
 const owner = zksync.Wallet.createRandom();
 const guardian = zksync.Wallet.createRandom();
