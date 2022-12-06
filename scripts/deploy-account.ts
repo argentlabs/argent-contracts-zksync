@@ -12,7 +12,7 @@ import { getInfrastructure } from "./infrastructure.service";
   const owner = zksync.Wallet.createRandom();
   console.log(`Using owner private key: ${owner.privateKey}`);
   const ownerAddress = owner.address;
-  const guardianAddress = "0x2222222222222222222222222222222222222222";
+  const guardianAddress = "0x0000000000000000000000000000000000000000";
 
   const account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: false });
   console.log("Argent account deployed to", account.address);
