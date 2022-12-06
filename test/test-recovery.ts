@@ -37,8 +37,8 @@ describe("Recovery", () => {
   before(async () => {
     await checkDeployer(deployer);
     argent = await getTestInfrastructure(deployer);
-    ({ dummyAccount: account } = argent);
 
+    const account = argent.implementation;
     noEscape = await account.NO_ESCAPE();
     ownerEscape = await account.OWNER_ESCAPE();
     guardianEscape = await account.GUARDIAN_ESCAPE();

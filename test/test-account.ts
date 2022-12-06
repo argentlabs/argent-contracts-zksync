@@ -7,7 +7,7 @@ import * as zksync from "zksync-web3";
 import { computeCreate2AddressFromSdk, connect, deployAccount } from "../scripts/account.service";
 import { checkDeployer, getDeployer } from "../scripts/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../scripts/infrastructure.service";
-import { ArgentArtifacts, ArgentInfrastructure } from "../scripts/model";
+import { ArgentInfrastructure } from "../scripts/model";
 import { ArgentAccount, TestDapp } from "../typechain-types";
 
 const { AddressZero } = ethers.constants;
@@ -24,13 +24,11 @@ const { deployer, deployerAddress, provider } = getDeployer();
 
 describe("Argent account", () => {
   let argent: ArgentInfrastructure;
-  let artifacts: ArgentArtifacts;
   let account: ArgentAccount;
 
   before(async () => {
     await checkDeployer(deployer);
     argent = await getTestInfrastructure(deployer);
-    ({ artifacts, dummyAccount: account } = argent);
   });
 
   describe("AccountFactory", () => {
@@ -62,7 +60,8 @@ describe("Argent account", () => {
     });
 
     it("Should refuse to be initialized twice", async () => {
-      const accountFromEoa = new zksync.Contract(account.address, artifacts.implementation.abi, deployer.zkWallet);
+      const { abi } = argent.artifacts.implementation;
+      const accountFromEoa = new zksync.Contract(account.address, abi, deployer.zkWallet);
       const promise = accountFromEoa.initialize(owner.address, guardian.address);
       await expect(promise).to.be.rejectedWith("argent/already-init");
     });
@@ -73,7 +72,7 @@ describe("Argent account", () => {
 
     before(async () => {
       account = await deployAccount({ argent, ownerAddress, guardianAddress });
-      newImplementation = await deployer.deploy(artifacts.implementation, [10]);
+      newImplementation = await deployer.deploy(argent.artifacts.implementation, [10]);
     });
 
     it("Should revert with the wrong owner", async () => {
