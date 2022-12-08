@@ -109,6 +109,30 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.Owned__factory>;
     getContractFactory(
+      name: "ArgentAccountPaymaster",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.ArgentAccountPaymaster__factory>;
+    getContractFactory(
+      name: "DappWhitelistPaymaster",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.DappWhitelistPaymaster__factory>;
+    getContractFactory(
+      name: "EOASignatureCheckPaymaster",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.EOASignatureCheckPaymaster__factory>;
+    getContractFactory(
+      name: "SignatureCheckPaymaster",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.SignatureCheckPaymaster__factory>;
+    getContractFactory(
+      name: "SponsorPaymaster",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.SponsorPaymaster__factory>;
+    getContractFactory(
+      name: "UserWhitelistPaymaster",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.UserWhitelistPaymaster__factory>;
+    getContractFactory(
       name: "IProxy",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.IProxy__factory>;
@@ -253,6 +277,36 @@ declare module "hardhat/types/runtime" {
       address: string,
       signer?: ethers.Signer
     ): Promise<Contracts.Owned>;
+    getContractAt(
+      name: "ArgentAccountPaymaster",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.ArgentAccountPaymaster>;
+    getContractAt(
+      name: "DappWhitelistPaymaster",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.DappWhitelistPaymaster>;
+    getContractAt(
+      name: "EOASignatureCheckPaymaster",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.EOASignatureCheckPaymaster>;
+    getContractAt(
+      name: "SignatureCheckPaymaster",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.SignatureCheckPaymaster>;
+    getContractAt(
+      name: "SponsorPaymaster",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.SponsorPaymaster>;
+    getContractAt(
+      name: "UserWhitelistPaymaster",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.UserWhitelistPaymaster>;
     getContractAt(
       name: "IProxy",
       address: string,

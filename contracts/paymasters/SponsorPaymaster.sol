@@ -7,7 +7,7 @@ import {Transaction} from "@matterlabs/zksync-contracts/l2/system-contracts/Tran
 import {BOOTLOADER_FORMAL_ADDRESS} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 
-import {Owned} from "./Owned.sol";
+import {Owned} from "../Owned.sol";
 
 abstract contract SponsorPaymaster is IPaymaster, Owned {
     modifier onlyBootloader() {

@@ -7,7 +7,7 @@ import {Transaction} from "@matterlabs/zksync-contracts/l2/system-contracts/Tran
 import {BOOTLOADER_FORMAL_ADDRESS} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 
-import {ArgentAccountDetector} from "./ArgentAccountDetector.sol";
+import {ArgentAccountDetector} from "../ArgentAccountDetector.sol";
 
 contract ArgentAccountPaymaster is IPaymaster, ArgentAccountDetector {
     modifier onlyBootloader() {
