@@ -6,10 +6,11 @@ import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { PaymasterParams, TransactionRequest } from "zksync-web3/build/src/types";
 import { deployAccount } from "../scripts/account.service";
-import { getDeployer } from "../scripts/deployer.service";
+import { CustomDeployer, getDeployer } from "../scripts/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../scripts/infrastructure.service";
 import { ArgentInfrastructure } from "../scripts/model";
 import { hashMeaningfulTransaction } from "../scripts/paymaster.service";
+import { ArgentSigner } from "../scripts/signer.service";
 import { ArgentAccount, TestDapp } from "../typechain-types";
 
 const owner = zksync.Wallet.createRandom();
@@ -183,7 +184,79 @@ describe("Paymasters", () => {
   });
 
   describe("SignatureCheckPaymaster", () => {
-    // wait to be able to deploy from contract accounts
+    let paymasterOwner: ArgentAccount;
+    let testDapp: TestDapp;
+
+    before(async () => {
+      paymasterOwner = await deployAccount({
+        argent,
+        ownerAddress,
+        guardianAddress,
+        connect: [owner, guardian],
+        funds: "0.01",
+      });
+      const customDeployer = new CustomDeployer(new ArgentSigner(paymasterOwner, [owner, guardian]));
+      const artifact = await customDeployer.loadArtifact("SignatureCheckPaymaster");
+      paymaster = await customDeployer.deploy(artifact);
+      const response = await deployer.zkWallet.sendTransaction({ to: paymaster.address, value: paymasterBudget });
+      await response.wait();
+      expect(await paymaster.owner()).to.equal(paymasterOwner.address);
+
+      testDapp = await deployTestDapp(deployer);
+      testDapp = testDapp.connect(emptyAccount.signer);
+    });
+
+    // TODO: investigate why the revert reason doesn't bubble up like it does with EOASignatureCheckPaymaster
+    it("Should refuse to pay with invalid signature", async () => {
+      overrides = await getPaymasterOverrides(testDapp);
+      let promise = testDapp.setNumber(42, overrides);
+      await expect(promise).to.be.rejected;
+
+      overrides = await getPaymasterOverrides(testDapp, new Uint8Array(65));
+      promise = testDapp.setNumber(42, overrides);
+      await expect(promise).to.be.rejected;
+
+      overrides = await getPaymasterOverrides(testDapp, new Uint8Array(2 * 65));
+      promise = testDapp.setNumber(42, overrides);
+      await expect(promise).to.be.rejected;
+
+      overrides = await getPaymasterOverrides(testDapp, ethers.utils.randomBytes(65));
+      promise = testDapp.setNumber(42, overrides);
+      await expect(promise).to.be.rejected;
+
+      overrides = await getPaymasterOverrides(testDapp, ethers.utils.randomBytes(2 * 65));
+      promise = testDapp.setNumber(42, overrides);
+      await expect(promise).to.be.rejected;
+    });
+
+    it("Should refuse to be owned by an EOA", async () => {
+      const artifact = await deployer.loadArtifact("SignatureCheckPaymaster");
+      let promise = deployer.deploy(artifact);
+      await expect(promise).to.be.rejected;
+
+      promise = paymaster.changeOwner(emptyEoa.address);
+      await expect(promise).to.be.rejectedWith("non-ERC1271 owner");
+    });
+
+    it("Should pay with a valid signature", async () => {
+      overrides = await getPaymasterOverrides(testDapp);
+      let transaction: TransactionRequest = await testDapp.populateTransaction.setNumber(42, {
+        type: zksync.utils.EIP712_TX_TYPE,
+        ...overrides,
+      });
+      transaction = await emptyAccount.signer.populateTransaction(transaction);
+
+      const messageHash = hashMeaningfulTransaction(transaction);
+      const signature = await paymasterOwner.signer.signMessage(ethers.utils.arrayify(messageHash));
+
+      overrides = await getPaymasterOverrides(testDapp, signature);
+      transaction = { ...transaction, ...overrides };
+      const signedTransaction = await emptyAccount.signer.signTransaction(transaction);
+      const response = await provider.sendTransaction(signedTransaction);
+      await response.wait();
+
+      expect(await testDapp.userNumbers(emptyAccount.address)).to.equal(42n);
+    });
   });
 
   describe("EOASignatureCheckPaymaster", () => {
@@ -203,11 +276,10 @@ describe("Paymasters", () => {
       await response.wait();
 
       testDapp = await deployTestDapp(deployer);
+      testDapp = testDapp.connect(emptyEoa);
     });
 
-    it("Should pay or no for given users", async () => {
-      testDapp = testDapp.connect(emptyEoa);
-
+    it("Should refuse to pay with invalid signature", async () => {
       overrides = await getPaymasterOverrides(testDapp);
       let promise = testDapp.setNumber(42, overrides);
       await expect(promise).to.be.rejectedWith("Unsponsored transaction");
@@ -219,7 +291,10 @@ describe("Paymasters", () => {
       overrides = await getPaymasterOverrides(testDapp, ethers.utils.randomBytes(65));
       promise = testDapp.setNumber(42, overrides);
       await expect(promise).to.be.rejectedWith("Unsponsored transaction");
+    });
 
+    it("Should pay with a valid signature", async () => {
+      overrides = await getPaymasterOverrides(testDapp);
       let transaction: TransactionRequest = await testDapp.populateTransaction.setNumber(42, {
         type: zksync.utils.EIP712_TX_TYPE,
         ...overrides,

@@ -14,8 +14,8 @@ contract EOASignatureCheckPaymaster is SponsorPaymaster {
     using ECDSA for bytes32;
 
     function isSponsoredTransaction(Transaction calldata _transaction) internal view override returns (bool) {
-        bytes32 messageHash = _transaction.hashMeaningfulTransaction().toEthSignedMessageHash();
         bytes memory signature = abi.decode(_transaction.paymasterInput[4:], (bytes));
+        bytes32 messageHash = _transaction.hashMeaningfulTransaction().toEthSignedMessageHash();
         return owner.isValidSignatureNow(messageHash, signature);
     }
 }
