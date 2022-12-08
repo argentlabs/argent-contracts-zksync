@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity 0.8.16;
 
-import {Owned} from "./Owned.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IProxy} from "./Proxy.sol";
 
 /**
@@ -12,7 +12,7 @@ import {IProxy} from "./Proxy.sol";
  * Only the owner of the contract can add code hash and implementations.
  * @author Julien Niset - <julien@argent.xyz>
  */
-contract ArgentAccountDetector is Owned {
+contract ArgentAccountDetector is Ownable {
     // The accepted code hashes
     bytes32[] private codes;
     // The accepted implementations

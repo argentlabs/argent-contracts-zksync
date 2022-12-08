@@ -20,13 +20,43 @@ const ownerAddress = owner.address;
 const guardianAddress = guardian.address;
 const { deployer } = getDeployer();
 
-describe("Argent account", () => {
+const eip1271MagicValue = zksync.utils.EIP1271_MAGIC_VALUE;
+
+describe("Argent signer", () => {
   let argent: ArgentInfrastructure;
   let account: ArgentAccount;
 
   before(async () => {
     await checkDeployer(deployer);
     argent = await getTestInfrastructure(deployer);
+    account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: false });
+  });
+
+  describe("EIP-1271 signature verification of Ethereum signed messages", () => {
+    const message = ethers.utils.randomBytes(100);
+    const hash = ethers.utils.hashMessage(message);
+
+    it("Should verify on the account", async () => {
+      const signature = await new ArgentSigner(account, [owner, guardian]).signMessage(message);
+      expect(await account.isValidSignature(hash, signature)).to.equal(eip1271MagicValue);
+    });
+
+    it("Should fail to verify", async () => {
+      let signature = await new ArgentSigner(account, [owner]).signMessage(message);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+
+      signature = await new ArgentSigner(account, [owner, owner]).signMessage(message);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+
+      signature = await new ArgentSigner(account, [guardian, guardian]).signMessage(message);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+
+      signature = await new ArgentSigner(account, [0]).signMessage(message);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+
+      signature = await new ArgentSigner(account, [0, 0]).signMessage(message);
+      await expect(account.isValidSignature(hash, signature)).to.be.rejected;
+    });
   });
 
   describe("EIP-1271 signature verification of EIP-712 typed messages", () => {
@@ -56,21 +86,16 @@ describe("Argent account", () => {
     };
 
     const hash = ethers.utils._TypedDataEncoder.hash(domain, types, value);
-    const eip1271SuccessReturnValue = "0x1626ba7e";
-
-    before(async () => {
-      account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: false });
-    });
 
     it("Should verify on the account", async () => {
       const signature = await new ArgentSigner(account, [owner, guardian])._signTypedData(domain, types, value);
-      expect(await account.isValidSignature(hash, signature)).to.equal(eip1271SuccessReturnValue);
+      expect(await account.isValidSignature(hash, signature)).to.equal(eip1271MagicValue);
     });
 
     it("Should verify with a single signature when not using a guardian", async () => {
       const accountNoGuardian = await deployAccount({ argent, ownerAddress, guardianAddress: AddressZero });
       const signature = await new ArgentSigner(accountNoGuardian, [owner])._signTypedData(domain, types, value);
-      expect(await accountNoGuardian.isValidSignature(hash, signature)).to.equal(eip1271SuccessReturnValue);
+      expect(await accountNoGuardian.isValidSignature(hash, signature)).to.equal(eip1271MagicValue);
     });
 
     it("Should fail to verify using incorrect owners", async () => {

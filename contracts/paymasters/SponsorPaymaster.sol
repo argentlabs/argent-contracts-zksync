@@ -6,10 +6,9 @@ import {IPaymasterFlow} from "@matterlabs/zksync-contracts/l2/system-contracts/i
 import {Transaction} from "@matterlabs/zksync-contracts/l2/system-contracts/TransactionHelper.sol";
 import {BOOTLOADER_FORMAL_ADDRESS} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-import {Owned} from "./Owned.sol";
-
-abstract contract SponsorPaymaster is IPaymaster, Owned {
+abstract contract SponsorPaymaster is IPaymaster, Ownable {
     modifier onlyBootloader() {
         require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "Only bootloader can call this method");
         // Continue execution if called from the bootloader.

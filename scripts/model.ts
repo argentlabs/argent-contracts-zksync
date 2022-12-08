@@ -3,7 +3,7 @@ import { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
 import { BytesLike } from "ethers";
 import * as zksync from "zksync-web3";
 import { AccountFactory } from "../typechain-types";
-import { Signatories } from "./signer.service";
+import { Signatory } from "./signer.service";
 
 export interface IConfig {
   escapeSecurityPeriodInSeconds: number;
@@ -31,7 +31,7 @@ export interface AccountDeploymentParams {
   argent: Omit<ArgentInfrastructure, "dummyAccount">;
   ownerAddress: string;
   guardianAddress: string;
-  connect?: Signatories;
+  connect?: Signatory[];
   funds?: false | string;
   salt?: BytesLike;
 }

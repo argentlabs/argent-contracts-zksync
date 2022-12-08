@@ -10,10 +10,12 @@ import type { Listener, Provider } from "@ethersproject/providers";
 import type {
   BaseContract,
   BigNumber,
+  BigNumberish,
   BytesLike,
   CallOverrides,
   ContractTransaction,
   Overrides,
+  PayableOverrides,
   PopulatedTransaction,
   Signer,
   utils,
@@ -24,9 +26,58 @@ import type {
   TypedEvent,
   TypedEventFilter,
   TypedListener,
-} from "../common";
+} from "../../common";
 
-export interface ArgentAccountDetectorInterface extends utils.Interface {
+export type TransactionStruct = {
+  txType: PromiseOrValue<BigNumberish>;
+  from: PromiseOrValue<BigNumberish>;
+  to: PromiseOrValue<BigNumberish>;
+  ergsLimit: PromiseOrValue<BigNumberish>;
+  ergsPerPubdataByteLimit: PromiseOrValue<BigNumberish>;
+  maxFeePerErg: PromiseOrValue<BigNumberish>;
+  maxPriorityFeePerErg: PromiseOrValue<BigNumberish>;
+  paymaster: PromiseOrValue<BigNumberish>;
+  reserved: PromiseOrValue<BigNumberish>[];
+  data: PromiseOrValue<BytesLike>;
+  signature: PromiseOrValue<BytesLike>;
+  factoryDeps: PromiseOrValue<BytesLike>[];
+  paymasterInput: PromiseOrValue<BytesLike>;
+  reservedDynamic: PromiseOrValue<BytesLike>;
+};
+
+export type TransactionStructOutput = [
+  BigNumber,
+  BigNumber,
+  BigNumber,
+  BigNumber,
+  BigNumber,
+  BigNumber,
+  BigNumber,
+  BigNumber,
+  BigNumber[],
+  string,
+  string,
+  string[],
+  string,
+  string
+] & {
+  txType: BigNumber;
+  from: BigNumber;
+  to: BigNumber;
+  ergsLimit: BigNumber;
+  ergsPerPubdataByteLimit: BigNumber;
+  maxFeePerErg: BigNumber;
+  maxPriorityFeePerErg: BigNumber;
+  paymaster: BigNumber;
+  reserved: BigNumber[];
+  data: string;
+  signature: string;
+  factoryDeps: string[];
+  paymasterInput: string;
+  reservedDynamic: string;
+};
+
+export interface ArgentAccountPaymasterInterface extends utils.Interface {
   functions: {
     "acceptedCodes(bytes32)": FunctionFragment;
     "acceptedImplementations(address)": FunctionFragment;
@@ -37,8 +88,11 @@ export interface ArgentAccountDetectorInterface extends utils.Interface {
     "getImplementations()": FunctionFragment;
     "isArgentAccount(address)": FunctionFragment;
     "owner()": FunctionFragment;
+    "postOp(bytes,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[6],bytes,bytes,bytes32[],bytes,bytes),bytes32,bytes32,uint8,uint256)": FunctionFragment;
+    "recoverToken(address,address)": FunctionFragment;
     "renounceOwnership()": FunctionFragment;
     "transferOwnership(address)": FunctionFragment;
+    "validateAndPayForPaymasterTransaction(bytes32,bytes32,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[6],bytes,bytes,bytes32[],bytes,bytes))": FunctionFragment;
   };
 
   getFunction(
@@ -52,8 +106,11 @@ export interface ArgentAccountDetectorInterface extends utils.Interface {
       | "getImplementations"
       | "isArgentAccount"
       | "owner"
+      | "postOp"
+      | "recoverToken"
       | "renounceOwnership"
       | "transferOwnership"
+      | "validateAndPayForPaymasterTransaction"
   ): FunctionFragment;
 
   encodeFunctionData(
@@ -87,12 +144,35 @@ export interface ArgentAccountDetectorInterface extends utils.Interface {
   ): string;
   encodeFunctionData(functionFragment: "owner", values?: undefined): string;
   encodeFunctionData(
+    functionFragment: "postOp",
+    values: [
+      PromiseOrValue<BytesLike>,
+      TransactionStruct,
+      PromiseOrValue<BytesLike>,
+      PromiseOrValue<BytesLike>,
+      PromiseOrValue<BigNumberish>,
+      PromiseOrValue<BigNumberish>
+    ]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "recoverToken",
+    values: [PromiseOrValue<string>, PromiseOrValue<string>]
+  ): string;
+  encodeFunctionData(
     functionFragment: "renounceOwnership",
     values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "transferOwnership",
     values: [PromiseOrValue<string>]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "validateAndPayForPaymasterTransaction",
+    values: [
+      PromiseOrValue<BytesLike>,
+      PromiseOrValue<BytesLike>,
+      TransactionStruct
+    ]
   ): string;
 
   decodeFunctionResult(
@@ -122,12 +202,21 @@ export interface ArgentAccountDetectorInterface extends utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "owner", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "postOp", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "recoverToken",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "renounceOwnership",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
     functionFragment: "transferOwnership",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "validateAndPayForPaymasterTransaction",
     data: BytesLike
   ): Result;
 
@@ -172,12 +261,12 @@ export type OwnershipTransferredEvent = TypedEvent<
 export type OwnershipTransferredEventFilter =
   TypedEventFilter<OwnershipTransferredEvent>;
 
-export interface ArgentAccountDetector extends BaseContract {
+export interface ArgentAccountPaymaster extends BaseContract {
   connect(signerOrProvider: Signer | Provider | string): this;
   attach(addressOrName: string): this;
   deployed(): Promise<this>;
 
-  interface: ArgentAccountDetectorInterface;
+  interface: ArgentAccountPaymasterInterface;
 
   queryFilter<TEvent extends TypedEvent>(
     event: TypedEventFilter<TEvent>,
@@ -235,6 +324,22 @@ export interface ArgentAccountDetector extends BaseContract {
 
     owner(overrides?: CallOverrides): Promise<[string]>;
 
+    postOp(
+      _context: PromiseOrValue<BytesLike>,
+      _transaction: TransactionStruct,
+      _transactionHash: PromiseOrValue<BytesLike>,
+      _suggestedSignedHash: PromiseOrValue<BytesLike>,
+      _transactionResult: PromiseOrValue<BigNumberish>,
+      _maxRefundedErgs: PromiseOrValue<BigNumberish>,
+      overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
+
+    recoverToken(
+      _recipient: PromiseOrValue<string>,
+      _token: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
+
     renounceOwnership(
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
@@ -242,6 +347,13 @@ export interface ArgentAccountDetector extends BaseContract {
     transferOwnership(
       newOwner: PromiseOrValue<string>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
+
+    validateAndPayForPaymasterTransaction(
+      arg0: PromiseOrValue<BytesLike>,
+      arg1: PromiseOrValue<BytesLike>,
+      _transaction: TransactionStruct,
+      overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
   };
 
@@ -281,6 +393,22 @@ export interface ArgentAccountDetector extends BaseContract {
 
   owner(overrides?: CallOverrides): Promise<string>;
 
+  postOp(
+    _context: PromiseOrValue<BytesLike>,
+    _transaction: TransactionStruct,
+    _transactionHash: PromiseOrValue<BytesLike>,
+    _suggestedSignedHash: PromiseOrValue<BytesLike>,
+    _transactionResult: PromiseOrValue<BigNumberish>,
+    _maxRefundedErgs: PromiseOrValue<BigNumberish>,
+    overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
+
+  recoverToken(
+    _recipient: PromiseOrValue<string>,
+    _token: PromiseOrValue<string>,
+    overrides?: Overrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
+
   renounceOwnership(
     overrides?: Overrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
@@ -288,6 +416,13 @@ export interface ArgentAccountDetector extends BaseContract {
   transferOwnership(
     newOwner: PromiseOrValue<string>,
     overrides?: Overrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
+
+  validateAndPayForPaymasterTransaction(
+    arg0: PromiseOrValue<BytesLike>,
+    arg1: PromiseOrValue<BytesLike>,
+    _transaction: TransactionStruct,
+    overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
 
   callStatic: {
@@ -327,12 +462,35 @@ export interface ArgentAccountDetector extends BaseContract {
 
     owner(overrides?: CallOverrides): Promise<string>;
 
+    postOp(
+      _context: PromiseOrValue<BytesLike>,
+      _transaction: TransactionStruct,
+      _transactionHash: PromiseOrValue<BytesLike>,
+      _suggestedSignedHash: PromiseOrValue<BytesLike>,
+      _transactionResult: PromiseOrValue<BigNumberish>,
+      _maxRefundedErgs: PromiseOrValue<BigNumberish>,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    recoverToken(
+      _recipient: PromiseOrValue<string>,
+      _token: PromiseOrValue<string>,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     renounceOwnership(overrides?: CallOverrides): Promise<void>;
 
     transferOwnership(
       newOwner: PromiseOrValue<string>,
       overrides?: CallOverrides
     ): Promise<void>;
+
+    validateAndPayForPaymasterTransaction(
+      arg0: PromiseOrValue<BytesLike>,
+      arg1: PromiseOrValue<BytesLike>,
+      _transaction: TransactionStruct,
+      overrides?: CallOverrides
+    ): Promise<string>;
   };
 
   filters: {
@@ -395,6 +553,22 @@ export interface ArgentAccountDetector extends BaseContract {
 
     owner(overrides?: CallOverrides): Promise<BigNumber>;
 
+    postOp(
+      _context: PromiseOrValue<BytesLike>,
+      _transaction: TransactionStruct,
+      _transactionHash: PromiseOrValue<BytesLike>,
+      _suggestedSignedHash: PromiseOrValue<BytesLike>,
+      _transactionResult: PromiseOrValue<BigNumberish>,
+      _maxRefundedErgs: PromiseOrValue<BigNumberish>,
+      overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
+
+    recoverToken(
+      _recipient: PromiseOrValue<string>,
+      _token: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
+
     renounceOwnership(
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
@@ -402,6 +576,13 @@ export interface ArgentAccountDetector extends BaseContract {
     transferOwnership(
       newOwner: PromiseOrValue<string>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
+
+    validateAndPayForPaymasterTransaction(
+      arg0: PromiseOrValue<BytesLike>,
+      arg1: PromiseOrValue<BytesLike>,
+      _transaction: TransactionStruct,
+      overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
   };
 
@@ -444,6 +625,22 @@ export interface ArgentAccountDetector extends BaseContract {
 
     owner(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
+    postOp(
+      _context: PromiseOrValue<BytesLike>,
+      _transaction: TransactionStruct,
+      _transactionHash: PromiseOrValue<BytesLike>,
+      _suggestedSignedHash: PromiseOrValue<BytesLike>,
+      _transactionResult: PromiseOrValue<BigNumberish>,
+      _maxRefundedErgs: PromiseOrValue<BigNumberish>,
+      overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
+
+    recoverToken(
+      _recipient: PromiseOrValue<string>,
+      _token: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
+
     renounceOwnership(
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
@@ -451,6 +648,13 @@ export interface ArgentAccountDetector extends BaseContract {
     transferOwnership(
       newOwner: PromiseOrValue<string>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
+
+    validateAndPayForPaymasterTransaction(
+      arg0: PromiseOrValue<BytesLike>,
+      arg1: PromiseOrValue<BytesLike>,
+      _transaction: TransactionStruct,
+      overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
   };
 }
