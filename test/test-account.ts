@@ -7,7 +7,7 @@ import * as zksync from "zksync-web3";
 import { computeCreate2AddressFromSdk, connect, deployAccount } from "../scripts/account.service";
 import { checkDeployer, CustomDeployer, getDeployer } from "../scripts/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../scripts/infrastructure.service";
-import { ArgentArtifacts, ArgentInfrastructure } from "../scripts/model";
+import { ArgentInfrastructure } from "../scripts/model";
 import { ArgentSigner } from "../scripts/signer.service";
 import { ArgentAccount, TestDapp } from "../typechain-types";
 
@@ -25,13 +25,11 @@ const { deployer, deployerAddress, provider } = getDeployer();
 
 describe("Argent account", () => {
   let argent: ArgentInfrastructure;
-  let artifacts: ArgentArtifacts;
   let account: ArgentAccount;
 
   before(async () => {
     await checkDeployer(deployer);
     argent = await getTestInfrastructure(deployer);
-    ({ artifacts, dummyAccount: account } = argent);
   });
 
   describe("AccountFactory", () => {
@@ -63,7 +61,8 @@ describe("Argent account", () => {
     });
 
     it("Should refuse to be initialized twice", async () => {
-      const accountFromEoa = new zksync.Contract(account.address, artifacts.implementation.abi, deployer.zkWallet);
+      const { abi } = argent.artifacts.implementation;
+      const accountFromEoa = new zksync.Contract(account.address, abi, deployer.zkWallet);
       const promise = accountFromEoa.initialize(owner.address, guardian.address);
       await expect(promise).to.be.rejectedWith("argent/already-init");
     });
@@ -74,7 +73,7 @@ describe("Argent account", () => {
 
     before(async () => {
       account = await deployAccount({ argent, ownerAddress, guardianAddress });
-      newImplementation = await deployer.deploy(artifacts.implementation, [10]);
+      newImplementation = await deployer.deploy(argent.artifacts.implementation, [10]);
     });
 
     it("Should revert with the wrong owner", async () => {
@@ -327,7 +326,7 @@ describe("Argent account", () => {
 
       const signer = new ArgentSigner(account, [owner, guardian]);
       const customDeployer = new CustomDeployer(signer);
-      const testDapp = await customDeployer.deploy(artifacts.testDapp);
+      const testDapp = await customDeployer.deploy(argent.artifacts.testDapp);
 
       const response = await testDapp.setNumber(52);
       await response.wait();
