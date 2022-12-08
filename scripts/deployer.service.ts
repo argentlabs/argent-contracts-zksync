@@ -60,7 +60,7 @@ export const loadArtifacts = async (deployer: Deployer): Promise<ArgentArtifacts
 
 // Temporary hack while waiting for `hardhat-zksync-deploy` to be updated
 export class CustomDeployer extends Deployer {
-  constructor(signer: zksync.Signer) {
+  constructor(signer: ethers.Signer & { provider: ethers.providers.Provider }) {
     super(hre, zksync.Wallet.createRandom());
     this.zkWallet = signer.connect(signer.provider) as any;
   }

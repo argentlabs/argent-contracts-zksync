@@ -14,8 +14,8 @@
     "postinstall": "./bin/postinstall.sh"
   },
   "devDependencies": {
-    "@matterlabs/hardhat-zksync-deploy": "link:/Users/axel/hardhat-zksync/packages/hardhat-zksync-deploy",
-    "@matterlabs/hardhat-zksync-solc": "^0.3.9",
+    "@matterlabs/hardhat-zksync-deploy": "^0.5.2",
+    "@matterlabs/hardhat-zksync-solc": "^0.3.12",
     "@matterlabs/zksync-contracts": "^0.4.2",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.4",
     "@nomiclabs/hardhat-ethers": "^2.2.1",
@@ -24,7 +24,7 @@
     "@typechain/hardhat": "^6.1.4",
     "@types/chai": "^4.3.4",
     "@types/mocha": "^10.0.1",
-    "@types/node": "^18.11.10",
+    "@types/node": "^18.11.11",
     "chai": "^4.3.7",
     "dotenv": "^16.0.3",
     "ethers": "^5.7.2",

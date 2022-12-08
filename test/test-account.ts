@@ -1,12 +1,11 @@
-import { Deployer, SignerWithAddress } from "@matterlabs/hardhat-zksync-deploy";
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomiclabs/hardhat-ethers";
 import { expect } from "chai";
 import { PopulatedTransaction } from "ethers";
-import hre, { ethers } from "hardhat";
+import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { computeCreate2AddressFromSdk, connect, deployAccount } from "../scripts/account.service";
-import { checkDeployer, getDeployer } from "../scripts/deployer.service";
+import { checkDeployer, CustomDeployer, getDeployer } from "../scripts/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../scripts/infrastructure.service";
 import { ArgentArtifacts, ArgentInfrastructure } from "../scripts/model";
 import { ArgentSigner } from "../scripts/signer.service";
@@ -312,7 +311,7 @@ describe("Argent account", () => {
     });
   });
 
-  describe.only("Deploying contracts from account", () => {
+  describe("Deploying contracts from account", () => {
     before(async () => {
       account = await deployAccount({
         argent,
@@ -324,17 +323,17 @@ describe("Argent account", () => {
     });
 
     it("Should deploy a contract from the account", async () => {
-      const signer = new ArgentSigner(account, [owner, guardian]) as unknown as SignerWithAddress;
-      const customDeployer = new Deployer(hre, signer);
-      console.log("address", account.address);
-      console.log("address", customDeployer.zkWallet.address);
+      const balanceBefore = await provider.getBalance(account.address);
+
+      const signer = new ArgentSigner(account, [owner, guardian]);
+      const customDeployer = new CustomDeployer(signer);
       const testDapp = await customDeployer.deploy(artifacts.testDapp);
-      await testDapp.deployed();
-      console.log("contract at", testDapp.address);
-      console.log("number is", await testDapp.userNumbers(account.address));
+
       const response = await testDapp.setNumber(52);
       await response.wait();
-      console.log("number is", await testDapp.userNumbers(account.address));
+
+      const balanceAfter = await provider.getBalance(account.address);
+      expect(balanceAfter).to.be.lessThan(balanceBefore);
     });
   });
 });
