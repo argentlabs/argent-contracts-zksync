@@ -324,8 +324,7 @@ describe("Argent account", () => {
     it("Should deploy a contract from the account", async () => {
       const balanceBefore = await provider.getBalance(account.address);
 
-      const signer = new ArgentSigner(account, [owner, guardian]);
-      const customDeployer = new CustomDeployer(signer);
+      const customDeployer = new CustomDeployer(new ArgentSigner(account, [owner, guardian]));
       const testDapp = await customDeployer.deploy(argent.artifacts.testDapp);
 
       const response = await testDapp.setNumber(52);
