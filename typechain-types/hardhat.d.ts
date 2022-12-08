@@ -69,6 +69,10 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.ISystemContext__factory>;
     getContractFactory(
+      name: "Ownable",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.Ownable__factory>;
+    getContractFactory(
       name: "IERC1271",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.IERC1271__factory>;
@@ -105,22 +109,6 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.EOASignatureCheckPaymaster__factory>;
     getContractFactory(
-      name: "Owned",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.Owned__factory>;
-    getContractFactory(
-      name: "ArgentAccountPaymaster",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.ArgentAccountPaymaster__factory>;
-    getContractFactory(
-      name: "DappWhitelistPaymaster",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.DappWhitelistPaymaster__factory>;
-    getContractFactory(
-      name: "EOASignatureCheckPaymaster",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.EOASignatureCheckPaymaster__factory>;
-    getContractFactory(
       name: "SignatureCheckPaymaster",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.SignatureCheckPaymaster__factory>;
@@ -141,21 +129,9 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.Proxy__factory>;
     getContractFactory(
-      name: "SignatureCheckPaymaster",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.SignatureCheckPaymaster__factory>;
-    getContractFactory(
-      name: "SponsorPaymaster",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.SponsorPaymaster__factory>;
-    getContractFactory(
       name: "TestDapp",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.TestDapp__factory>;
-    getContractFactory(
-      name: "UserWhitelistPaymaster",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.UserWhitelistPaymaster__factory>;
 
     getContractAt(
       name: "IContractDeployer",
@@ -228,6 +204,11 @@ declare module "hardhat/types/runtime" {
       signer?: ethers.Signer
     ): Promise<Contracts.ISystemContext>;
     getContractAt(
+      name: "Ownable",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.Ownable>;
+    getContractAt(
       name: "IERC1271",
       address: string,
       signer?: ethers.Signer
@@ -273,26 +254,6 @@ declare module "hardhat/types/runtime" {
       signer?: ethers.Signer
     ): Promise<Contracts.EOASignatureCheckPaymaster>;
     getContractAt(
-      name: "Owned",
-      address: string,
-      signer?: ethers.Signer
-    ): Promise<Contracts.Owned>;
-    getContractAt(
-      name: "ArgentAccountPaymaster",
-      address: string,
-      signer?: ethers.Signer
-    ): Promise<Contracts.ArgentAccountPaymaster>;
-    getContractAt(
-      name: "DappWhitelistPaymaster",
-      address: string,
-      signer?: ethers.Signer
-    ): Promise<Contracts.DappWhitelistPaymaster>;
-    getContractAt(
-      name: "EOASignatureCheckPaymaster",
-      address: string,
-      signer?: ethers.Signer
-    ): Promise<Contracts.EOASignatureCheckPaymaster>;
-    getContractAt(
       name: "SignatureCheckPaymaster",
       address: string,
       signer?: ethers.Signer
@@ -318,25 +279,10 @@ declare module "hardhat/types/runtime" {
       signer?: ethers.Signer
     ): Promise<Contracts.Proxy>;
     getContractAt(
-      name: "SignatureCheckPaymaster",
-      address: string,
-      signer?: ethers.Signer
-    ): Promise<Contracts.SignatureCheckPaymaster>;
-    getContractAt(
-      name: "SponsorPaymaster",
-      address: string,
-      signer?: ethers.Signer
-    ): Promise<Contracts.SponsorPaymaster>;
-    getContractAt(
       name: "TestDapp",
       address: string,
       signer?: ethers.Signer
     ): Promise<Contracts.TestDapp>;
-    getContractAt(
-      name: "UserWhitelistPaymaster",
-      address: string,
-      signer?: ethers.Signer
-    ): Promise<Contracts.UserWhitelistPaymaster>;
 
     // default types
     getContractFactory(

@@ -234,7 +234,7 @@ describe("Paymasters", () => {
       let promise = deployer.deploy(artifact);
       await expect(promise).to.be.rejected;
 
-      promise = paymaster.changeOwner(emptyEoa.address);
+      promise = paymaster.transferOwnership(emptyEoa.address);
       await expect(promise).to.be.rejectedWith("non-ERC1271 owner");
     });
 
@@ -268,7 +268,7 @@ describe("Paymasters", () => {
       const artifact = await deployer.loadArtifact("EOASignatureCheckPaymaster");
       paymaster = await deployer.deploy(artifact);
 
-      let response = await paymaster.changeOwner(paymasterOwner.address);
+      let response = await paymaster.transferOwnership(paymasterOwner.address);
       await response.wait();
       expect(await paymaster.owner()).to.equal(paymasterOwner.address);
 

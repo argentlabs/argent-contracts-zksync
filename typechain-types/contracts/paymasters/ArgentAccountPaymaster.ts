@@ -84,13 +84,14 @@ export interface ArgentAccountPaymasterInterface extends utils.Interface {
     "addCode(bytes32)": FunctionFragment;
     "addCodeAndImplementationFromAccount(address)": FunctionFragment;
     "addImplementation(address)": FunctionFragment;
-    "changeOwner(address)": FunctionFragment;
     "getCodes()": FunctionFragment;
     "getImplementations()": FunctionFragment;
     "isArgentAccount(address)": FunctionFragment;
     "owner()": FunctionFragment;
     "postOp(bytes,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[6],bytes,bytes,bytes32[],bytes,bytes),bytes32,bytes32,uint8,uint256)": FunctionFragment;
     "recoverToken(address,address)": FunctionFragment;
+    "renounceOwnership()": FunctionFragment;
+    "transferOwnership(address)": FunctionFragment;
     "validateAndPayForPaymasterTransaction(bytes32,bytes32,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[6],bytes,bytes,bytes32[],bytes,bytes))": FunctionFragment;
   };
 
@@ -101,13 +102,14 @@ export interface ArgentAccountPaymasterInterface extends utils.Interface {
       | "addCode"
       | "addCodeAndImplementationFromAccount"
       | "addImplementation"
-      | "changeOwner"
       | "getCodes"
       | "getImplementations"
       | "isArgentAccount"
       | "owner"
       | "postOp"
       | "recoverToken"
+      | "renounceOwnership"
+      | "transferOwnership"
       | "validateAndPayForPaymasterTransaction"
   ): FunctionFragment;
 
@@ -129,10 +131,6 @@ export interface ArgentAccountPaymasterInterface extends utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "addImplementation",
-    values: [PromiseOrValue<string>]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "changeOwner",
     values: [PromiseOrValue<string>]
   ): string;
   encodeFunctionData(functionFragment: "getCodes", values?: undefined): string;
@@ -161,6 +159,14 @@ export interface ArgentAccountPaymasterInterface extends utils.Interface {
     values: [PromiseOrValue<string>, PromiseOrValue<string>]
   ): string;
   encodeFunctionData(
+    functionFragment: "renounceOwnership",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "transferOwnership",
+    values: [PromiseOrValue<string>]
+  ): string;
+  encodeFunctionData(
     functionFragment: "validateAndPayForPaymasterTransaction",
     values: [
       PromiseOrValue<BytesLike>,
@@ -186,10 +192,6 @@ export interface ArgentAccountPaymasterInterface extends utils.Interface {
     functionFragment: "addImplementation",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(
-    functionFragment: "changeOwner",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "getCodes", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "getImplementations",
@@ -206,6 +208,14 @@ export interface ArgentAccountPaymasterInterface extends utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "renounceOwnership",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "transferOwnership",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "validateAndPayForPaymasterTransaction",
     data: BytesLike
   ): Result;
@@ -213,12 +223,12 @@ export interface ArgentAccountPaymasterInterface extends utils.Interface {
   events: {
     "CodeAdded(bytes32)": EventFragment;
     "ImplementationAdded(address)": EventFragment;
-    "OwnerChanged(address)": EventFragment;
+    "OwnershipTransferred(address,address)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "CodeAdded"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "ImplementationAdded"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "OwnerChanged"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "OwnershipTransferred"): EventFragment;
 }
 
 export interface CodeAddedEventObject {
@@ -239,12 +249,17 @@ export type ImplementationAddedEvent = TypedEvent<
 export type ImplementationAddedEventFilter =
   TypedEventFilter<ImplementationAddedEvent>;
 
-export interface OwnerChangedEventObject {
-  _newOwner: string;
+export interface OwnershipTransferredEventObject {
+  previousOwner: string;
+  newOwner: string;
 }
-export type OwnerChangedEvent = TypedEvent<[string], OwnerChangedEventObject>;
+export type OwnershipTransferredEvent = TypedEvent<
+  [string, string],
+  OwnershipTransferredEventObject
+>;
 
-export type OwnerChangedEventFilter = TypedEventFilter<OwnerChangedEvent>;
+export type OwnershipTransferredEventFilter =
+  TypedEventFilter<OwnershipTransferredEvent>;
 
 export interface ArgentAccountPaymaster extends BaseContract {
   connect(signerOrProvider: Signer | Provider | string): this;
@@ -298,11 +313,6 @@ export interface ArgentAccountPaymaster extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
 
-    changeOwner(
-      _newOwner: PromiseOrValue<string>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<ContractTransaction>;
-
     getCodes(overrides?: CallOverrides): Promise<[string[]]>;
 
     getImplementations(overrides?: CallOverrides): Promise<[string[]]>;
@@ -327,6 +337,15 @@ export interface ArgentAccountPaymaster extends BaseContract {
     recoverToken(
       _recipient: PromiseOrValue<string>,
       _token: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
+
+    renounceOwnership(
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
+
+    transferOwnership(
+      newOwner: PromiseOrValue<string>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
 
@@ -363,11 +382,6 @@ export interface ArgentAccountPaymaster extends BaseContract {
     overrides?: Overrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
 
-  changeOwner(
-    _newOwner: PromiseOrValue<string>,
-    overrides?: Overrides & { from?: PromiseOrValue<string> }
-  ): Promise<ContractTransaction>;
-
   getCodes(overrides?: CallOverrides): Promise<string[]>;
 
   getImplementations(overrides?: CallOverrides): Promise<string[]>;
@@ -392,6 +406,15 @@ export interface ArgentAccountPaymaster extends BaseContract {
   recoverToken(
     _recipient: PromiseOrValue<string>,
     _token: PromiseOrValue<string>,
+    overrides?: Overrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
+
+  renounceOwnership(
+    overrides?: Overrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
+
+  transferOwnership(
+    newOwner: PromiseOrValue<string>,
     overrides?: Overrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
 
@@ -428,11 +451,6 @@ export interface ArgentAccountPaymaster extends BaseContract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    changeOwner(
-      _newOwner: PromiseOrValue<string>,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
     getCodes(overrides?: CallOverrides): Promise<string[]>;
 
     getImplementations(overrides?: CallOverrides): Promise<string[]>;
@@ -460,6 +478,13 @@ export interface ArgentAccountPaymaster extends BaseContract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    renounceOwnership(overrides?: CallOverrides): Promise<void>;
+
+    transferOwnership(
+      newOwner: PromiseOrValue<string>,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     validateAndPayForPaymasterTransaction(
       arg0: PromiseOrValue<BytesLike>,
       arg1: PromiseOrValue<BytesLike>,
@@ -481,12 +506,14 @@ export interface ArgentAccountPaymaster extends BaseContract {
       implementation?: PromiseOrValue<string> | null
     ): ImplementationAddedEventFilter;
 
-    "OwnerChanged(address)"(
-      _newOwner?: PromiseOrValue<string> | null
-    ): OwnerChangedEventFilter;
-    OwnerChanged(
-      _newOwner?: PromiseOrValue<string> | null
-    ): OwnerChangedEventFilter;
+    "OwnershipTransferred(address,address)"(
+      previousOwner?: PromiseOrValue<string> | null,
+      newOwner?: PromiseOrValue<string> | null
+    ): OwnershipTransferredEventFilter;
+    OwnershipTransferred(
+      previousOwner?: PromiseOrValue<string> | null,
+      newOwner?: PromiseOrValue<string> | null
+    ): OwnershipTransferredEventFilter;
   };
 
   estimateGas: {
@@ -515,11 +542,6 @@ export interface ArgentAccountPaymaster extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
-    changeOwner(
-      _newOwner: PromiseOrValue<string>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<BigNumber>;
-
     getCodes(overrides?: CallOverrides): Promise<BigNumber>;
 
     getImplementations(overrides?: CallOverrides): Promise<BigNumber>;
@@ -544,6 +566,15 @@ export interface ArgentAccountPaymaster extends BaseContract {
     recoverToken(
       _recipient: PromiseOrValue<string>,
       _token: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
+
+    renounceOwnership(
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
+
+    transferOwnership(
+      newOwner: PromiseOrValue<string>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
@@ -581,11 +612,6 @@ export interface ArgentAccountPaymaster extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 
-    changeOwner(
-      _newOwner: PromiseOrValue<string>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<PopulatedTransaction>;
-
     getCodes(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     getImplementations(
@@ -612,6 +638,15 @@ export interface ArgentAccountPaymaster extends BaseContract {
     recoverToken(
       _recipient: PromiseOrValue<string>,
       _token: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
+
+    renounceOwnership(
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
+
+    transferOwnership(
+      newOwner: PromiseOrValue<string>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 

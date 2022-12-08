@@ -33,11 +33,12 @@ export interface ArgentAccountDetectorInterface extends utils.Interface {
     "addCode(bytes32)": FunctionFragment;
     "addCodeAndImplementationFromAccount(address)": FunctionFragment;
     "addImplementation(address)": FunctionFragment;
-    "changeOwner(address)": FunctionFragment;
     "getCodes()": FunctionFragment;
     "getImplementations()": FunctionFragment;
     "isArgentAccount(address)": FunctionFragment;
     "owner()": FunctionFragment;
+    "renounceOwnership()": FunctionFragment;
+    "transferOwnership(address)": FunctionFragment;
   };
 
   getFunction(
@@ -47,11 +48,12 @@ export interface ArgentAccountDetectorInterface extends utils.Interface {
       | "addCode"
       | "addCodeAndImplementationFromAccount"
       | "addImplementation"
-      | "changeOwner"
       | "getCodes"
       | "getImplementations"
       | "isArgentAccount"
       | "owner"
+      | "renounceOwnership"
+      | "transferOwnership"
   ): FunctionFragment;
 
   encodeFunctionData(
@@ -74,10 +76,6 @@ export interface ArgentAccountDetectorInterface extends utils.Interface {
     functionFragment: "addImplementation",
     values: [PromiseOrValue<string>]
   ): string;
-  encodeFunctionData(
-    functionFragment: "changeOwner",
-    values: [PromiseOrValue<string>]
-  ): string;
   encodeFunctionData(functionFragment: "getCodes", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "getImplementations",
@@ -88,6 +86,14 @@ export interface ArgentAccountDetectorInterface extends utils.Interface {
     values: [PromiseOrValue<string>]
   ): string;
   encodeFunctionData(functionFragment: "owner", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "renounceOwnership",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "transferOwnership",
+    values: [PromiseOrValue<string>]
+  ): string;
 
   decodeFunctionResult(
     functionFragment: "acceptedCodes",
@@ -106,10 +112,6 @@ export interface ArgentAccountDetectorInterface extends utils.Interface {
     functionFragment: "addImplementation",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(
-    functionFragment: "changeOwner",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "getCodes", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "getImplementations",
@@ -120,16 +122,24 @@ export interface ArgentAccountDetectorInterface extends utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "owner", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "renounceOwnership",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "transferOwnership",
+    data: BytesLike
+  ): Result;
 
   events: {
     "CodeAdded(bytes32)": EventFragment;
     "ImplementationAdded(address)": EventFragment;
-    "OwnerChanged(address)": EventFragment;
+    "OwnershipTransferred(address,address)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "CodeAdded"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "ImplementationAdded"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "OwnerChanged"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "OwnershipTransferred"): EventFragment;
 }
 
 export interface CodeAddedEventObject {
@@ -150,12 +160,17 @@ export type ImplementationAddedEvent = TypedEvent<
 export type ImplementationAddedEventFilter =
   TypedEventFilter<ImplementationAddedEvent>;
 
-export interface OwnerChangedEventObject {
-  _newOwner: string;
+export interface OwnershipTransferredEventObject {
+  previousOwner: string;
+  newOwner: string;
 }
-export type OwnerChangedEvent = TypedEvent<[string], OwnerChangedEventObject>;
+export type OwnershipTransferredEvent = TypedEvent<
+  [string, string],
+  OwnershipTransferredEventObject
+>;
 
-export type OwnerChangedEventFilter = TypedEventFilter<OwnerChangedEvent>;
+export type OwnershipTransferredEventFilter =
+  TypedEventFilter<OwnershipTransferredEvent>;
 
 export interface ArgentAccountDetector extends BaseContract {
   connect(signerOrProvider: Signer | Provider | string): this;
@@ -209,11 +224,6 @@ export interface ArgentAccountDetector extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
 
-    changeOwner(
-      _newOwner: PromiseOrValue<string>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<ContractTransaction>;
-
     getCodes(overrides?: CallOverrides): Promise<[string[]]>;
 
     getImplementations(overrides?: CallOverrides): Promise<[string[]]>;
@@ -224,6 +234,15 @@ export interface ArgentAccountDetector extends BaseContract {
     ): Promise<[boolean]>;
 
     owner(overrides?: CallOverrides): Promise<[string]>;
+
+    renounceOwnership(
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
+
+    transferOwnership(
+      newOwner: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
   };
 
   acceptedCodes(
@@ -251,11 +270,6 @@ export interface ArgentAccountDetector extends BaseContract {
     overrides?: Overrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
 
-  changeOwner(
-    _newOwner: PromiseOrValue<string>,
-    overrides?: Overrides & { from?: PromiseOrValue<string> }
-  ): Promise<ContractTransaction>;
-
   getCodes(overrides?: CallOverrides): Promise<string[]>;
 
   getImplementations(overrides?: CallOverrides): Promise<string[]>;
@@ -266,6 +280,15 @@ export interface ArgentAccountDetector extends BaseContract {
   ): Promise<boolean>;
 
   owner(overrides?: CallOverrides): Promise<string>;
+
+  renounceOwnership(
+    overrides?: Overrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
+
+  transferOwnership(
+    newOwner: PromiseOrValue<string>,
+    overrides?: Overrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
 
   callStatic: {
     acceptedCodes(
@@ -293,11 +316,6 @@ export interface ArgentAccountDetector extends BaseContract {
       overrides?: CallOverrides
     ): Promise<void>;
 
-    changeOwner(
-      _newOwner: PromiseOrValue<string>,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
     getCodes(overrides?: CallOverrides): Promise<string[]>;
 
     getImplementations(overrides?: CallOverrides): Promise<string[]>;
@@ -308,6 +326,13 @@ export interface ArgentAccountDetector extends BaseContract {
     ): Promise<boolean>;
 
     owner(overrides?: CallOverrides): Promise<string>;
+
+    renounceOwnership(overrides?: CallOverrides): Promise<void>;
+
+    transferOwnership(
+      newOwner: PromiseOrValue<string>,
+      overrides?: CallOverrides
+    ): Promise<void>;
   };
 
   filters: {
@@ -323,12 +348,14 @@ export interface ArgentAccountDetector extends BaseContract {
       implementation?: PromiseOrValue<string> | null
     ): ImplementationAddedEventFilter;
 
-    "OwnerChanged(address)"(
-      _newOwner?: PromiseOrValue<string> | null
-    ): OwnerChangedEventFilter;
-    OwnerChanged(
-      _newOwner?: PromiseOrValue<string> | null
-    ): OwnerChangedEventFilter;
+    "OwnershipTransferred(address,address)"(
+      previousOwner?: PromiseOrValue<string> | null,
+      newOwner?: PromiseOrValue<string> | null
+    ): OwnershipTransferredEventFilter;
+    OwnershipTransferred(
+      previousOwner?: PromiseOrValue<string> | null,
+      newOwner?: PromiseOrValue<string> | null
+    ): OwnershipTransferredEventFilter;
   };
 
   estimateGas: {
@@ -357,11 +384,6 @@ export interface ArgentAccountDetector extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
-    changeOwner(
-      _newOwner: PromiseOrValue<string>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<BigNumber>;
-
     getCodes(overrides?: CallOverrides): Promise<BigNumber>;
 
     getImplementations(overrides?: CallOverrides): Promise<BigNumber>;
@@ -372,6 +394,15 @@ export interface ArgentAccountDetector extends BaseContract {
     ): Promise<BigNumber>;
 
     owner(overrides?: CallOverrides): Promise<BigNumber>;
+
+    renounceOwnership(
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
+
+    transferOwnership(
+      newOwner: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
   };
 
   populateTransaction: {
@@ -400,11 +431,6 @@ export interface ArgentAccountDetector extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 
-    changeOwner(
-      _newOwner: PromiseOrValue<string>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<PopulatedTransaction>;
-
     getCodes(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     getImplementations(
@@ -417,5 +443,14 @@ export interface ArgentAccountDetector extends BaseContract {
     ): Promise<PopulatedTransaction>;
 
     owner(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    renounceOwnership(
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
+
+    transferOwnership(
+      newOwner: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
   };
 }

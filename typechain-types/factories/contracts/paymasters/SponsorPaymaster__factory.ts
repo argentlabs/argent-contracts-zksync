@@ -16,25 +16,18 @@ const _abi = [
       {
         indexed: true,
         internalType: "address",
-        name: "_newOwner",
+        name: "previousOwner",
         type: "address",
       },
-    ],
-    name: "OwnerChanged",
-    type: "event",
-  },
-  {
-    inputs: [
       {
+        indexed: true,
         internalType: "address",
-        name: "_newOwner",
+        name: "newOwner",
         type: "address",
       },
     ],
-    name: "changeOwner",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
+    name: "OwnershipTransferred",
+    type: "event",
   },
   {
     inputs: [],
@@ -180,6 +173,26 @@ const _abi = [
         type: "uint256",
       },
     ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "renounceOwnership",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "newOwner",
+        type: "address",
+      },
+    ],
+    name: "transferOwnership",
+    outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },

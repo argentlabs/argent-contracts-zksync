@@ -79,26 +79,24 @@ export type TransactionStructOutput = [
 
 export interface SignatureCheckPaymasterInterface extends utils.Interface {
   functions: {
-    "changeOwner(address)": FunctionFragment;
     "owner()": FunctionFragment;
     "postOp(bytes,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[6],bytes,bytes,bytes32[],bytes,bytes),bytes32,bytes32,uint8,uint256)": FunctionFragment;
     "recoverToken(address,address)": FunctionFragment;
+    "renounceOwnership()": FunctionFragment;
+    "transferOwnership(address)": FunctionFragment;
     "validateAndPayForPaymasterTransaction(bytes32,bytes32,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[6],bytes,bytes,bytes32[],bytes,bytes))": FunctionFragment;
   };
 
   getFunction(
     nameOrSignatureOrTopic:
-      | "changeOwner"
       | "owner"
       | "postOp"
       | "recoverToken"
+      | "renounceOwnership"
+      | "transferOwnership"
       | "validateAndPayForPaymasterTransaction"
   ): FunctionFragment;
 
-  encodeFunctionData(
-    functionFragment: "changeOwner",
-    values: [PromiseOrValue<string>]
-  ): string;
   encodeFunctionData(functionFragment: "owner", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "postOp",
@@ -116,6 +114,14 @@ export interface SignatureCheckPaymasterInterface extends utils.Interface {
     values: [PromiseOrValue<string>, PromiseOrValue<string>]
   ): string;
   encodeFunctionData(
+    functionFragment: "renounceOwnership",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "transferOwnership",
+    values: [PromiseOrValue<string>]
+  ): string;
+  encodeFunctionData(
     functionFragment: "validateAndPayForPaymasterTransaction",
     values: [
       PromiseOrValue<BytesLike>,
@@ -124,14 +130,18 @@ export interface SignatureCheckPaymasterInterface extends utils.Interface {
     ]
   ): string;
 
-  decodeFunctionResult(
-    functionFragment: "changeOwner",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "owner", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "postOp", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "recoverToken",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "renounceOwnership",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "transferOwnership",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -140,18 +150,23 @@ export interface SignatureCheckPaymasterInterface extends utils.Interface {
   ): Result;
 
   events: {
-    "OwnerChanged(address)": EventFragment;
+    "OwnershipTransferred(address,address)": EventFragment;
   };
 
-  getEvent(nameOrSignatureOrTopic: "OwnerChanged"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "OwnershipTransferred"): EventFragment;
 }
 
-export interface OwnerChangedEventObject {
-  _newOwner: string;
+export interface OwnershipTransferredEventObject {
+  previousOwner: string;
+  newOwner: string;
 }
-export type OwnerChangedEvent = TypedEvent<[string], OwnerChangedEventObject>;
+export type OwnershipTransferredEvent = TypedEvent<
+  [string, string],
+  OwnershipTransferredEventObject
+>;
 
-export type OwnerChangedEventFilter = TypedEventFilter<OwnerChangedEvent>;
+export type OwnershipTransferredEventFilter =
+  TypedEventFilter<OwnershipTransferredEvent>;
 
 export interface SignatureCheckPaymaster extends BaseContract {
   connect(signerOrProvider: Signer | Provider | string): this;
@@ -180,11 +195,6 @@ export interface SignatureCheckPaymaster extends BaseContract {
   removeListener: OnEvent<this>;
 
   functions: {
-    changeOwner(
-      _newOwner: PromiseOrValue<string>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<ContractTransaction>;
-
     owner(overrides?: CallOverrides): Promise<[string]>;
 
     postOp(
@@ -203,6 +213,15 @@ export interface SignatureCheckPaymaster extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
 
+    renounceOwnership(
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
+
+    transferOwnership(
+      newOwner: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<ContractTransaction>;
+
     validateAndPayForPaymasterTransaction(
       arg0: PromiseOrValue<BytesLike>,
       arg1: PromiseOrValue<BytesLike>,
@@ -210,11 +229,6 @@ export interface SignatureCheckPaymaster extends BaseContract {
       overrides?: PayableOverrides & { from?: PromiseOrValue<string> }
     ): Promise<ContractTransaction>;
   };
-
-  changeOwner(
-    _newOwner: PromiseOrValue<string>,
-    overrides?: Overrides & { from?: PromiseOrValue<string> }
-  ): Promise<ContractTransaction>;
 
   owner(overrides?: CallOverrides): Promise<string>;
 
@@ -234,6 +248,15 @@ export interface SignatureCheckPaymaster extends BaseContract {
     overrides?: Overrides & { from?: PromiseOrValue<string> }
   ): Promise<ContractTransaction>;
 
+  renounceOwnership(
+    overrides?: Overrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
+
+  transferOwnership(
+    newOwner: PromiseOrValue<string>,
+    overrides?: Overrides & { from?: PromiseOrValue<string> }
+  ): Promise<ContractTransaction>;
+
   validateAndPayForPaymasterTransaction(
     arg0: PromiseOrValue<BytesLike>,
     arg1: PromiseOrValue<BytesLike>,
@@ -242,11 +265,6 @@ export interface SignatureCheckPaymaster extends BaseContract {
   ): Promise<ContractTransaction>;
 
   callStatic: {
-    changeOwner(
-      _newOwner: PromiseOrValue<string>,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
     owner(overrides?: CallOverrides): Promise<string>;
 
     postOp(
@@ -265,6 +283,13 @@ export interface SignatureCheckPaymaster extends BaseContract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    renounceOwnership(overrides?: CallOverrides): Promise<void>;
+
+    transferOwnership(
+      newOwner: PromiseOrValue<string>,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     validateAndPayForPaymasterTransaction(
       arg0: PromiseOrValue<BytesLike>,
       arg1: PromiseOrValue<BytesLike>,
@@ -274,20 +299,17 @@ export interface SignatureCheckPaymaster extends BaseContract {
   };
 
   filters: {
-    "OwnerChanged(address)"(
-      _newOwner?: PromiseOrValue<string> | null
-    ): OwnerChangedEventFilter;
-    OwnerChanged(
-      _newOwner?: PromiseOrValue<string> | null
-    ): OwnerChangedEventFilter;
+    "OwnershipTransferred(address,address)"(
+      previousOwner?: PromiseOrValue<string> | null,
+      newOwner?: PromiseOrValue<string> | null
+    ): OwnershipTransferredEventFilter;
+    OwnershipTransferred(
+      previousOwner?: PromiseOrValue<string> | null,
+      newOwner?: PromiseOrValue<string> | null
+    ): OwnershipTransferredEventFilter;
   };
 
   estimateGas: {
-    changeOwner(
-      _newOwner: PromiseOrValue<string>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<BigNumber>;
-
     owner(overrides?: CallOverrides): Promise<BigNumber>;
 
     postOp(
@@ -306,6 +328,15 @@ export interface SignatureCheckPaymaster extends BaseContract {
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<BigNumber>;
 
+    renounceOwnership(
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
+
+    transferOwnership(
+      newOwner: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<BigNumber>;
+
     validateAndPayForPaymasterTransaction(
       arg0: PromiseOrValue<BytesLike>,
       arg1: PromiseOrValue<BytesLike>,
@@ -315,11 +346,6 @@ export interface SignatureCheckPaymaster extends BaseContract {
   };
 
   populateTransaction: {
-    changeOwner(
-      _newOwner: PromiseOrValue<string>,
-      overrides?: Overrides & { from?: PromiseOrValue<string> }
-    ): Promise<PopulatedTransaction>;
-
     owner(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     postOp(
@@ -335,6 +361,15 @@ export interface SignatureCheckPaymaster extends BaseContract {
     recoverToken(
       _recipient: PromiseOrValue<string>,
       _token: PromiseOrValue<string>,
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
+
+    renounceOwnership(
+      overrides?: Overrides & { from?: PromiseOrValue<string> }
+    ): Promise<PopulatedTransaction>;
+
+    transferOwnership(
+      newOwner: PromiseOrValue<string>,
       overrides?: Overrides & { from?: PromiseOrValue<string> }
     ): Promise<PopulatedTransaction>;
 
