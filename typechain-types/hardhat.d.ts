@@ -101,6 +101,10 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.DappWhitelistPaymaster__factory>;
     getContractFactory(
+      name: "EOASignatureCheckPaymaster",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.EOASignatureCheckPaymaster__factory>;
+    getContractFactory(
       name: "Owned",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.Owned__factory>;
@@ -112,6 +116,10 @@ declare module "hardhat/types/runtime" {
       name: "Proxy",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.Proxy__factory>;
+    getContractFactory(
+      name: "SignatureCheckPaymaster",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.SignatureCheckPaymaster__factory>;
     getContractFactory(
       name: "SponsorPaymaster",
       signerOrOptions?: ethers.Signer | FactoryOptions
@@ -236,6 +244,11 @@ declare module "hardhat/types/runtime" {
       signer?: ethers.Signer
     ): Promise<Contracts.DappWhitelistPaymaster>;
     getContractAt(
+      name: "EOASignatureCheckPaymaster",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.EOASignatureCheckPaymaster>;
+    getContractAt(
       name: "Owned",
       address: string,
       signer?: ethers.Signer
@@ -250,6 +263,11 @@ declare module "hardhat/types/runtime" {
       address: string,
       signer?: ethers.Signer
     ): Promise<Contracts.Proxy>;
+    getContractAt(
+      name: "SignatureCheckPaymaster",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.SignatureCheckPaymaster>;
     getContractAt(
       name: "SponsorPaymaster",
       address: string,
