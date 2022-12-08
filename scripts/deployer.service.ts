@@ -1,5 +1,7 @@
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
-import hre, { ethers } from "hardhat";
+import { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
+import { ethers } from "ethers";
+import hre from "hardhat";
 import * as zksync from "zksync-web3";
 import { logBalance } from "./account.service";
 import { getEnv } from "./config.service";
@@ -55,3 +57,26 @@ export const loadArtifacts = async (deployer: Deployer): Promise<ArgentArtifacts
   proxy: await deployer.loadArtifact("Proxy"),
   testDapp: await deployer.loadArtifact("TestDapp"),
 });
+
+// Temporary hack while waiting for `hardhat-zksync-deploy` to be updated
+export class CustomDeployer extends Deployer {
+  constructor(signer: ethers.Signer & { provider: ethers.providers.Provider }) {
+    super(hre, zksync.Wallet.createRandom());
+    this.zkWallet = signer.connect(signer.provider) as any;
+  }
+
+  public async estimateDeployGas(artifact: ZkSyncArtifact, constructorArguments: any[]): Promise<ethers.BigNumber> {
+    const factoryDeps = await this.extractFactoryDeps(artifact);
+    const factory = new zksync.ContractFactory(artifact.abi, artifact.bytecode, this.zkWallet);
+
+    // Encode deploy transaction so it can be estimated.
+    const deployTx = factory.getDeployTransaction(...constructorArguments, {
+      customData: {
+        factoryDeps,
+      },
+    });
+    deployTx.from = await this.zkWallet.getAddress();
+
+    return await this.zkWallet.provider.estimateGas(deployTx);
+  }
+}

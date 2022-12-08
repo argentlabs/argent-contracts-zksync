@@ -5,9 +5,10 @@ import { PopulatedTransaction } from "ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { computeCreate2AddressFromSdk, connect, deployAccount } from "../scripts/account.service";
-import { checkDeployer, getDeployer } from "../scripts/deployer.service";
+import { checkDeployer, CustomDeployer, getDeployer } from "../scripts/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../scripts/infrastructure.service";
 import { ArgentInfrastructure } from "../scripts/model";
+import { ArgentSigner } from "../scripts/signer.service";
 import { ArgentAccount, TestDapp } from "../typechain-types";
 
 const { AddressZero } = ethers.constants;
@@ -306,6 +307,32 @@ describe("Argent account", () => {
       await response.wait();
 
       expect(await testDapp.userNumbers(account.address)).to.equal(69n);
+    });
+  });
+
+  describe("Deploying contracts from account", () => {
+    before(async () => {
+      account = await deployAccount({
+        argent,
+        ownerAddress,
+        guardianAddress,
+        connect: [owner, guardian],
+        funds: "0.01",
+      });
+    });
+
+    it("Should deploy a contract from the account", async () => {
+      const balanceBefore = await provider.getBalance(account.address);
+
+      const signer = new ArgentSigner(account, [owner, guardian]);
+      const customDeployer = new CustomDeployer(signer);
+      const testDapp = await customDeployer.deploy(argent.artifacts.testDapp);
+
+      const response = await testDapp.setNumber(52);
+      await response.wait();
+
+      const balanceAfter = await provider.getBalance(account.address);
+      expect(balanceAfter).to.be.lessThan(balanceBefore);
     });
   });
 });
