@@ -25,21 +25,14 @@ contract AccountFactory {
             DEPLOYER_SYSTEM_CONTRACT.create2Account,
             (_salt, proxyBytecodeHash, input)
         );
-        bytes memory returnData = SystemContractsCaller.systemCall(
+        bytes memory returnData = SystemContractsCaller.systemCallWithPropagatedRevert(
             uint32(gasleft()),
             address(DEPLOYER_SYSTEM_CONTRACT),
             0,
             deployData
         );
 
-        bytes memory revertData;
-        (_newAddress, revertData) = abi.decode(returnData, (address, bytes));
-        if (revertData.length > 0) {
-            assembly {
-                returndatacopy(0, 0, returndatasize())
-                revert(0, returndatasize())
-            }
-        }
+        (_newAddress, ) = abi.decode(returnData, (address, bytes));
     }
 
     function computeCreate2Address(

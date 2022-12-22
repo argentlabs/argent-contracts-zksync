@@ -19,8 +19,11 @@ export const deployAccount = async ({
   const receipt = await response.wait();
   const [{ deployedAddress }] = zksync.utils.getDeployedContracts(receipt);
 
-  // make sure account doesn't have a signer by default
-  const provider = new zksync.Provider(hre.config.zkSyncDeploy.zkSyncNetwork);
+  const network = hre.config.networks.zkSyncTestnet;
+  if (!("url" in network && network.url)) {
+    throw new Error("network needs a 'url' property set");
+  }
+  const provider = new zksync.Provider(network.url);
   const account = new zksync.Contract(deployedAddress, implementation.interface, provider) as ArgentAccount;
 
   if (funds) {
