@@ -29,10 +29,12 @@ export const getDeployer = () => {
 
 export const checkDeployer = async ({ zkWallet: { provider, address } }: Deployer) => {
   try {
-    const balance = await provider.getBalance(address);
-
     if (showPreamble) {
       console.log(`Using env "${env}" and hardhat network "${hre.network.name}"`);
+    }
+
+    const balance = await provider.getBalance(address);
+    if (showPreamble) {
       await logBalance(address, balance, "Deployer");
       console.log();
       showPreamble = false;
@@ -43,6 +45,7 @@ export const checkDeployer = async ({ zkWallet: { provider, address } }: Deploye
     }
   } catch (error) {
     if (`${error}`.includes("noNetwork") && getEnv() === "local") {
+      console.error(error);
       console.error("\nRun `yarn start` to start the local zkSync node.\n");
       process.exit(1);
     } else {

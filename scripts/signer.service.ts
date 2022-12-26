@@ -53,7 +53,7 @@ export class ArgentSigner extends Signer {
       chainId: transaction.chainId ?? (await this.getChainId()),
       gasPrice: transaction.gasPrice ?? (await this.provider.getGasPrice()),
       gasLimit: transaction.gasLimit ?? (await this.provider.estimateGas({ ...transaction, from })),
-      nonce: transaction.nonce ?? (await this.provider.getTransactionCount(from)),
+      nonce: transaction.nonce ?? (await this.provider.getTransactionCount(from, "pending")),
       customData: {
         ...transaction.customData,
         ergsPerPubdata: transaction.customData?.ergsPerPubdata ?? zksync.utils.DEFAULT_ERGS_PER_PUBDATA_LIMIT,
