@@ -88,8 +88,8 @@ describe("Paymasters", () => {
 
       promise = emptyEoa.sendTransaction({
         to: zksync.Wallet.createRandom().address,
-        value: 69,
-        data: "0x",
+        value: 0,
+        data: "0xdeadbeef",
         ...overrides,
       });
       await expect(promise).to.be.rejectedWith("Unsponsored transaction");
