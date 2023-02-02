@@ -83,3 +83,15 @@ export class CustomDeployer extends Deployer {
     return await this.zkWallet.provider.estimateGas(deployTx);
   }
 }
+
+export const verifyContract = async (
+  address: string,
+  { contractName, sourceName }: ZkSyncArtifact,
+  constructorArguments: unknown[] = [],
+) => {
+  if (getEnv() === "goerli") {
+    const fullyQualifiedName = `${sourceName}:${contractName}`;
+    console.log(`Verifying source code of ${fullyQualifiedName} on zkSync explorer`);
+    await hre.run("verify:verify", { address, contract: fullyQualifiedName, constructorArguments });
+  }
+};

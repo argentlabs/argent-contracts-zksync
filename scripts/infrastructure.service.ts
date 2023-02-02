@@ -3,20 +3,23 @@ import * as zksync from "zksync-web3";
 import { AccountFactory, TestDapp } from "../typechain-types";
 import { deployAccount } from "./account.service";
 import { getEnv, loadConfig } from "./config.service";
-import { checkDeployer, loadArtifacts } from "./deployer.service";
+import { checkDeployer, loadArtifacts, verifyContract } from "./deployer.service";
 import { ArgentInfrastructure } from "./model";
 
 export const deployInfrastructure = async (deployer: Deployer): Promise<ArgentInfrastructure> => {
   const config = await loadConfig();
   const artifacts = await loadArtifacts(deployer);
 
-  const implementation = await deployer.deploy(artifacts.implementation, [config.escapeSecurityPeriodInSeconds]);
+  const constructorArguments = [config.escapeSecurityPeriodInSeconds];
+  const implementation = await deployer.deploy(artifacts.implementation, constructorArguments);
   console.log(`Account implementation deployed to ${implementation.address}`);
+  await verifyContract(implementation.address, artifacts.implementation, constructorArguments);
 
   const { bytecode } = artifacts.proxy;
   const proxyBytecodeHash = zksync.utils.hashBytecode(bytecode);
   const factory = await deployer.deploy(artifacts.factory, [proxyBytecodeHash], undefined, [bytecode]);
   console.log(`Account factory deployed to ${factory.address}`);
+  await verifyContract(factory.address, artifacts.factory, [proxyBytecodeHash]);
 
   const argent = { deployer, artifacts, implementation, factory: factory as AccountFactory };
 

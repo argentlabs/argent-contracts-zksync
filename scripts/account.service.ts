@@ -2,6 +2,7 @@ import { BigNumber, BytesLike } from "ethers";
 import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount } from "../typechain-types";
+import { verifyContract } from "./deployer.service";
 import { AccountDeploymentParams, ArgentInfrastructure } from "./model";
 import { ArgentSigner, Signatory } from "./signer.service";
 
@@ -13,11 +14,13 @@ export const deployAccount = async ({
   funds = "0.0001",
   salt = ethers.utils.randomBytes(32),
 }: AccountDeploymentParams): Promise<ArgentAccount> => {
-  const { deployer, factory, implementation } = argent;
+  const { deployer, factory, implementation, artifacts } = argent;
 
   const response = await factory.deployProxyAccount(salt, implementation.address, ownerAddress, guardianAddress);
   const receipt = await response.wait();
   const [{ deployedAddress }] = zksync.utils.getDeployedContracts(receipt);
+  const initData = implementation.interface.encodeFunctionData("initialize", [ownerAddress, guardianAddress]);
+  await verifyContract(deployedAddress, artifacts.proxy, [implementation.address, initData]);
 
   const network = hre.config.networks.zkSyncTestnet;
   if (!("url" in network && network.url)) {
