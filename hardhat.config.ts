@@ -24,7 +24,7 @@ const zkSyncTestnet =
 
 module.exports = {
   zksolc: {
-    version: "1.2.2",
+    version: "1.2.3",
     compilerSource: "binary",
     settings: {},
   },
