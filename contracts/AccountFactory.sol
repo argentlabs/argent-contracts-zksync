@@ -3,7 +3,9 @@ pragma solidity 0.8.16;
 
 import {DEPLOYER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {L2ContractHelper} from "@matterlabs/zksync-contracts/l2/contracts/L2ContractHelper.sol";
-import {SystemContractsCaller} from "@matterlabs/zksync-contracts/l2/system-contracts/SystemContractsCaller.sol";
+import {IContractDeployer} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IContractDeployer.sol";
+import {SystemContractsCaller} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/SystemContractsCaller.sol";
+import {SystemContractHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/SystemContractHelper.sol";
 
 import {ArgentAccount} from "./ArgentAccount.sol";
 
@@ -21,9 +23,10 @@ contract AccountFactory {
         address _guardian
     ) external returns (address _newAddress) {
         bytes memory input = proxyContructorData(_implementation, _owner, _guardian);
+        IContractDeployer.AccountAbstractionVersion version = IContractDeployer.AccountAbstractionVersion.Version1;
         bytes memory deployData = abi.encodeCall(
             DEPLOYER_SYSTEM_CONTRACT.create2Account,
-            (_salt, proxyBytecodeHash, input)
+            (_salt, proxyBytecodeHash, input, version)
         );
         bytes memory returnData = SystemContractsCaller.systemCallWithPropagatedRevert(
             uint32(gasleft()),

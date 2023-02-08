@@ -6,10 +6,13 @@ import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 
-import {SystemContractsCaller, INonceHolder} from "@matterlabs/zksync-contracts/l2/system-contracts/SystemContractsCaller.sol";
 import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
-import {Transaction, TransactionHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/TransactionHelper.sol";
-import {IAccount} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccount.sol";
+import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccount.sol";
+import {INonceHolder} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/INonceHolder.sol";
+import {SystemContractsCaller} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/SystemContractsCaller.sol";
+import {SystemContractHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/SystemContractHelper.sol";
+import {Transaction, TransactionHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
+import {Utils} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/Utils.sol";
 
 contract ArgentAccount is IAccount, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
@@ -77,11 +80,34 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         _;
     }
 
-    receive() external payable {
-        // If the bootloader called the `receive` function, it likely means
-        // that something went wrong and the transaction should be aborted. The bootloader should
-        // only interact through the `validateTransaction`/`executeTransaction` methods.
+    /**
+     * @dev Simulate the behavior of the EOA if it is called via `delegatecall`.
+     * Thus, the default account on a delegate call behaves the same as EOA on Ethereum.
+     * If all functions will use this modifier AND the contract will implement an empty payable fallback()
+     * then the contract will be indistinguishable from the EOA when called.
+     */
+    modifier ignoreInDelegateCall() {
+        address codeAddress = SystemContractHelper.getCodeAddress();
+        if (codeAddress != address(this)) {
+            // If the function was delegate called, behave like an EOA.
+            assembly {
+                return(0, 0)
+            }
+        }
+
+        // Continue execution if not delegate called.
+        _;
+    }
+
+    fallback() external {
+        // fallback of default account shouldn't be called by bootloader under no circumstances
         assert(msg.sender != BOOTLOADER_FORMAL_ADDRESS);
+
+        // If the contract is called directly, behave like an EOA
+    }
+
+    receive() external payable {
+        // If the contract is called directly, behave like an EOA
     }
 
     constructor(uint32 _escapeSecurityPeriod) {
@@ -182,21 +208,44 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         bytes32, // _transactionHash
         bytes32 _suggestedSignedHash,
         Transaction calldata _transaction
-    ) external payable override onlyBootloader {
+    ) external payable override onlyBootloader ignoreInDelegateCall returns (bytes4 magic) {
         _validateTransaction(_suggestedSignedHash, _transaction);
     }
 
-    function _validateTransaction(bytes32 _suggestedSignedHash, Transaction calldata _transaction) internal {
+    function _validateTransaction(
+        bytes32 _suggestedSignedHash,
+        Transaction calldata _transaction
+    ) internal returns (bytes4 magic) {
         // no need to check if account is initialized because it's done during proxy deployment
 
-        bytes memory calldata_ = abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.reserved[0]));
-        SystemContractsCaller.systemCall(uint32(gasleft()), address(NONCE_HOLDER_SYSTEM_CONTRACT), 0, calldata_);
+        address nonceHolderAddress = address(NONCE_HOLDER_SYSTEM_CONTRACT);
+        bytes memory calldata_ = abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce));
+        SystemContractsCaller.systemCallWithPropagatedRevert(uint32(gasleft()), nonceHolderAddress, 0, calldata_);
 
         bytes32 txHash;
         if (_suggestedSignedHash == bytes32(0)) {
             txHash = _transaction.encodeHash();
         } else {
             txHash = _suggestedSignedHash;
+        }
+
+        if (_transaction.to == uint256(uint160(address(DEPLOYER_SYSTEM_CONTRACT)))) {
+            require(_transaction.data.length >= 4, "Invalid call to ContractDeployer");
+        }
+
+        // The fact there is are enough balance for the account
+        // should be checked explicitly to prevent user paying for fee for a
+        // transaction that wouldn't be included on Ethereum.
+        uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
+        require(totalRequiredBalance <= address(this).balance, "Not enough balance for fee + value");
+
+        bytes memory signature = _transaction.signature;
+        if (_transaction.signature.length == 0) {
+            // substituting the signature with some signature-like array to make sure that the
+            // validation step uses as much steps as the validation with the correct signature provided
+            signature = new bytes(130);
+            signature[64] = bytes1(uint8(27));
+            signature[129] = bytes1(uint8(27));
         }
 
         bytes4 selector = bytes4(_transaction.data);
@@ -210,6 +259,8 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         } else {
             validateSignatures(txHash, _transaction.signature);
         }
+
+        return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
     }
 
     function validateSignatures(bytes32 _hash, bytes calldata _signature) internal view {
@@ -242,24 +293,27 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         bytes32, // _transactionHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
-    ) external payable override onlyBootloader {
-        _execute(address(uint160(_transaction.to)), _transaction.reserved[1], _transaction.data);
+    ) external payable override onlyBootloader ignoreInDelegateCall {
+        _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
     }
 
-    function executeTransactionFromOutside(Transaction calldata _transaction) external payable override onlyBootloader {
+    function executeTransactionFromOutside(
+        Transaction calldata _transaction
+    ) external payable override onlyBootloader ignoreInDelegateCall {
         _validateTransaction(bytes32(0), _transaction); // The account recalculates the hash on its own
-        _execute(address(uint160(_transaction.to)), _transaction.reserved[1], _transaction.data);
+        _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
     }
 
     function _execute(address to, uint256 value, bytes memory data) internal {
+        uint128 value128 = Utils.safeCastToU128(value);
         if (to == address(DEPLOYER_SYSTEM_CONTRACT)) {
-            // We allow calling ContractDeployer with any calldata
-            SystemContractsCaller.systemCall(uint32(gasleft()), to, uint128(value), data);
+            uint32 gas = Utils.safeCastToU32(gasleft());
+            SystemContractsCaller.systemCallWithPropagatedRevert(gas, to, value128, data);
         } else {
             // using assembly saves us a returndatacopy of the entire return data
             bool success;
             assembly {
-                success := call(gas(), to, value, add(data, 0x20), mload(data), 0, 0)
+                success := call(gas(), to, value128, add(data, 0x20), mload(data), 0, 0)
             }
             require(success);
         }
@@ -269,14 +323,14 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         bytes32, // _transactionHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
-    ) external payable override onlyBootloader {
+    ) external payable override onlyBootloader ignoreInDelegateCall {
         bool success = _transaction.payToTheBootloader();
         require(success, "argent/failed-fee-payment");
     }
 
     // Here, the user should prepare for the transaction to be paid for by a paymaster
     // Here, the account should set the allowance for the smart contracts
-    function prePaymaster(
+    function prepareForPaymaster(
         bytes32, // _transactionHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction

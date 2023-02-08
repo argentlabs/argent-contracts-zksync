@@ -4,7 +4,7 @@ pragma solidity 0.8.16;
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
-import {Transaction, TransactionHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/TransactionHelper.sol";
+import {Transaction, TransactionHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
 
 import {SponsorPaymaster} from "./SponsorPaymaster.sol";
 
@@ -17,12 +17,12 @@ library MeaningfulTransaction {
             _transaction.txType,
             _transaction.from,
             _transaction.to,
-            _transaction.ergsLimit,
-            _transaction.ergsPerPubdataByteLimit,
-            _transaction.maxFeePerErg,
-            _transaction.maxPriorityFeePerErg,
-            _transaction.reserved[0], // nonce
-            _transaction.reserved[1], // value
+            _transaction.gasLimit,
+            _transaction.gasPerPubdataByteLimit,
+            _transaction.maxFeePerGas,
+            _transaction.maxPriorityFeePerGas,
+            _transaction.nonce,
+            _transaction.value,
             keccak256(_transaction.data),
             keccak256(abi.encodePacked(_transaction.factoryDeps))
         );

@@ -3,7 +3,7 @@ pragma solidity 0.8.16;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
-import {Transaction} from "@matterlabs/zksync-contracts/l2/system-contracts/TransactionHelper.sol";
+import {Transaction} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
 
 import {SponsorPaymaster} from "./SponsorPaymaster.sol";
 import {MeaningfulTransaction} from "./SignatureCheckPaymaster.sol";
