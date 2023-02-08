@@ -208,14 +208,14 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         bytes32, // _transactionHash
         bytes32 _suggestedSignedHash,
         Transaction calldata _transaction
-    ) external payable override onlyBootloader ignoreInDelegateCall returns (bytes4 magic) {
-        _validateTransaction(_suggestedSignedHash, _transaction);
+    ) external payable override onlyBootloader ignoreInDelegateCall returns (bytes4) {
+        return _validateTransaction(_suggestedSignedHash, _transaction);
     }
 
     function _validateTransaction(
         bytes32 _suggestedSignedHash,
         Transaction calldata _transaction
-    ) internal returns (bytes4 magic) {
+    ) internal returns (bytes4 _magic) {
         // no need to check if account is initialized because it's done during proxy deployment
 
         address nonceHolderAddress = address(NONCE_HOLDER_SYSTEM_CONTRACT);
@@ -250,43 +250,45 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
 
         bytes4 selector = bytes4(_transaction.data);
         bool toSelf = _transaction.to == uint256(uint160(address(this)));
+        bool isValid;
         if (toSelf && (selector == this.escapeOwner.selector || selector == this.triggerEscapeOwner.selector)) {
-            validateGuardianSignature(txHash, _transaction.signature);
+            isValid = isValidGuardianSignature(txHash, _transaction.signature);
         } else if (
             toSelf && (selector == this.escapeGuardian.selector || selector == this.triggerEscapeGuardian.selector)
         ) {
-            validateOwnerSignature(txHash, _transaction.signature);
+            isValid = isValidOwnerSignature(txHash, _transaction.signature);
         } else {
-            validateSignatures(txHash, _transaction.signature);
+            isValid = _isValidSignature(txHash, _transaction.signature);
         }
 
-        return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+        if (isValid) {
+            _magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+        }
     }
 
-    function validateSignatures(bytes32 _hash, bytes calldata _signature) internal view {
-        validateOwnerSignature(_hash, _signature[:65]);
-        validateGuardianSignature(_hash, _signature[65:]);
+    function _isValidSignature(bytes32 _hash, bytes calldata _signature) internal view returns (bool) {
+        return isValidOwnerSignature(_hash, _signature[:65]) && isValidGuardianSignature(_hash, _signature[65:]);
     }
 
-    function validateOwnerSignature(bytes32 _hash, bytes calldata _signature) internal view {
+    function isValidOwnerSignature(bytes32 _hash, bytes calldata _signature) internal view returns (bool) {
         require(_signature.length == 65, "argent/invalid-owner-signature-length");
         address recovered = ECDSA.recover(_hash, _signature);
-        require(recovered == owner, "argent/invalid-owner-signature");
+        return recovered == owner;
     }
 
-    function validateGuardianSignature(bytes32 _hash, bytes calldata _signature) internal view {
+    function isValidGuardianSignature(bytes32 _hash, bytes calldata _signature) internal view returns (bool) {
         if (guardian == NO_GUARDIAN) {
-            return;
+            return true;
         }
         require(_signature.length == 65, "argent/invalid-guardian-signature-length");
         address recovered = ECDSA.recover(_hash, _signature);
         if (recovered == guardian) {
-            return;
+            return true;
         }
         if (recovered == guardianBackup && guardianBackup != NO_GUARDIAN) {
-            return;
+            return true;
         }
-        revert("argent/invalid-guardian-signature");
+        return false;
     }
 
     function executeTransaction(
@@ -350,8 +352,9 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
 
     // IERC1271 implementation
 
-    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4) {
-        validateSignatures(_hash, _signature);
-        return IERC1271.isValidSignature.selector;
+    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4 _magic) {
+        if (_isValidSignature(_hash, _signature)) {
+            _magic = IERC1271.isValidSignature.selector;
+        }
     }
 }
