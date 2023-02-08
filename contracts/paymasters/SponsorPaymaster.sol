@@ -21,7 +21,7 @@ abstract contract SponsorPaymaster is IPaymaster, Ownable {
         bytes32 /*_transactionHash*/,
         bytes32 /*_suggestedSignedHash*/,
         Transaction calldata _transaction
-    ) external payable override onlyBootloader returns (bytes4 _magic, bytes memory _context) {
+    ) external payable override onlyBootloader returns (bytes4 _magic, bytes memory) {
         _magic = PAYMASTER_VALIDATION_SUCCESS_MAGIC;
         require(_transaction.paymasterInput.length >= 4, "The standard paymaster input must be at least 4 bytes long");
 
@@ -31,7 +31,7 @@ abstract contract SponsorPaymaster is IPaymaster, Ownable {
         }
 
         if (!isSponsoredTransaction(_transaction)) {
-            return (bytes4(0), _context);
+            _magic = bytes4(0);
         }
 
         // Note, that while the minimal amount of ETH needed is tx.gasPrice * tx.gasLimit,

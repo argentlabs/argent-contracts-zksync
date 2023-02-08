@@ -36,7 +36,7 @@ contract ArgentAccountPaymaster is IPaymaster, ArgentAccountDetector {
         }
 
         if (!_isArgentAccount(address(uint160(_transaction.from)))) {
-            return (bytes4(0), _context);
+            _magic = bytes4(0);
         }
 
         // Note, that while the minimal amount of ETH needed is tx.gasPrice * tx.gasLimit,
@@ -46,6 +46,7 @@ contract ArgentAccountPaymaster is IPaymaster, ArgentAccountDetector {
         // The bootloader never returns any data, so it can safely be ignored here.
         (bool success, ) = payable(BOOTLOADER_FORMAL_ADDRESS).call{value: requiredEth}("");
         require(success, "Failed to transfer funds to the bootloader");
+        return (_magic, _context);
     }
 
     function postTransaction(
