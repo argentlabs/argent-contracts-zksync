@@ -35,7 +35,7 @@ contract AccountFactory {
             deployData
         );
 
-        (_accountAddress, ) = abi.decode(returnData, (address, bytes));
+        (_accountAddress) = abi.decode(returnData, (address));
     }
 
     function computeCreate2Address(

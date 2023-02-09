@@ -222,11 +222,11 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         bytes memory calldata_ = abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce));
         SystemContractsCaller.systemCallWithPropagatedRevert(uint32(gasleft()), nonceHolderAddress, 0, calldata_);
 
-        bytes32 txHash;
+        bytes32 transactionHash;
         if (_suggestedSignedHash == bytes32(0)) {
-            txHash = _transaction.encodeHash();
+            transactionHash = _transaction.encodeHash();
         } else {
-            txHash = _suggestedSignedHash;
+            transactionHash = _suggestedSignedHash;
         }
 
         if (_transaction.to == uint256(uint160(address(DEPLOYER_SYSTEM_CONTRACT)))) {
@@ -239,26 +239,27 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
         require(totalRequiredBalance <= address(this).balance, "Not enough balance for fee + value");
 
-        bytes memory signature = _transaction.signature;
-        if (_transaction.signature.length == 0) {
+        bytes memory fullSignature = _transaction.signature;
+        if (fullSignature.length == 0) {
             // substituting the signature with some signature-like array to make sure that the
             // validation step uses as much steps as the validation with the correct signature provided
-            signature = new bytes(130);
-            signature[64] = bytes1(uint8(27));
-            signature[129] = bytes1(uint8(27));
+            fullSignature = new bytes(130);
+            fullSignature[64] = bytes1(uint8(27));
+            fullSignature[129] = bytes1(uint8(27));
         }
+        (bytes memory ownerSignature, bytes memory guardianSignature) = splitMemorySignatures(fullSignature);
 
         bytes4 selector = bytes4(_transaction.data);
         bool toSelf = _transaction.to == uint256(uint160(address(this)));
         bool isValid;
-        if (toSelf && (selector == this.escapeOwner.selector || selector == this.triggerEscapeOwner.selector)) {
-            isValid = isValidGuardianSignature(txHash, _transaction.signature);
-        } else if (
-            toSelf && (selector == this.escapeGuardian.selector || selector == this.triggerEscapeGuardian.selector)
-        ) {
-            isValid = isValidOwnerSignature(txHash, _transaction.signature);
+        if (toSelf && (selector == this.escapeGuardian.selector || selector == this.triggerEscapeGuardian.selector)) {
+            isValid = isValidOwnerSignature(transactionHash, ownerSignature);
+        } else if (toSelf && (selector == this.escapeOwner.selector || selector == this.triggerEscapeOwner.selector)) {
+            isValid = isValidGuardianSignature(transactionHash, guardianSignature);
         } else {
-            isValid = _isValidSignature(txHash, _transaction.signature);
+            isValid =
+                isValidOwnerSignature(transactionHash, ownerSignature) &&
+                isValidGuardianSignature(transactionHash, guardianSignature);
         }
 
         if (isValid) {
@@ -266,22 +267,18 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         }
     }
 
-    function _isValidSignature(bytes32 _hash, bytes calldata _signature) internal view returns (bool) {
-        return isValidOwnerSignature(_hash, _signature[:65]) && isValidGuardianSignature(_hash, _signature[65:]);
-    }
-
-    function isValidOwnerSignature(bytes32 _hash, bytes calldata _signature) internal view returns (bool) {
-        require(_signature.length == 65, "argent/invalid-owner-signature-length");
-        address recovered = ECDSA.recover(_hash, _signature);
+    function isValidOwnerSignature(bytes32 _hash, bytes memory _ownerSignature) internal view returns (bool) {
+        require(_ownerSignature.length == 65, "argent/invalid-owner-signature-length");
+        address recovered = ECDSA.recover(_hash, _ownerSignature);
         return recovered == owner;
     }
 
-    function isValidGuardianSignature(bytes32 _hash, bytes calldata _signature) internal view returns (bool) {
+    function isValidGuardianSignature(bytes32 _hash, bytes memory _guardianSignature) internal view returns (bool) {
         if (guardian == NO_GUARDIAN) {
             return true;
         }
-        require(_signature.length == 65, "argent/invalid-guardian-signature-length");
-        address recovered = ECDSA.recover(_hash, _signature);
+        require(_guardianSignature.length == 65, "argent/invalid-guardian-signature-length");
+        address recovered = ECDSA.recover(_hash, _guardianSignature);
         if (recovered == guardian) {
             return true;
         }
@@ -289,6 +286,43 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
             return true;
         }
         return false;
+    }
+
+    function splitMemorySignatures(
+        bytes memory _fullSignature
+    ) internal pure returns (bytes memory _ownerSignature, bytes memory _guardianSignature) {
+        require(_fullSignature.length >= 65, "argent/invalid-signature-length");
+        _ownerSignature = new bytes(65);
+
+        // Copying the first signature. Note, that we need an offset of 0x20
+        // since it is where the length of the `_fullSignature` is stored
+        assembly {
+            let r := mload(add(_fullSignature, 0x20))
+            let s := mload(add(_fullSignature, 0x40))
+            let v := and(mload(add(_fullSignature, 0x41)), 0xff)
+
+            mstore(add(_ownerSignature, 0x20), r)
+            mstore(add(_ownerSignature, 0x40), s)
+            mstore8(add(_ownerSignature, 0x60), v)
+        }
+
+        if (_fullSignature.length == 65) {
+            return (_ownerSignature, _guardianSignature);
+        }
+
+        require(_fullSignature.length == 130, "argent/invalid-signature-length");
+        _guardianSignature = new bytes(65);
+
+        // Copying the second signature.
+        assembly {
+            let r := mload(add(_fullSignature, 0x61))
+            let s := mload(add(_fullSignature, 0x81))
+            let v := and(mload(add(_fullSignature, 0x82)), 0xff)
+
+            mstore(add(_guardianSignature, 0x20), r)
+            mstore(add(_guardianSignature, 0x40), s)
+            mstore8(add(_guardianSignature, 0x60), v)
+        }
     }
 
     function executeTransaction(
@@ -353,7 +387,8 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     // IERC1271 implementation
 
     function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4 _magic) {
-        if (_isValidSignature(_hash, _signature)) {
+        (bytes memory ownerSignature, bytes memory guardianSignature) = splitMemorySignatures(_signature);
+        if (isValidOwnerSignature(_hash, ownerSignature) && isValidGuardianSignature(_hash, guardianSignature)) {
             _magic = IERC1271.isValidSignature.selector;
         }
     }

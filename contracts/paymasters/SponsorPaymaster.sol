@@ -21,7 +21,7 @@ abstract contract SponsorPaymaster is IPaymaster, Ownable {
         bytes32 /*_transactionHash*/,
         bytes32 /*_suggestedSignedHash*/,
         Transaction calldata _transaction
-    ) external payable override onlyBootloader returns (bytes4 _magic, bytes memory) {
+    ) external payable override onlyBootloader returns (bytes4 _magic, bytes memory _context) {
         _magic = PAYMASTER_VALIDATION_SUCCESS_MAGIC;
         require(_transaction.paymasterInput.length >= 4, "The standard paymaster input must be at least 4 bytes long");
 
@@ -41,6 +41,7 @@ abstract contract SponsorPaymaster is IPaymaster, Ownable {
         // The bootloader never returns any data, so it can safely be ignored here.
         (bool success, ) = payable(BOOTLOADER_FORMAL_ADDRESS).call{value: requiredEth}("");
         require(success, "Failed to transfer funds to the bootloader");
+        return (_magic, _context);
     }
 
     function postTransaction(
