@@ -21,7 +21,7 @@ contract AccountFactory {
         address _implementation,
         address _owner,
         address _guardian
-    ) external returns (address _newAddress) {
+    ) external returns (address _accountAddress) {
         bytes memory input = proxyContructorData(_implementation, _owner, _guardian);
         IContractDeployer.AccountAbstractionVersion version = IContractDeployer.AccountAbstractionVersion.Version1;
         bytes memory deployData = abi.encodeCall(
@@ -35,7 +35,7 @@ contract AccountFactory {
             deployData
         );
 
-        (_newAddress, ) = abi.decode(returnData, (address, bytes));
+        (_accountAddress, ) = abi.decode(returnData, (address, bytes));
     }
 
     function computeCreate2Address(
