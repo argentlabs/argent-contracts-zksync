@@ -52,12 +52,12 @@ describe("Recovery", () => {
 
     it("Should revert with the wrong owner signature", async () => {
       const promise = connect(account, [wrongOwner, guardian]).changeOwner(newOwner.address);
-      await expect(promise).to.be.rejectedWith("argent/invalid-owner-signature");
+      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
     });
 
     it("Should revert with the wrong guardian signature", async () => {
       const promise = connect(account, [owner, wrongGuardian]).changeOwner(newOwner.address);
-      await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
+      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
     });
 
     it("Should work with the correct signatures", async () => {
@@ -82,12 +82,12 @@ describe("Recovery", () => {
 
     it("Should revert with the wrong owner signature", async () => {
       const promise = connect(account, [wrongOwner, guardian]).changeGuardian(newGuardian.address);
-      await expect(promise).to.be.rejectedWith("argent/invalid-owner-signature");
+      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
     });
 
     it("Should revert with the wrong guardian signature", async () => {
       const promise = connect(account, [owner, wrongGuardian]).changeGuardian(newGuardian.address);
-      await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
+      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
     });
 
     it("Should work with the correct signatures", async () => {
@@ -112,12 +112,12 @@ describe("Recovery", () => {
 
     it("Should revert with the wrong owner signature", async () => {
       const promise = connect(account, [wrongOwner, guardian]).changeGuardianBackup(newGuardianBackup.address);
-      await expect(promise).to.be.rejectedWith("argent/invalid-owner-signature");
+      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
     });
 
     it("Should revert with the wrong guardian signature", async () => {
       const promise = connect(account, [owner, wrongGuardian]).changeGuardianBackup(newGuardianBackup.address);
-      await expect(promise).to.be.rejectedWith("argent/invalid-guardian-signature");
+      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
     });
 
     it("Should work with the correct signatures", async () => {
@@ -202,7 +202,7 @@ describe("Recovery", () => {
         ownerAddress,
         guardianAddress,
         connect: [owner],
-        funds: "0.00015",
+        funds: "0.0004",
       });
 
       // trigger escape
@@ -238,7 +238,7 @@ describe("Recovery", () => {
         ownerAddress,
         guardianAddress,
         connect: [guardian],
-        funds: "0.00015",
+        funds: "0.0005",
       });
 
       // trigger escape
@@ -328,7 +328,7 @@ describe("Recovery", () => {
 
     // should fail to cancel with just the owner signature
     const rejectingPromise = connect(account, [owner]).cancelEscape();
-    await expect(rejectingPromise).to.be.rejectedWith("argent/invalid-guardian-signature");
+    await expect(rejectingPromise).to.be.rejectedWith("Account validation returned invalid magic value");
 
     const resolvingPromise = connect(account, [owner, guardian]).cancelEscape();
     await expect(resolvingPromise).to.emit(account, "EscapeCancelled");

@@ -6,7 +6,7 @@ import * as zksync from "zksync-web3";
 import { ArgentAccount } from "../typechain-types";
 
 type TransactionRequest = zksync.types.TransactionRequest;
-export type Signatory = (Signer & TypedDataSigner) | 0 | "zeros" | "random";
+export type Signatory = (Signer & TypedDataSigner) | "zeros" | "random";
 
 export class ArgentSigner extends Signer {
   public address: string;
@@ -78,7 +78,7 @@ export class ArgentSigner extends Signer {
 
   private async concatSignatures(sign: (signer: Signer & TypedDataSigner) => Promise<BytesLike>): Promise<string> {
     const promises = this.signatories.map(async (signatory) => {
-      if (signatory === 0 || signatory === "zeros") {
+      if (signatory === "zeros") {
         return new Uint8Array(65);
       }
       if (signatory === "random") {
