@@ -245,10 +245,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         } else if (toSelf && isOwnerEscapeCall(selector)) {
             isValid = isValidGuardianSignature(transactionHash, signature);
         } else {
-            (bytes memory ownerSignature, bytes memory guardianSignature) = Signatures.splitSignatures(signature);
-            isValid =
-                isValidOwnerSignature(transactionHash, ownerSignature) &&
-                isValidGuardianSignature(transactionHash, guardianSignature);
+            isValid = _isValidSignature(transactionHash, signature);
         }
 
         if (!isValid) {
@@ -262,7 +259,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     function isValidGuardianSignature(bytes32 _hash, bytes memory _guardianSignature) internal view returns (bool) {
-        if (guardian == NO_GUARDIAN) {
+        if (guardian == NO_GUARDIAN && _guardianSignature.length == 0) {
             return true;
         }
         address recovered = Signatures.recoverSigner(_hash, _guardianSignature);
@@ -338,11 +335,17 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     // IERC1271 implementation
 
     function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4 _magic) {
-        (bytes memory ownerSignature, bytes memory guardianSignature) = Signatures.splitSignatures(_signature);
-        if (isValidOwnerSignature(_hash, ownerSignature) && isValidGuardianSignature(_hash, guardianSignature)) {
+        if (_isValidSignature(_hash, _signature)) {
             _magic = IERC1271.isValidSignature.selector;
         }
     }
+
+    function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {
+        (bytes memory ownerSignature, bytes memory guardianSignature) = Signatures.splitSignatures(_signature);
+        return isValidOwnerSignature(_hash, ownerSignature) && isValidGuardianSignature(_hash, guardianSignature);
+    }
+
+    // fallback & receive
 
     fallback() external {
         // fallback of default account shouldn't be called by bootloader under no circumstances
