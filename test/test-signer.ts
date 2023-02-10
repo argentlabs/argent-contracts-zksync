@@ -7,7 +7,7 @@ import { deployAccount } from "../scripts/account.service";
 import { checkDeployer, getDeployer } from "../scripts/deployer.service";
 import { getTestInfrastructure } from "../scripts/infrastructure.service";
 import { ArgentInfrastructure } from "../scripts/model";
-import { ArgentSigner } from "../scripts/signer.service";
+import { ArgentSigner, Signatory } from "../scripts/signer.service";
 import { ArgentAccount } from "../typechain-types";
 
 const { AddressZero } = ethers.constants;
@@ -23,7 +23,6 @@ const { deployer } = getDeployer();
 const eip1271MagicValue = zksync.utils.EIP1271_MAGIC_VALUE;
 
 describe("Argent signer", () => {
-  let signature;
   let argent: ArgentInfrastructure;
   let account: ArgentAccount;
 
@@ -36,44 +35,37 @@ describe("Argent signer", () => {
     const message = ethers.utils.randomBytes(100);
     const hash = ethers.utils.hashMessage(message);
 
+    const signAndCheck = async (signatories: Signatory[]) => {
+      const signer = new ArgentSigner(account, signatories);
+      const signature = await signer.signMessage(message);
+      return account.isValidSignature(hash, signature);
+    };
+
     describe("Without guardian", () => {
       before(async () => {
         account = await deployAccount({ argent, ownerAddress, guardianAddress: AddressZero, funds: false });
       });
 
       it("Should verify on the account", async () => {
-        signature = await new ArgentSigner(account, [owner]).signMessage(message);
-        await expect(account.isValidSignature(hash, signature)).to.eventually.equal(eip1271MagicValue);
+        await expect(signAndCheck([owner])).to.eventually.equal(eip1271MagicValue);
+      });
+
+      it("Should fail to verify invalid signatures", async () => {
+        await expect(signAndCheck(["random"])).to.eventually.equal(0n);
+        await expect(signAndCheck(["zeros"])).to.eventually.equal(0n);
       });
 
       it("Should fail to verify with wrong signature length", async () => {
-        signature = await new ArgentSigner(account, [owner, "zeros"]).signMessage(message);
-        await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
-
-        signature = await new ArgentSigner(account, [owner, "random"]).signMessage(message);
-        await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
-
-        signature = await new ArgentSigner(account, [owner, owner, owner]).signMessage(message);
-        await expect(account.isValidSignature(hash, signature)).to.be.reverted;
-
-        signature = await new ArgentSigner(account, ["zeros", "zeros", "zeros"]).signMessage(message);
-        await expect(account.isValidSignature(hash, signature)).to.be.reverted;
-
-        signature = await new ArgentSigner(account, ["random", "random", "random"]).signMessage(message);
-        await expect(account.isValidSignature(hash, signature)).to.be.reverted;
-
+        await expect(signAndCheck([owner, "zeros"])).to.eventually.equal(0n);
+        await expect(signAndCheck([owner, "random"])).to.eventually.equal(0n);
+        await expect(signAndCheck([owner, owner, owner])).to.be.reverted;
+        await expect(signAndCheck([owner, owner, owner])).to.be.reverted;
+        await expect(signAndCheck(["zeros", "zeros", "zeros"])).to.be.reverted;
+        await expect(signAndCheck(["random", "random", "random"])).to.be.reverted;
         await expect(account.isValidSignature(hash, new Uint8Array())).to.be.reverted;
         await expect(account.isValidSignature(hash, new Uint8Array(1))).to.be.reverted;
         await expect(account.isValidSignature(hash, new Uint8Array(64))).to.be.reverted;
         await expect(account.isValidSignature(hash, new Uint8Array(66))).to.be.reverted;
-      });
-
-      it("Should fail to verify with invalid signatures", async () => {
-        signature = await new ArgentSigner(account, ["random"]).signMessage(message);
-        await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
-
-        signature = await new ArgentSigner(account, ["zeros"]).signMessage(message);
-        await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
       });
     });
 
@@ -83,33 +75,21 @@ describe("Argent signer", () => {
       });
 
       it("Should verify on the account", async () => {
-        signature = await new ArgentSigner(account, [owner, guardian]).signMessage(message);
-        await expect(account.isValidSignature(hash, signature)).to.eventually.equal(eip1271MagicValue);
+        await expect(signAndCheck([owner, guardian])).to.eventually.equal(eip1271MagicValue);
       });
 
       it("Should fail to verify with wrong signature length", async () => {
-        signature = await new ArgentSigner(account, [owner]).signMessage(message);
-        await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
-
-        signature = await new ArgentSigner(account, ["random"]).signMessage(message);
-        await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
-
-        signature = await new ArgentSigner(account, ["zeros"]).signMessage(message);
-        await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
+        await expect(signAndCheck([owner])).to.eventually.equal(0n);
+        await expect(signAndCheck([guardian])).to.eventually.equal(0n);
+        await expect(signAndCheck(["random"])).to.eventually.equal(0n);
+        await expect(signAndCheck(["zeros"])).to.eventually.equal(0n);
       });
 
       it("Should fail to verify with invalid signatures", async () => {
-        signature = await new ArgentSigner(account, [owner, owner]).signMessage(message);
-        await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
-
-        signature = await new ArgentSigner(account, [guardian, guardian]).signMessage(message);
-        await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
-
-        signature = await new ArgentSigner(account, ["random", "random"]).signMessage(message);
-        await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
-
-        signature = await new ArgentSigner(account, ["zeros", "zeros"]).signMessage(message);
-        await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
+        await expect(signAndCheck([owner, owner])).to.eventually.equal(0n);
+        await expect(signAndCheck([guardian, guardian])).to.eventually.equal(0n);
+        await expect(signAndCheck(["random", "random"])).to.eventually.equal(0n);
+        await expect(signAndCheck(["zeros", "zeros"])).to.eventually.equal(0n);
       });
     });
   });
@@ -142,13 +122,18 @@ describe("Argent signer", () => {
 
     const hash = ethers.utils._TypedDataEncoder.hash(domain, types, value);
 
+    const signAndCheck = async (signatories: Signatory[]) => {
+      const signer = new ArgentSigner(account, signatories);
+      const signature = await signer._signTypedData(domain, types, value);
+      return account.isValidSignature(hash, signature);
+    };
+
     before(async () => {
       account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: false });
     });
 
     it("Should verify on the account", async () => {
-      const signature = await new ArgentSigner(account, [owner, guardian])._signTypedData(domain, types, value);
-      await expect(account.isValidSignature(hash, signature)).to.eventually.equal(eip1271MagicValue);
+      await expect(signAndCheck([owner, guardian])).to.eventually.equal(eip1271MagicValue);
     });
 
     it("Should verify with a single signature when not using a guardian", async () => {
@@ -158,26 +143,16 @@ describe("Argent signer", () => {
     });
 
     it("Should fail to verify using incorrect owners", async () => {
-      signature = await new ArgentSigner(account, [owner, wrongGuardian])._signTypedData(domain, types, value);
-      await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
-
-      signature = await new ArgentSigner(account, [owner, owner])._signTypedData(domain, types, value);
-      await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
-
-      signature = await new ArgentSigner(account, [guardian, guardian])._signTypedData(domain, types, value);
-      await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
-
-      signature = await new ArgentSigner(account, ["random", "random"])._signTypedData(domain, types, value);
-      await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
+      await expect(signAndCheck([owner, wrongGuardian])).to.eventually.equal(0n);
+      await expect(signAndCheck([owner, owner])).to.eventually.equal(0n);
+      await expect(signAndCheck([guardian, guardian])).to.eventually.equal(0n);
+      await expect(signAndCheck(["random", "random"])).to.eventually.equal(0n);
     });
 
     it("Should fail to verify using zeros in any position", async () => {
-      signature = await new ArgentSigner(account, ["zeros", guardian])._signTypedData(domain, types, value);
-      await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
-
-      signature = await new ArgentSigner(account, [owner, "zeros"])._signTypedData(domain, types, value);
-      await expect(account.isValidSignature(hash, signature)).to.eventually.equal(0n);
-
+      await expect(signAndCheck(["zeros", guardian])).to.eventually.equal(0n);
+      await expect(signAndCheck([owner, "zeros"])).to.eventually.equal(0n);
+      await expect(account.isValidSignature(hash, new Uint8Array(65))).to.eventually.equal(0n);
       await expect(account.isValidSignature(hash, new Uint8Array(130))).to.eventually.equal(0n);
     });
   });
