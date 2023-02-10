@@ -74,9 +74,9 @@ describe("Paymasters", () => {
     });
 
     it("Should have no balance on the accounts and some balance on the paymaster", async () => {
-      expect(await provider.getBalance(emptyAccount.address)).to.equal(0n);
-      expect(await provider.getBalance(emptyEoa.address)).to.equal(0n);
-      expect(await provider.getBalance(paymaster.address)).to.equal(paymasterBudget);
+      await expect(provider.getBalance(emptyAccount.address)).to.eventually.equal(0n);
+      await expect(provider.getBalance(emptyEoa.address)).to.eventually.equal(0n);
+      await expect(provider.getBalance(paymaster.address)).to.eventually.equal(paymasterBudget);
     });
 
     it("Should refuse to pay for dapps not on the whitelist", async () => {
@@ -96,35 +96,35 @@ describe("Paymasters", () => {
     });
 
     it("Should pay for a whitelisted dapp", async () => {
-      expect(await allowedDapp.userNumbers(emptyAccount.address)).to.equal(0n);
-      expect(await provider.getTransactionCount(emptyAccount.address)).to.equal(0n);
+      await expect(allowedDapp.userNumbers(emptyAccount.address)).to.eventually.equal(0n);
+      await expect(provider.getTransactionCount(emptyAccount.address)).to.eventually.equal(0n);
 
       const response = await allowedDapp.connect(emptyAccount.signer).setNumber(42, overrides);
       await response.wait();
 
-      expect(await allowedDapp.userNumbers(emptyAccount.address)).to.equal(42n);
-      expect(await provider.getTransactionCount(emptyAccount.address)).to.equal(1n);
+      await expect(allowedDapp.userNumbers(emptyAccount.address)).to.eventually.equal(42n);
+      await expect(provider.getTransactionCount(emptyAccount.address)).to.eventually.equal(1n);
     });
 
     it("Should have lower balance on the paymaster and still no balance on the accounts", async () => {
-      expect(await provider.getBalance(emptyAccount.address)).to.equal(0n);
+      await expect(provider.getBalance(emptyAccount.address)).to.eventually.equal(0n);
 
       const fee = overrides.maxFeePerGas.mul(overrides.gasLimit.toString());
-      expect(await provider.getBalance(paymaster.address)).to.equal(paymasterBudget.sub(fee));
+      await expect(provider.getBalance(paymaster.address)).to.eventually.equal(paymasterBudget.sub(fee));
     });
 
     it("Should update the whitelist", async () => {
       const randomDapp = await deployer.deploy(argent.artifacts.testDapp);
       await randomDapp.deployed();
 
-      expect(await paymaster.whitelist(allowedDapp.address)).to.be.true;
-      expect(await paymaster.whitelist(randomDapp.address)).to.be.false;
+      await expect(paymaster.whitelist(allowedDapp.address)).to.eventually.be.true;
+      await expect(paymaster.whitelist(randomDapp.address)).to.eventually.be.false;
 
       // add to whitelist
 
       let response = await paymaster.whitelistDapp(randomDapp.address);
       await response.wait();
-      expect(await paymaster.whitelist(randomDapp.address)).to.be.true;
+      await expect(paymaster.whitelist(randomDapp.address)).to.eventually.be.true;
 
       response = await randomDapp.connect(emptyAccount.signer).setNumber(42, overrides);
       await response.wait();
@@ -136,7 +136,7 @@ describe("Paymasters", () => {
 
       response = await paymaster.unwhitelistDapp(allowedDapp.address);
       await response.wait();
-      expect(await paymaster.whitelist(allowedDapp.address)).to.be.false;
+      await expect(paymaster.whitelist(allowedDapp.address)).to.eventually.be.false;
 
       promise = allowedDapp.connect(emptyAccount.signer).setNumber(42, overrides);
       await expect(promise).to.be.rejectedWith("Unsponsored transaction");
@@ -161,8 +161,8 @@ describe("Paymasters", () => {
     });
 
     it("Should pay or refuse to pay for given users", async () => {
-      expect(await provider.getBalance(emptyAccount.address)).to.equal(0n);
-      expect(await testDapp.userNumbers(emptyAccount.address)).to.equal(0n);
+      await expect(provider.getBalance(emptyAccount.address)).to.eventually.equal(0n);
+      await expect(testDapp.userNumbers(emptyAccount.address)).to.eventually.equal(0n);
 
       let promise = testDapp.setNumber(42, overrides);
       await expect(promise).to.be.rejectedWith("Unsponsored transaction");
@@ -173,7 +173,7 @@ describe("Paymasters", () => {
       response = await testDapp.setNumber(42, overrides);
       await response.wait();
 
-      expect(await testDapp.userNumbers(emptyAccount.address)).to.equal(42n);
+      await expect(testDapp.userNumbers(emptyAccount.address)).to.eventually.equal(42n);
 
       response = await paymaster.unwhitelistUser(emptyAccount.address);
       await response.wait();
@@ -200,7 +200,7 @@ describe("Paymasters", () => {
       paymaster = await customDeployer.deploy(artifact);
       const response = await deployer.zkWallet.sendTransaction({ to: paymaster.address, value: paymasterBudget });
       await response.wait();
-      expect(await paymaster.owner()).to.equal(paymasterOwner.address);
+      await expect(paymaster.owner()).to.eventually.equal(paymasterOwner.address);
 
       testDapp = await deployTestDapp(deployer);
       testDapp = testDapp.connect(emptyAccount.signer);
@@ -255,7 +255,7 @@ describe("Paymasters", () => {
       const response = await provider.sendTransaction(signedTransaction);
       await response.wait();
 
-      expect(await testDapp.userNumbers(emptyAccount.address)).to.equal(42n);
+      await expect(testDapp.userNumbers(emptyAccount.address)).to.eventually.equal(42n);
     });
   });
 
@@ -270,7 +270,7 @@ describe("Paymasters", () => {
 
       let response = await paymaster.transferOwnership(paymasterOwner.address);
       await response.wait();
-      expect(await paymaster.owner()).to.equal(paymasterOwner.address);
+      await expect(paymaster.owner()).to.eventually.equal(paymasterOwner.address);
 
       response = await deployer.zkWallet.sendTransaction({ to: paymaster.address, value: paymasterBudget });
       await response.wait();
@@ -310,7 +310,7 @@ describe("Paymasters", () => {
       const response = await provider.sendTransaction(signedTransaction);
       await response.wait();
 
-      expect(await testDapp.userNumbers(emptyEoa.address)).to.equal(42n);
+      await expect(testDapp.userNumbers(emptyEoa.address)).to.eventually.equal(42n);
     });
   });
 
@@ -331,9 +331,9 @@ describe("Paymasters", () => {
     });
 
     it("Should have no balance on the accounts and some balance on the paymaster", async () => {
-      expect(await provider.getBalance(emptyAccount.address)).to.equal(0n);
-      expect(await provider.getBalance(emptyEoa.address)).to.equal(0n);
-      expect(await provider.getBalance(paymaster.address)).to.equal(paymasterBudget);
+      await expect(provider.getBalance(emptyAccount.address)).to.eventually.equal(0n);
+      await expect(provider.getBalance(emptyEoa.address)).to.eventually.equal(0n);
+      await expect(provider.getBalance(paymaster.address)).to.eventually.equal(paymasterBudget);
     });
 
     it("Should refuse to pay for an EOA", async () => {
@@ -343,20 +343,20 @@ describe("Paymasters", () => {
     });
 
     it("Should pay for an ArgentAccount", async () => {
-      expect(await testDapp.userNumbers(emptyAccount.address)).to.equal(0n);
+      await expect(testDapp.userNumbers(emptyAccount.address)).to.eventually.equal(0n);
 
       const testDappFromArgent = testDapp.connect(emptyAccount.signer);
       const response = await testDappFromArgent.setNumber(42, overrides);
       await response.wait();
 
-      expect(await testDapp.userNumbers(emptyAccount.address)).to.equal(42n);
+      await expect(testDapp.userNumbers(emptyAccount.address)).to.eventually.equal(42n);
     });
 
     it("Should have lower balance on the paymaster and still no balance on the accounts", async () => {
-      expect(await provider.getBalance(emptyAccount.address)).to.equal(0n);
+      await expect(provider.getBalance(emptyAccount.address)).to.eventually.equal(0n);
 
       const fee = overrides.maxFeePerGas.mul(overrides.gasLimit.toString());
-      expect(await provider.getBalance(paymaster.address)).to.equal(paymasterBudget.sub(fee));
+      await expect(provider.getBalance(paymaster.address)).to.eventually.equal(paymasterBudget.sub(fee));
     });
   });
 });

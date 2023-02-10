@@ -251,12 +251,12 @@ describe("Argent account", () => {
       });
 
       it("Should add a guardian", async () => {
-        expect(await account.guardian()).to.equal(AddressZero);
+        await expect(account.guardian()).to.eventually.equal(AddressZero);
 
         const promise = account.changeGuardian(guardian.address);
 
         await expect(promise).to.emit(account, "GuardianChanged").withArgs(guardian.address);
-        expect(await account.guardian()).to.equal(guardian.address);
+        await expect(account.guardian()).to.eventually.equal(guardian.address);
       });
     });
   });
@@ -298,7 +298,7 @@ describe("Argent account", () => {
     });
 
     it("Should successfully execute multiple calls", async () => {
-      expect(await testDapp.userNumbers(account.address)).to.equal(0n);
+      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
 
       const response = await account.multicall([
         makeCall(await testDapp.populateTransaction.setNumber(59)),
@@ -306,7 +306,7 @@ describe("Argent account", () => {
       ]);
       await response.wait();
 
-      expect(await testDapp.userNumbers(account.address)).to.equal(69n);
+      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(69n);
     });
   });
 

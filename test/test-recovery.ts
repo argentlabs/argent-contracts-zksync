@@ -61,12 +61,12 @@ describe("Recovery", () => {
     });
 
     it("Should work with the correct signatures", async () => {
-      expect(await account.owner()).to.equal(owner.address);
+      await expect(account.owner()).to.eventually.equal(owner.address);
 
       const promise = account.changeOwner(newOwner.address);
 
       await expect(promise).to.emit(account, "OwnerChanged").withArgs(newOwner.address);
-      expect(await account.owner()).to.equal(newOwner.address);
+      await expect(account.owner()).to.eventually.equal(newOwner.address);
     });
   });
 
@@ -91,12 +91,12 @@ describe("Recovery", () => {
     });
 
     it("Should work with the correct signatures", async () => {
-      expect(await account.guardian()).to.equal(guardian.address);
+      await expect(account.guardian()).to.eventually.equal(guardian.address);
 
       const promise = account.changeGuardian(newGuardian.address);
 
       await expect(promise).to.emit(account, "GuardianChanged").withArgs(newGuardian.address);
-      expect(await account.guardian()).to.equal(newGuardian.address);
+      await expect(account.guardian()).to.eventually.equal(newGuardian.address);
     });
   });
 
@@ -121,12 +121,12 @@ describe("Recovery", () => {
     });
 
     it("Should work with the correct signatures", async () => {
-      expect(await account.guardianBackup()).to.equal(AddressZero);
+      await expect(account.guardianBackup()).to.eventually.equal(AddressZero);
 
       const promise = account.changeGuardianBackup(newGuardianBackup.address);
 
       await expect(promise).to.emit(account, "GuardianBackupChanged").withArgs(newGuardianBackup.address);
-      expect(await account.guardianBackup()).to.equal(newGuardianBackup.address);
+      await expect(account.guardianBackup()).to.eventually.equal(newGuardianBackup.address);
     });
 
     it("Should fail when no guardian", async () => {
@@ -218,13 +218,13 @@ describe("Recovery", () => {
       // wait security period
       await waitForTimestamp(escape.activeAt, provider);
 
-      expect(await account.guardian()).to.equal(guardian.address);
+      await expect(account.guardian()).to.eventually.equal(guardian.address);
 
       // should escape after the security period
       const promise = account.escapeGuardian(newGuardian.address);
       await expect(promise).to.emit(account, "GuardianEscaped").withArgs(newGuardian.address);
 
-      expect(await account.guardian()).to.equal(newGuardian.address);
+      await expect(account.guardian()).to.eventually.equal(newGuardian.address);
 
       // escape should be cleared
       const postEscape = await account.escape();
@@ -254,13 +254,13 @@ describe("Recovery", () => {
       // wait security period
       await waitForTimestamp(escape.activeAt, provider);
 
-      expect(await account.owner()).to.equal(owner.address);
+      await expect(account.owner()).to.eventually.equal(owner.address);
 
       // should escape after the security period
       const promise = account.escapeOwner(newOwner.address);
       await expect(promise).to.emit(account, "OwnerEscaped").withArgs(newOwner.address);
 
-      expect(await account.owner()).to.equal(newOwner.address);
+      await expect(account.owner()).to.eventually.equal(newOwner.address);
 
       // escape should be cleared
       const postEscape = await account.escape();
