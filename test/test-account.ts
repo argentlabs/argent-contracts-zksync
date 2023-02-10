@@ -55,9 +55,9 @@ describe("Argent account", () => {
     });
 
     it("Should be initialized properly", async () => {
-      expect(await account.VERSION()).to.equal("0.0.1");
-      expect(await account.owner()).to.equal(owner.address);
-      expect(await account.guardian()).to.equal(guardian.address);
+      await expect(account.VERSION()).to.eventually.equal("0.0.1");
+      await expect(account.owner()).to.eventually.equal(owner.address);
+      await expect(account.guardian()).to.eventually.equal(guardian.address);
     });
 
     it("Should refuse to be initialized twice", async () => {
@@ -92,12 +92,12 @@ describe("Argent account", () => {
     });
 
     it("Should upgrade the account", async () => {
-      expect(await account.implementation()).to.equal(argent.implementation.address);
+      await expect(account.implementation()).to.eventually.equal(argent.implementation.address);
 
       const promise = connect(account, [owner, guardian]).upgrade(newImplementation.address);
 
       await expect(promise).to.emit(account, "AccountUpgraded").withArgs(newImplementation.address);
-      expect(await account.implementation()).to.equal(newImplementation.address);
+      await expect(account.implementation()).to.eventually.equal(newImplementation.address);
     });
   });
 
@@ -163,12 +163,12 @@ describe("Argent account", () => {
     });
 
     it("Should call the dapp from an EOA", async () => {
-      expect(await testDapp.userNumbers(deployerAddress)).to.equal(0n);
+      await expect(testDapp.userNumbers(deployerAddress)).to.eventually.equal(0n);
 
       const response = await testDapp.setNumber(42);
       await response.wait();
 
-      expect(await testDapp.userNumbers(deployerAddress)).to.equal(42n);
+      await expect(testDapp.userNumbers(deployerAddress)).to.eventually.equal(42n);
     });
 
     describe("Calling the dapp using a guardian", () => {
@@ -207,12 +207,12 @@ describe("Argent account", () => {
 
       it("Should successfully call the dapp", async () => {
         const dapp = testDapp.connect(account.signer);
-        expect(await dapp.userNumbers(account.address)).to.equal(0n);
+        await expect(dapp.userNumbers(account.address)).to.eventually.equal(0n);
 
         const response = await dapp.setNumber(69);
         await response.wait();
 
-        expect(await dapp.userNumbers(account.address)).to.equal(69n);
+        await expect(dapp.userNumbers(account.address)).to.eventually.equal(69n);
       });
     });
 
@@ -228,21 +228,21 @@ describe("Argent account", () => {
       });
 
       it("Should successfully call the dapp", async () => {
-        expect(await testDapp.userNumbers(account.address)).to.equal(0n);
+        await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
 
         const response = await testDapp.connect(account.signer).setNumber(69);
         await response.wait();
 
-        expect(await testDapp.userNumbers(account.address)).to.equal(69n);
+        await expect(testDapp.userNumbers(account.address)).to.eventually.equal(69n);
       });
 
       it("Should change the owner", async () => {
-        expect(await account.owner()).to.equal(owner.address);
+        await expect(account.owner()).to.eventually.equal(owner.address);
 
         const promise = account.changeOwner(newOwner.address);
 
         await expect(promise).to.emit(account, "OwnerChanged").withArgs(newOwner.address);
-        expect(await account.owner()).to.equal(newOwner.address);
+        await expect(account.owner()).to.eventually.equal(newOwner.address);
       });
 
       it("Should revert calls that require the guardian to be set", async () => {

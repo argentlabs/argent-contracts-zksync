@@ -38,7 +38,7 @@ describe("Argent signer", () => {
 
     it("Should verify on the account", async () => {
       const signature = await new ArgentSigner(account, [owner, guardian]).signMessage(message);
-      expect(await account.isValidSignature(hash, signature)).to.equal(eip1271MagicValue);
+      await expect(account.isValidSignature(hash, signature)).to.eventually.equal(eip1271MagicValue);
     });
 
     it("Should fail to verify", async () => {
@@ -89,13 +89,13 @@ describe("Argent signer", () => {
 
     it("Should verify on the account", async () => {
       const signature = await new ArgentSigner(account, [owner, guardian])._signTypedData(domain, types, value);
-      expect(await account.isValidSignature(hash, signature)).to.equal(eip1271MagicValue);
+      await expect(account.isValidSignature(hash, signature)).to.eventually.equal(eip1271MagicValue);
     });
 
     it("Should verify with a single signature when not using a guardian", async () => {
       const accountNoGuardian = await deployAccount({ argent, ownerAddress, guardianAddress: AddressZero });
       const signature = await new ArgentSigner(accountNoGuardian, [owner])._signTypedData(domain, types, value);
-      expect(await accountNoGuardian.isValidSignature(hash, signature)).to.equal(eip1271MagicValue);
+      await expect(accountNoGuardian.isValidSignature(hash, signature)).to.eventually.equal(eip1271MagicValue);
     });
 
     it("Should fail to verify using incorrect owners", async () => {
