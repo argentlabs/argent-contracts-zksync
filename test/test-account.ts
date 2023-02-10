@@ -79,12 +79,12 @@ describe("Argent account", () => {
 
     it("Should revert with the wrong owner", async () => {
       const promise = connect(account, [wrongOwner, guardian]).upgrade(newImplementation.address);
-      await expect(promise).to.be.rejectedWith("failed to validate the transaction");
+      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
     });
 
     it("Should revert with the wrong guardian", async () => {
       const promise = connect(account, [owner, wrongGuardian]).upgrade(newImplementation.address);
-      await expect(promise).to.be.rejectedWith("failed to validate the transaction");
+      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
     });
 
     it("Should revert when new implementation isn't an IAccount", async () => {
