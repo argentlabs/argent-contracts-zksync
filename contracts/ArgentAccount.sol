@@ -3,7 +3,6 @@ pragma solidity 0.8.16;
 
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 
 import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
@@ -78,36 +77,6 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "argent/only-bootloader");
         // Continue execution if called from the bootloader.
         _;
-    }
-
-    /**
-     * @dev Simulate the behavior of the EOA if it is called via `delegatecall`.
-     * Thus, the default account on a delegate call behaves the same as EOA on Ethereum.
-     * If all functions will use this modifier AND the contract will implement an empty payable fallback()
-     * then the contract will be indistinguishable from the EOA when called.
-     */
-    modifier ignoreInDelegateCall() {
-        address codeAddress = SystemContractHelper.getCodeAddress();
-        if (codeAddress != address(this)) {
-            // If the function was delegate called, behave like an EOA.
-            assembly {
-                return(0, 0)
-            }
-        }
-
-        // Continue execution if not delegate called.
-        _;
-    }
-
-    fallback() external {
-        // fallback of default account shouldn't be called by bootloader under no circumstances
-        assert(msg.sender != BOOTLOADER_FORMAL_ADDRESS);
-
-        // If the contract is called directly, behave like an EOA
-    }
-
-    receive() external payable {
-        // If the contract is called directly, behave like an EOA
     }
 
     constructor(uint32 _escapeSecurityPeriod) {
@@ -202,13 +171,28 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         emit GuardianEscaped(_newGuardian);
     }
 
+    function isOwnerEscapeCall(bytes4 _selector) internal pure returns (bool) {
+        return _selector == this.escapeOwner.selector || _selector == this.triggerEscapeOwner.selector;
+    }
+
+    function isGuardianEscapeCall(bytes4 _selector) internal pure returns (bool) {
+        return _selector == this.escapeGuardian.selector || _selector == this.triggerEscapeGuardian.selector;
+    }
+
+    function requiredSignatureLength(bytes4 _selector) internal view returns (uint256) {
+        if (guardian != NO_GUARDIAN && !isOwnerEscapeCall(_selector) && !isGuardianEscapeCall(_selector)) {
+            return 130;
+        }
+        return 65;
+    }
+
     // IAccount implementation
 
     function validateTransaction(
         bytes32, // _transactionHash
         bytes32 _suggestedSignedHash,
         Transaction calldata _transaction
-    ) external payable override onlyBootloader ignoreInDelegateCall returns (bytes4) {
+    ) external payable override onlyBootloader returns (bytes4) {
         return _validateTransaction(_suggestedSignedHash, _transaction);
     }
 
@@ -217,6 +201,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         Transaction calldata _transaction
     ) internal returns (bytes4 _magic) {
         // no need to check if account is initialized because it's done during proxy deployment
+        _magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
 
         address nonceHolderAddress = address(NONCE_HOLDER_SYSTEM_CONTRACT);
         bytes memory calldata_ = abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce));
@@ -237,48 +222,51 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         // should be checked explicitly to prevent user paying for fee for a
         // transaction that wouldn't be included on Ethereum.
         uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
-        require(totalRequiredBalance <= address(this).balance, "Not enough balance for fee + value");
-
-        bytes memory fullSignature = _transaction.signature;
-        if (fullSignature.length == 0) {
-            // substituting the signature with some signature-like array to make sure that the
-            // validation step uses as much steps as the validation with the correct signature provided
-            fullSignature = new bytes(130);
-            fullSignature[64] = bytes1(uint8(27));
-            fullSignature[129] = bytes1(uint8(27));
-        }
-        (bytes memory ownerSignature, bytes memory guardianSignature) = splitMemorySignatures(fullSignature);
+        require(totalRequiredBalance <= address(this).balance, "insufficient funds for gas + value");
 
         bytes4 selector = bytes4(_transaction.data);
+        bytes memory signature = _transaction.signature;
+
+        if (signature.length == 65 && requiredSignatureLength(selector) == 130) {
+            // gas estimation mode:
+            // substituting the signature with some signature-like array to make sure that the
+            // validation step uses as much steps as the validation with the correct signature provided
+            signature = new bytes(130);
+            signature[64] = bytes1(uint8(27));
+            signature[129] = bytes1(uint8(27));
+        }
+
         bool toSelf = _transaction.to == uint256(uint160(address(this)));
         bool isValid;
-        if (toSelf && (selector == this.escapeGuardian.selector || selector == this.triggerEscapeGuardian.selector)) {
-            isValid = isValidOwnerSignature(transactionHash, ownerSignature);
-        } else if (toSelf && (selector == this.escapeOwner.selector || selector == this.triggerEscapeOwner.selector)) {
-            isValid = isValidGuardianSignature(transactionHash, guardianSignature);
+        if (toSelf && isGuardianEscapeCall(selector)) {
+            isValid = isValidOwnerSignature(transactionHash, signature);
+        } else if (toSelf && isOwnerEscapeCall(selector)) {
+            isValid = isValidGuardianSignature(transactionHash, signature);
         } else {
+            (bytes memory ownerSignature, bytes memory guardianSignature) = splitSignatures(signature);
             isValid =
                 isValidOwnerSignature(transactionHash, ownerSignature) &&
                 isValidGuardianSignature(transactionHash, guardianSignature);
         }
 
-        if (isValid) {
-            _magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+        if (!isValid) {
+            _magic = bytes4(0);
         }
     }
 
     function isValidOwnerSignature(bytes32 _hash, bytes memory _ownerSignature) internal view returns (bool) {
-        require(_ownerSignature.length == 65, "argent/invalid-owner-signature-length");
-        address recovered = ECDSA.recover(_hash, _ownerSignature);
-        return recovered == owner;
+        address recovered = recoverSigner(_hash, _ownerSignature);
+        return recovered != address(0) && recovered == owner;
     }
 
     function isValidGuardianSignature(bytes32 _hash, bytes memory _guardianSignature) internal view returns (bool) {
         if (guardian == NO_GUARDIAN) {
             return true;
         }
-        require(_guardianSignature.length == 65, "argent/invalid-guardian-signature-length");
-        address recovered = ECDSA.recover(_hash, _guardianSignature);
+        address recovered = recoverSigner(_hash, _guardianSignature);
+        if (recovered == address(0)) {
+            return false;
+        }
         if (recovered == guardian) {
             return true;
         }
@@ -288,11 +276,49 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         return false;
     }
 
-    function splitMemorySignatures(
+    // non-reverting version of ECDSA.recover
+    function recoverSigner(bytes32 _hash, bytes memory _signature) internal pure returns (address) {
+        if (_signature.length != 65) {
+            return address(0);
+        }
+
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+        // Signature loading code
+        // we jump 32 (0x20) as the first slot of bytes contains the length
+        // we jump 65 (0x41) per signature
+        // for v we load 32 bytes ending with v (the first 31 come from s) then apply a mask
+        assembly {
+            r := mload(add(_signature, 0x20))
+            s := mload(add(_signature, 0x40))
+            v := and(mload(add(_signature, 0x41)), 0xff)
+        }
+        if (v != 27 && v != 28) {
+            return address(0);
+        }
+
+        // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
+        // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
+        // the valid range for s in (301): 0 < s < secp256k1n ÷ 2 + 1, and for v in (302): v ∈ {27, 28}. Most
+        // signatures from current libraries generate a unique signature with an s-value in the lower half order.
+        //
+        // If your library generates malleable signatures, such as s-values in the upper range, calculate a new s-value
+        // with 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 - s1 and flip v from 27 to 28 or
+        // vice versa. If your library also generates signatures with 0/1 for v instead 27/28, add 27 to v to accept
+        // these malleable signatures as well.
+        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+            return address(0);
+        }
+
+        return ecrecover(_hash, v, r, s);
+    }
+
+    function splitSignatures(
         bytes memory _fullSignature
-    ) internal pure returns (bytes memory _ownerSignature, bytes memory _guardianSignature) {
+    ) internal pure returns (bytes memory _signature1, bytes memory _signature2) {
         require(_fullSignature.length >= 65, "argent/invalid-signature-length");
-        _ownerSignature = new bytes(65);
+        _signature1 = new bytes(65);
 
         // Copying the first signature. Note, that we need an offset of 0x20
         // since it is where the length of the `_fullSignature` is stored
@@ -301,17 +327,17 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
             let s := mload(add(_fullSignature, 0x40))
             let v := and(mload(add(_fullSignature, 0x41)), 0xff)
 
-            mstore(add(_ownerSignature, 0x20), r)
-            mstore(add(_ownerSignature, 0x40), s)
-            mstore8(add(_ownerSignature, 0x60), v)
+            mstore(add(_signature1, 0x20), r)
+            mstore(add(_signature1, 0x40), s)
+            mstore8(add(_signature1, 0x60), v)
         }
 
         if (_fullSignature.length == 65) {
-            return (_ownerSignature, _guardianSignature);
+            return (_signature1, _signature2);
         }
 
-        require(_fullSignature.length == 130, "argent/invalid-signature-length");
-        _guardianSignature = new bytes(65);
+        require(_fullSignature.length == 130, "argent/invalid-double-signature-length");
+        _signature2 = new bytes(65);
 
         // Copying the second signature.
         assembly {
@@ -319,9 +345,9 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
             let s := mload(add(_fullSignature, 0x81))
             let v := and(mload(add(_fullSignature, 0x82)), 0xff)
 
-            mstore(add(_guardianSignature, 0x20), r)
-            mstore(add(_guardianSignature, 0x40), s)
-            mstore8(add(_guardianSignature, 0x60), v)
+            mstore(add(_signature2, 0x20), r)
+            mstore(add(_signature2, 0x40), s)
+            mstore8(add(_signature2, 0x60), v)
         }
     }
 
@@ -329,13 +355,11 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         bytes32, // _transactionHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
-    ) external payable override onlyBootloader ignoreInDelegateCall {
+    ) external payable override onlyBootloader {
         _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
     }
 
-    function executeTransactionFromOutside(
-        Transaction calldata _transaction
-    ) external payable override onlyBootloader ignoreInDelegateCall {
+    function executeTransactionFromOutside(Transaction calldata _transaction) external payable override onlyBootloader {
         _validateTransaction(bytes32(0), _transaction); // The account recalculates the hash on its own
         _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
     }
@@ -359,7 +383,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         bytes32, // _transactionHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
-    ) external payable override onlyBootloader ignoreInDelegateCall {
+    ) external payable override onlyBootloader {
         bool success = _transaction.payToTheBootloader();
         require(success, "argent/failed-fee-payment");
     }
@@ -387,9 +411,20 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     // IERC1271 implementation
 
     function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4 _magic) {
-        (bytes memory ownerSignature, bytes memory guardianSignature) = splitMemorySignatures(_signature);
+        (bytes memory ownerSignature, bytes memory guardianSignature) = splitSignatures(_signature);
         if (isValidOwnerSignature(_hash, ownerSignature) && isValidGuardianSignature(_hash, guardianSignature)) {
             _magic = IERC1271.isValidSignature.selector;
         }
+    }
+
+    fallback() external {
+        // fallback of default account shouldn't be called by bootloader under no circumstances
+        assert(msg.sender != BOOTLOADER_FORMAL_ADDRESS);
+
+        // If the contract is called directly, behave like an EOA
+    }
+
+    receive() external payable {
+        // If the contract is called directly, behave like an EOA
     }
 }

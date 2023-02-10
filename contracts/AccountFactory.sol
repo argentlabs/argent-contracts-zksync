@@ -23,10 +23,9 @@ contract AccountFactory {
         address _guardian
     ) external returns (address _accountAddress) {
         bytes memory input = proxyContructorData(_implementation, _owner, _guardian);
-        IContractDeployer.AccountAbstractionVersion version = IContractDeployer.AccountAbstractionVersion.Version1;
         bytes memory deployData = abi.encodeCall(
             DEPLOYER_SYSTEM_CONTRACT.create2Account,
-            (_salt, proxyBytecodeHash, input, version)
+            (_salt, proxyBytecodeHash, input, IContractDeployer.AccountAbstractionVersion.Version1)
         );
         bytes memory returnData = SystemContractsCaller.systemCallWithPropagatedRevert(
             uint32(gasleft()),

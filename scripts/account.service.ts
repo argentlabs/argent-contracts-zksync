@@ -2,6 +2,7 @@ import { BigNumber, BytesLike } from "ethers";
 import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount } from "../typechain-types";
+import { getEnv } from "./config.service";
 import { verifyContract } from "./deployer.service";
 import { AccountDeploymentParams, ArgentInfrastructure } from "./model";
 import { ArgentSigner, Signatory } from "./signer.service";
@@ -11,7 +12,7 @@ export const deployAccount = async ({
   ownerAddress,
   guardianAddress,
   connect: signatories,
-  funds = "0.0001",
+  funds = undefined,
   salt = ethers.utils.randomBytes(32),
 }: AccountDeploymentParams): Promise<ArgentAccount> => {
   const { deployer, factory, implementation, artifacts } = argent;
@@ -29,6 +30,9 @@ export const deployAccount = async ({
   const provider = new zksync.Provider(network.url);
   const account = new zksync.Contract(deployedAddress, implementation.interface, provider) as ArgentAccount;
 
+  if (getEnv() === "local" && funds === undefined) {
+    funds = "0.001";
+  }
   if (funds) {
     const response = await deployer.zkWallet.transfer({
       to: account.address,
