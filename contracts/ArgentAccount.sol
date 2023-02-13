@@ -205,9 +205,12 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         // no need to check if account is initialized because it's done during proxy deployment
         _magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
 
-        address nonceHolderAddress = address(NONCE_HOLDER_SYSTEM_CONTRACT);
-        bytes memory calldata_ = abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce));
-        SystemContractsCaller.systemCallWithPropagatedRevert(uint32(gasleft()), nonceHolderAddress, 0, calldata_);
+        SystemContractsCaller.systemCallWithPropagatedRevert(
+            uint32(gasleft()),
+            address(NONCE_HOLDER_SYSTEM_CONTRACT),
+            0,
+            abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
+        );
 
         bytes32 transactionHash;
         if (_suggestedSignedHash == bytes32(0)) {
@@ -217,14 +220,14 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         }
 
         if (_transaction.to == uint256(uint160(address(DEPLOYER_SYSTEM_CONTRACT)))) {
-            require(_transaction.data.length >= 4, "Invalid call to ContractDeployer");
+            require(_transaction.data.length >= 4, "argent/invalid-call-to-deployer");
         }
 
         // The fact there is are enough balance for the account
         // should be checked explicitly to prevent user paying for fee for a
         // transaction that wouldn't be included on Ethereum.
         uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
-        require(totalRequiredBalance <= address(this).balance, "insufficient funds for gas + value");
+        require(totalRequiredBalance <= address(this).balance, "argent/insufficient-funds-for-gas-plus-value");
 
         bytes4 selector = bytes4(_transaction.data);
         bytes memory signature = _transaction.signature;
@@ -266,13 +269,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         if (recovered == address(0)) {
             return false;
         }
-        if (recovered == guardian) {
-            return true;
-        }
-        if (recovered == guardianBackup && guardianBackup != NO_GUARDIAN) {
-            return true;
-        }
-        return false;
+        return recovered == guardian || recovered == guardianBackup;
     }
 
     function executeTransaction(
