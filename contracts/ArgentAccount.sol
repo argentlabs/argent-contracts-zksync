@@ -37,7 +37,6 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     string public constant VERSION = "0.0.1";
-    address public constant NO_GUARDIAN = address(0);
 
     uint8 public constant NO_ESCAPE = uint8(EscapeType.None);
     uint8 public constant GUARDIAN_ESCAPE = uint8(EscapeType.Guardian);
@@ -182,7 +181,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     function requiredSignatureLength(bytes4 _selector) internal view returns (uint256) {
-        if (guardian != NO_GUARDIAN && !isOwnerEscapeCall(_selector) && !isGuardianEscapeCall(_selector)) {
+        if (guardian != address(0) && !isOwnerEscapeCall(_selector) && !isGuardianEscapeCall(_selector)) {
             return 130;
         }
         return 65;
@@ -265,7 +264,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     function isValidGuardianSignature(bytes32 _hash, bytes memory _guardianSignature) internal view returns (bool) {
-        if (guardian == NO_GUARDIAN && _guardianSignature.length == 0) {
+        if (guardian == address(0) && _guardianSignature.length == 0) {
             return true;
         }
         address recovered = Signatures.recoverSigner(_hash, _guardianSignature);
