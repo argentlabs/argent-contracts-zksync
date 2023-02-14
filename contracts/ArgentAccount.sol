@@ -116,7 +116,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     function changeGuardian(address _newGuardian) public onlySelf {
-        require(_newGuardian != address(0) || guardianBackup == address(0), "argent/guardian-backup-needed");
+        require(_newGuardian != address(0) || guardianBackup == address(0), "argent/guardian-backup-required");
         guardian = _newGuardian;
         emit GuardianChanged(_newGuardian);
     }
