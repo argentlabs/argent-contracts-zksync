@@ -233,12 +233,15 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         bytes memory signature = _transaction.signature;
 
         // in gas estimation mode, we're called with a single signature filled with zeros
-        if (signature.length != 130 && requiredSignatureLength(selector) == 130) {
-            // substituting the signature with some signature-like array to make sure that the
-            // validation step uses as much steps as the validation with the correct signature provided
-            signature = new bytes(130);
+        // substituting the signature with some signature-like array to make sure that the
+        // validation step uses as much steps as the validation with the correct signature provided
+        uint256 requiredLength = requiredSignatureLength(selector);
+        if (signature.length < requiredLength) {
+            signature = new bytes(requiredLength);
             signature[64] = bytes1(uint8(27));
-            signature[129] = bytes1(uint8(27));
+            if (requiredLength == 130) {
+                signature[129] = bytes1(uint8(27));
+            }
         }
 
         bool toSelf = _transaction.to == uint256(uint160(address(this)));

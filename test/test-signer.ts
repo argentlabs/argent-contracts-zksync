@@ -155,5 +155,12 @@ describe("Argent signer", () => {
       await expect(account.isValidSignature(hash, new Uint8Array(65))).to.eventually.equal(0n);
       await expect(account.isValidSignature(hash, new Uint8Array(130))).to.eventually.equal(0n);
     });
+
+    it("Should fail to verify with invalid length", async () => {
+      await expect(account.isValidSignature(hash, new Uint8Array())).to.be.reverted;
+      await expect(account.isValidSignature(hash, new Uint8Array(1))).to.be.reverted;
+      await expect(account.isValidSignature(hash, new Uint8Array(136))).to.be.reverted;
+      await expect(account.isValidSignature(hash, new Uint8Array(195))).to.be.reverted;
+    });
   });
 });
