@@ -134,8 +134,8 @@ describe("Argent account", () => {
       const balanceBefore1 = await provider.getBalance(account1.address);
       const balanceBefore2 = await provider.getBalance(account2.address);
 
-      const response = await account1.signer.sendTransaction({ to: account2.address, value: amount });
-      await response.wait();
+      const promise = await account1.signer.sendTransaction({ to: account2.address, value: amount });
+      await expect(promise).to.emit(account2, "EthReceived").withArgs(amount, account1.address);
 
       const balanceAfter1 = await provider.getBalance(account1.address);
       const balanceAfter2 = await provider.getBalance(account2.address);

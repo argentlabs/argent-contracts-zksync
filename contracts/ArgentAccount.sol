@@ -54,6 +54,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     event AccountCreated(address account, address owner, address guardian);
     event AccountUpgraded(address newImplementation);
     event TransactionExecuted(bytes32 hashed, bytes response);
+    event EthReceived(uint256 indexed value, address indexed from);
 
     event OwnerChanged(address newOwner);
     event GuardianChanged(address newGuardian);
@@ -355,6 +356,6 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     receive() external payable {
-        // If the contract is called directly, behave like an EOA
+        emit EthReceived(msg.value, msg.sender);
     }
 }
