@@ -88,7 +88,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
 
     function initialize(address _owner, address _guardian) external {
         require(_owner != address(0), "argent/null-owner");
-        require(owner == address(0), "argent/already-init");
+        require(owner == address(0), "argent/already-initialized");
         owner = _owner;
         guardian = _guardian;
         emit AccountCreated(address(this), _owner, _guardian);
@@ -117,7 +117,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     function changeGuardian(address _newGuardian) public onlySelf {
-        require(_newGuardian != address(0), "argent/null-guardian");
+        require(_newGuardian != address(0) || guardianBackup == address(0), "argent/guardian-backup-needed");
         guardian = _newGuardian;
         emit GuardianChanged(_newGuardian);
     }
