@@ -78,17 +78,17 @@ describe("Argent account", () => {
     });
 
     it("Should revert with the wrong owner", async () => {
-      const promise = connect(account, [wrongOwner, guardian]).upgrade(newImplementation.address);
+      const promise = connect(account, [wrongOwner, guardian]).upgrade(newImplementation.address, "0x");
       await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
     });
 
     it("Should revert with the wrong guardian", async () => {
-      const promise = connect(account, [owner, wrongGuardian]).upgrade(newImplementation.address);
+      const promise = connect(account, [owner, wrongGuardian]).upgrade(newImplementation.address, "0x");
       await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
     });
 
     it("Should revert when new implementation isn't an IAccount", async () => {
-      const promise = connect(account, [owner, guardian]).upgrade(wrongGuardian.address);
+      const promise = connect(account, [owner, guardian]).upgrade(wrongGuardian.address, "0x");
       // await expect(promise).to.be.rejectedWith("argent/invalid-implementation");
       await expect(promise).to.be.rejected;
     });
@@ -96,7 +96,7 @@ describe("Argent account", () => {
     it("Should upgrade the account", async () => {
       await expect(account.implementation()).to.eventually.equal(argent.implementation.address);
 
-      const promise = connect(account, [owner, guardian]).upgrade(newImplementation.address);
+      const promise = connect(account, [owner, guardian]).upgrade(newImplementation.address, "0x");
 
       await expect(promise).to.emit(account, "AccountUpgraded").withArgs(newImplementation.address);
       await expect(account.implementation()).to.eventually.equal(newImplementation.address);

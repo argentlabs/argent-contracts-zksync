@@ -91,11 +91,20 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         emit AccountCreated(address(this), _owner, _guardian);
     }
 
-    function upgrade(address _newImplementation) external {
+    function upgrade(address _newImplementation, bytes calldata _data) external {
         requireOnlySelf();
-        require(_newImplementation.supportsInterface(type(IAccount).interfaceId), "argent/invalid-implementation");
+        bool isSupported = _newImplementation.supportsInterface(type(IAccount).interfaceId);
+        require(isSupported, "argent/invalid-implementation");
         implementation = _newImplementation;
         emit AccountUpgraded(_newImplementation);
+        // using delegatecall to run the `onAfterUpgrade` function of the new implementation
+        (bool success, ) = _newImplementation.delegatecall(abi.encodeCall(this.onAfterUpgrade, (VERSION, _data)));
+        require(success, "argent/upgrade-callback-failed");
+    }
+
+    // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
+    function onAfterUpgrade(string calldata _previousVersion, bytes calldata _data) external {
+        // reserved upgrade callback for future account versions
     }
 
     function multicall(Call[] memory _calls) external {
@@ -273,6 +282,9 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
             }
             if (isOwnerEscapeCall(selector)) {
                 return isValidGuardianSignature(_transactionHash, _signature);
+            }
+            if (selector == this.onAfterUpgrade.selector) {
+                return false;
             }
         }
         return _isValidSignature(_transactionHash, _signature);
