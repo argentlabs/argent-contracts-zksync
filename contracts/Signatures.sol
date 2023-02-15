@@ -45,39 +45,35 @@ library Signatures {
         return ecrecover(_hash, v, r, s);
     }
 
-    // equivalent of `return (_fullSignature[:65], _fullSignature[65:130]);` with `bytes calldata` but for `bytes memory`
+    // similar to `return (_fullSignature[:65], _fullSignature[65:]);` with `bytes calldata` but for `bytes memory`
     function splitSignatures(
         bytes memory _fullSignature
     ) internal pure returns (bytes memory _signature1, bytes memory _signature2) {
-        require(_fullSignature.length == 65 || _fullSignature.length == 130, "argent/invalid-signature-length");
-
-        // Copying the first signature. Note, that we need an offset of 0x20
-        // since it is where the length of the `_fullSignature` is stored
-        _signature1 = new bytes(65);
-        assembly {
-            let r := mload(add(_fullSignature, 0x20))
-            let s := mload(add(_fullSignature, 0x40))
-            let v := and(mload(add(_fullSignature, 0x41)), 0xff)
-
-            mstore(add(_signature1, 0x20), r)
-            mstore(add(_signature1, 0x40), s)
-            mstore8(add(_signature1, 0x60), v)
-        }
-
         if (_fullSignature.length == 65) {
-            return (_signature1, _signature2);
+            return (_fullSignature, _signature2);
         }
 
-        // Copying the second signature.
+        require(_fullSignature.length == 130, "argent/invalid-signature-length");
+        _signature1 = new bytes(65);
         _signature2 = new bytes(65);
-        assembly {
-            let r := mload(add(_fullSignature, 0x61))
-            let s := mload(add(_fullSignature, 0x81))
-            let v := and(mload(add(_fullSignature, 0x82)), 0xff)
 
-            mstore(add(_signature2, 0x20), r)
-            mstore(add(_signature2, 0x40), s)
-            mstore8(add(_signature2, 0x60), v)
+        assembly {
+            // Copying the first signature. Note, that we need an offset of 0x20
+            // since it is where the length of the `_fullSignature` is stored
+            let r1 := mload(add(_fullSignature, 0x20))
+            let s1 := mload(add(_fullSignature, 0x40))
+            let v1 := and(mload(add(_fullSignature, 0x41)), 0xff)
+            mstore(add(_signature1, 0x20), r1)
+            mstore(add(_signature1, 0x40), s1)
+            mstore8(add(_signature1, 0x60), v1)
+
+            // Copying the second signature.
+            let r2 := mload(add(_fullSignature, 0x61))
+            let s2 := mload(add(_fullSignature, 0x81))
+            let v2 := and(mload(add(_fullSignature, 0x82)), 0xff)
+            mstore(add(_signature2, 0x20), r2)
+            mstore(add(_signature2, 0x40), s2)
+            mstore8(add(_signature2, 0x60), v2)
         }
     }
 }
