@@ -9,7 +9,7 @@ import { checkDeployer, CustomDeployer, getDeployer } from "../scripts/deployer.
 import { deployTestDapp, getTestInfrastructure } from "../scripts/infrastructure.service";
 import { ArgentInfrastructure } from "../scripts/model";
 import { ArgentSigner } from "../scripts/signer.service";
-import { ArgentAccount, TestDapp } from "../typechain-types";
+import { ArgentAccount, TestDapp, UpgradedArgentAccount } from "../typechain-types";
 
 const { AddressZero } = ethers.constants;
 
@@ -22,6 +22,12 @@ const wrongGuardian = zksync.Wallet.createRandom();
 const ownerAddress = owner.address;
 const guardianAddress = guardian.address;
 const { deployer, deployerAddress, provider } = getDeployer();
+
+const makeCall = ({ to = AddressZero, data = "0x" }: PopulatedTransaction): ArgentAccount.CallStruct => ({
+  to,
+  value: 0,
+  data,
+});
 
 describe("Argent account", () => {
   let argent: ArgentInfrastructure;
@@ -93,6 +99,18 @@ describe("Argent account", () => {
       await expect(promise).to.be.rejected;
     });
 
+    it("Should revert when calling upgrade callback directly", async () => {
+      const promise = connect(account, [owner, guardian]).onAfterUpgrade("0.0.2", "0x");
+      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
+    });
+
+    it("Should revert when calling upgrade callback via multicall", async () => {
+      const call = makeCall(await account.populateTransaction.onAfterUpgrade("0.0.2", "0x"));
+      const promise = connect(account, [owner, guardian]).multicall([call]);
+      // await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
+      await expect(promise).to.be.rejected;
+    });
+
     it("Should upgrade the account", async () => {
       await expect(account.implementation()).to.eventually.equal(argent.implementation.address);
 
@@ -100,6 +118,38 @@ describe("Argent account", () => {
 
       await expect(promise).to.emit(account, "AccountUpgraded").withArgs(newImplementation.address);
       await expect(account.implementation()).to.eventually.equal(newImplementation.address);
+    });
+
+    it("Should upgrade the account and run the callback", async () => {
+      account = await deployAccount({
+        argent,
+        ownerAddress,
+        guardianAddress,
+        funds: "0.0005",
+        connect: [owner, guardian],
+      });
+
+      const artifact = await deployer.loadArtifact("UpgradedArgentAccount");
+      const newImplementation = await deployer.deploy(artifact, [10]);
+      const upgradedAccount = new zksync.Contract(
+        account.address,
+        artifact.abi,
+        account.provider,
+      ) as UpgradedArgentAccount;
+
+      await expect(upgradedAccount.newStorage()).to.be.reverted;
+
+      const promise = account.upgrade(newImplementation.address, "0x");
+      // await expect(promise).to.be.rejectedWith("argent/upgrade-callback-failed");
+      await expect(promise).to.be.rejected;
+
+      const value = 42;
+      const data = ethers.utils.hexZeroPad(ethers.utils.hexlify(value), 32);
+
+      const response = await account.upgrade(newImplementation.address, data);
+      await response.wait();
+
+      await expect(upgradedAccount.newStorage()).to.eventually.equal(value);
     });
   });
 
@@ -269,12 +319,6 @@ describe("Argent account", () => {
     before(async () => {
       account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
       testDapp = await deployTestDapp(deployer);
-    });
-
-    const makeCall = ({ to = AddressZero, data = "0x" }: PopulatedTransaction): ArgentAccount.CallStruct => ({
-      to,
-      value: 0,
-      data,
     });
 
     it("Should revert when one of the calls is to the account", async () => {
