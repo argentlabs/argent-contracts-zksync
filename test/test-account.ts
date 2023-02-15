@@ -144,7 +144,7 @@ describe("Argent account", () => {
       await expect(promise).to.be.rejected;
 
       const value = 42;
-      const data = ethers.utils.hexZeroPad(ethers.utils.hexlify(value), 32);
+      const data = new ethers.utils.AbiCoder().encode(["uint256"], [value]);
 
       const response = await account.upgrade(newImplementation.address, data);
       await response.wait();
