@@ -242,13 +242,12 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
         require(totalRequiredBalance <= address(this).balance, "argent/insufficient-funds-for-gas-plus-value");
 
-        bytes4 selector = bytes4(_transaction.data);
         bytes memory signature = _transaction.signature;
 
         // in gas estimation mode, we're called with a single signature filled with zeros
         // substituting the signature with some signature-like array to make sure that the
         // validation step uses as much steps as the validation with the correct signature provided
-        uint256 requiredLength = requiredSignatureLength(selector);
+        uint256 requiredLength = requiredSignatureLength(bytes4(_transaction.data));
         if (signature.length < requiredLength) {
             signature = new bytes(requiredLength);
             signature[64] = bytes1(uint8(27));
@@ -257,19 +256,26 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
             }
         }
 
-        bool toSelf = _transaction.to == uint256(uint160(address(this)));
-        bool isValid;
-        if (toSelf && isGuardianEscapeCall(selector)) {
-            isValid = isValidOwnerSignature(transactionHash, signature);
-        } else if (toSelf && isOwnerEscapeCall(selector)) {
-            isValid = isValidGuardianSignature(transactionHash, signature);
-        } else {
-            isValid = _isValidSignature(transactionHash, signature);
-        }
-
-        if (!isValid) {
+        if (!isValidTransaction(transactionHash, _transaction, signature)) {
             _magic = bytes4(0);
         }
+    }
+
+    function isValidTransaction(
+        bytes32 _transactionHash,
+        Transaction calldata _transaction,
+        bytes memory _signature
+    ) internal view returns (bool) {
+        if (_transaction.to == uint256(uint160(address(this)))) {
+            bytes4 selector = bytes4(_transaction.data);
+            if (isGuardianEscapeCall(selector)) {
+                return isValidOwnerSignature(_transactionHash, _signature);
+            }
+            if (isOwnerEscapeCall(selector)) {
+                return isValidGuardianSignature(_transactionHash, _signature);
+            }
+        }
+        return _isValidSignature(_transactionHash, _signature);
     }
 
     function isValidOwnerSignature(bytes32 _hash, bytes memory _ownerSignature) internal view returns (bool) {
