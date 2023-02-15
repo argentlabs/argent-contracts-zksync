@@ -64,20 +64,18 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     event GuardianEscaped(address newGuardian);
     event EscapeCancelled();
 
-    modifier onlySelf() {
+    // inlined modifiers for consistency of requirements, easier auditing and some gas savings
+
+    function requireOnlySelf() internal view {
         require(msg.sender == address(this), "argent/only-self");
-        _;
     }
 
-    modifier requireGuardian() {
+    function requireGuardian() internal view {
         require(guardian != address(0), "argent/guardian-required");
-        _;
     }
 
-    modifier onlyBootloader() {
+    function requireOnlyBootloader() internal view {
         require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "argent/only-bootloader");
-        // Continue execution if called from the bootloader.
-        _;
     }
 
     constructor(uint32 _escapeSecurityPeriod) {
@@ -93,13 +91,15 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         emit AccountCreated(address(this), _owner, _guardian);
     }
 
-    function upgrade(address _newImplementation) external onlySelf {
+    function upgrade(address _newImplementation) external {
+        requireOnlySelf();
         require(_newImplementation.supportsInterface(type(IAccount).interfaceId), "argent/invalid-implementation");
         implementation = _newImplementation;
         emit AccountUpgraded(_newImplementation);
     }
 
-    function multicall(Call[] memory _calls) external onlySelf {
+    function multicall(Call[] memory _calls) external {
+        requireOnlySelf();
         for (uint256 i = 0; i < _calls.length; i++) {
             Call memory call = _calls[i];
             require(call.to != address(this), "argent/no-multicall-to-self");
@@ -109,24 +109,30 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
 
     // Recovery
 
-    function changeOwner(address _newOwner) public onlySelf {
+    function changeOwner(address _newOwner) public {
+        requireOnlySelf();
         require(_newOwner != address(0), "argent/null-owner");
         owner = _newOwner;
         emit OwnerChanged(_newOwner);
     }
 
-    function changeGuardian(address _newGuardian) public onlySelf {
+    function changeGuardian(address _newGuardian) public {
+        requireOnlySelf();
         require(_newGuardian != address(0) || guardianBackup == address(0), "argent/guardian-backup-required");
         guardian = _newGuardian;
         emit GuardianChanged(_newGuardian);
     }
 
-    function changeGuardianBackup(address _newGuardianBackup) public onlySelf requireGuardian {
+    function changeGuardianBackup(address _newGuardianBackup) public {
+        requireOnlySelf();
+        requireGuardian();
         guardianBackup = _newGuardianBackup;
         emit GuardianBackupChanged(_newGuardianBackup);
     }
 
-    function triggerEscapeOwner() public onlySelf requireGuardian {
+    function triggerEscapeOwner() public {
+        requireOnlySelf();
+        requireGuardian();
         // no escape if there is an guardian escape triggered by the owner in progress
         if (escape.activeAt != 0) {
             require(escape.escapeType == OWNER_ESCAPE, "argent/cannot-override-owner-escape");
@@ -137,20 +143,25 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         emit EscapeOwnerTriggerred(activeAt);
     }
 
-    function triggerEscapeGuardian() public onlySelf requireGuardian {
+    function triggerEscapeGuardian() public {
+        requireOnlySelf();
+        requireGuardian();
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(activeAt, GUARDIAN_ESCAPE);
         emit EscapeGuardianTriggerred(activeAt);
     }
 
-    function cancelEscape() public onlySelf {
+    function cancelEscape() public {
+        requireOnlySelf();
         require(escape.activeAt != 0 && escape.escapeType != NO_ESCAPE, "argent/not-escaping");
 
         delete escape;
         emit EscapeCancelled();
     }
 
-    function escapeOwner(address _newOwner) public onlySelf requireGuardian {
+    function escapeOwner(address _newOwner) public {
+        requireOnlySelf();
+        requireGuardian();
         require(_newOwner != address(0), "argent/null-owner");
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
@@ -161,7 +172,9 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         emit OwnerEscaped(_newOwner);
     }
 
-    function escapeGuardian(address _newGuardian) public onlySelf requireGuardian {
+    function escapeGuardian(address _newGuardian) public {
+        requireOnlySelf();
+        requireGuardian();
         require(_newGuardian != address(0), "argent/null-guardian");
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
@@ -193,7 +206,8 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         bytes32, // _transactionHash
         bytes32 _suggestedSignedHash,
         Transaction calldata _transaction
-    ) external payable override onlyBootloader returns (bytes4) {
+    ) external payable override returns (bytes4) {
+        requireOnlyBootloader();
         return _validateTransaction(_suggestedSignedHash, _transaction);
     }
 
@@ -278,11 +292,13 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         bytes32, // _transactionHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
-    ) external payable override onlyBootloader {
+    ) external payable override {
+        requireOnlyBootloader();
         _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
     }
 
-    function executeTransactionFromOutside(Transaction calldata _transaction) external payable override onlyBootloader {
+    function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
+        requireOnlyBootloader();
         _validateTransaction(bytes32(0), _transaction); // The account recalculates the hash on its own
         _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
     }
@@ -306,7 +322,8 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         bytes32, // _transactionHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
-    ) external payable override onlyBootloader {
+    ) external payable override {
+        requireOnlyBootloader();
         bool success = _transaction.payToTheBootloader();
         require(success, "argent/failed-fee-payment");
     }
@@ -317,7 +334,8 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         bytes32, // _transactionHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
-    ) external payable override onlyBootloader {
+    ) external payable override {
+        requireOnlyBootloader();
         _transaction.processPaymasterInput();
     }
 
