@@ -162,9 +162,16 @@ describe("Argent account", () => {
 
     const eoa = zksync.Wallet.createRandom();
 
+    before(async () => {
+      // activate the EOA
+      await deployer.zkWallet.sendTransaction({ to: eoa.address, value: 1 });
+    });
+
     it("Should deploy a new account (1)", async () => {
       const connect = [owner, guardian];
       account1 = await deployAccount({ argent, ownerAddress, guardianAddress, connect, funds: false });
+      const response = await account1.signer.sendTransaction({ to: deployer.zkWallet.address, value: 1 });
+      await response.wait();
       console.log(`        Account 1 deployed to ${account1.address}`);
     });
 
@@ -176,12 +183,12 @@ describe("Argent account", () => {
 
     it("Should transfer ETH from EOA to account 1", async () => {
       const balanceBefore = await provider.getBalance(account1.address);
-      const amount = ethers.utils.parseEther("0.001");
-      const response = await deployer.zkWallet.transfer({ to: account1.address, amount });
+      const value = ethers.utils.parseEther("0.001");
+      const response = await deployer.zkWallet.sendTransaction({ to: account1.address, value });
       await response.wait();
 
       const balanceAfter = await provider.getBalance(account1.address);
-      expect(balanceAfter.sub(balanceBefore)).to.equal(amount);
+      expect(balanceAfter.sub(balanceBefore)).to.equal(value);
     });
 
     it("Should transfer ETH from account 1 to account 2", async () => {
