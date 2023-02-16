@@ -28,7 +28,7 @@ export interface ArgentArtifacts {
 }
 
 export interface AccountDeploymentParams {
-  argent: Omit<ArgentInfrastructure, "dummyAccount">;
+  argent: ArgentInfrastructure;
   ownerAddress: string;
   guardianAddress: string;
   connect?: Signatory[];

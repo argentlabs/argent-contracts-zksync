@@ -7,6 +7,16 @@ import { verifyContract } from "./deployer.service";
 import { AccountDeploymentParams, ArgentInfrastructure } from "./model";
 import { ArgentSigner, Signatory } from "./signer.service";
 
+export const argentAccountContract = (deployedAddress: string, argent: ArgentInfrastructure) => {
+  const network = hre.config.networks[hre.network.name];
+  if (!("url" in network && network.url)) {
+    throw new Error(`Current network (${hre.network.name}) needs to have a 'url' property`);
+  }
+  const provider = new zksync.Provider(network.url);
+  const account = new zksync.Contract(deployedAddress, argent.implementation.interface, provider) as ArgentAccount;
+  return account;
+};
+
 export const deployAccount = async ({
   argent,
   ownerAddress,
@@ -23,12 +33,7 @@ export const deployAccount = async ({
   const initData = implementation.interface.encodeFunctionData("initialize", [ownerAddress, guardianAddress]);
   await verifyContract(deployedAddress, artifacts.proxy, [implementation.address, initData]);
 
-  const network = hre.config.networks.zkSyncTestnet;
-  if (!("url" in network && network.url)) {
-    throw new Error("network needs a 'url' property set");
-  }
-  const provider = new zksync.Provider(network.url);
-  const account = new zksync.Contract(deployedAddress, implementation.interface, provider) as ArgentAccount;
+  const account = argentAccountContract(deployedAddress, argent);
 
   if (getEnv() === "local" && funds === undefined) {
     funds = "0.001";

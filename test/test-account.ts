@@ -23,6 +23,9 @@ const ownerAddress = owner.address;
 const guardianAddress = guardian.address;
 const { deployer, deployerAddress, provider } = getDeployer();
 
+console.log(`owner private key: ${owner.privateKey} (${ownerAddress})`);
+console.log(`guardian private key: ${guardian.privateKey} (${guardianAddress})`);
+
 const makeCall = ({ to = AddressZero, data = "0x" }: PopulatedTransaction): ArgentAccount.CallStruct => ({
   to,
   value: 0,
@@ -157,6 +160,8 @@ describe("Argent account", () => {
     let account1: ArgentAccount;
     let account2: ArgentAccount;
 
+    const eoa = zksync.Wallet.createRandom();
+
     it("Should deploy a new account (1)", async () => {
       const connect = [owner, guardian];
       account1 = await deployAccount({ argent, ownerAddress, guardianAddress, connect, funds: false });
@@ -169,9 +174,9 @@ describe("Argent account", () => {
       console.log(`        Account 2 deployed to ${account2.address}`);
     });
 
-    it("Should fund account 1 from owner key", async () => {
+    it("Should transfer ETH from EOA to account 1", async () => {
       const balanceBefore = await provider.getBalance(account1.address);
-      const amount = ethers.utils.parseEther("0.0004");
+      const amount = ethers.utils.parseEther("0.001");
       const response = await deployer.zkWallet.transfer({ to: account1.address, amount });
       await response.wait();
 
@@ -180,19 +185,35 @@ describe("Argent account", () => {
     });
 
     it("Should transfer ETH from account 1 to account 2", async () => {
-      const amount = ethers.utils.parseEther("0.00002668");
       const balanceBefore1 = await provider.getBalance(account1.address);
       const balanceBefore2 = await provider.getBalance(account2.address);
+      expect(balanceBefore2).to.equal(0n);
 
-      const response = await account1.signer.sendTransaction({ to: account2.address, value: amount });
+      const value = 42;
+      const response = await account1.signer.sendTransaction({ to: account2.address, value });
       await response.wait();
 
       const balanceAfter1 = await provider.getBalance(account1.address);
       const balanceAfter2 = await provider.getBalance(account2.address);
+      expect(balanceAfter1).to.be.lessThan(balanceBefore1.sub(value)); // account for paid gas
+      expect(balanceAfter2).to.equal(value);
+    });
 
-      expect(balanceBefore2).to.equal(0n);
-      expect(balanceAfter1).to.be.lessThan(balanceBefore1.sub(amount)); // account for paid gas
-      expect(balanceAfter2).to.equal(amount);
+    it("Should transfer ETH from account 1 to an EOA", async () => {
+      const balanceBefore1 = await provider.getBalance(account1.address);
+
+      const value = 69;
+      const response = await account1.signer.sendTransaction({ to: eoa.address, value });
+      await response.wait();
+
+      const balanceAfter1 = await provider.getBalance(account1.address);
+      expect(balanceAfter1).to.be.lessThanOrEqual(balanceBefore1.sub(value)); // account for paid gas
+    });
+
+    it("Should transfer ETH from an EOA to another EOA", async () => {
+      const value = 72;
+      const response = await deployer.zkWallet.sendTransaction({ to: eoa.address, value });
+      await response.wait();
     });
 
     it("Should fail to transfer ETH from account 2 to account 1", async () => {
@@ -201,7 +222,7 @@ describe("Argent account", () => {
         value: 1,
       });
 
-      await expect(promise).to.be.rejectedWith("insufficient funds for gas + value");
+      await expect(promise).to.be.rejectedWith(/Not enough balance|insufficient funds/i);
     });
   });
 

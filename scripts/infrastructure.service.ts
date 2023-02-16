@@ -1,8 +1,9 @@
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
+import hre from "hardhat";
 import * as zksync from "zksync-web3";
 import { AccountFactory, TestDapp } from "../typechain-types";
 import { deployAccount } from "./account.service";
-import { getEnv, loadConfig } from "./config.service";
+import { loadConfig } from "./config.service";
 import { checkDeployer, loadArtifacts, verifyContract } from "./deployer.service";
 import { ArgentInfrastructure } from "./model";
 
@@ -57,7 +58,7 @@ export const getTestInfrastructure: typeof deployInfrastructure = async (deploye
     return testInfrastructure;
   }
   await checkDeployer(deployer);
-  if (getEnv() !== "local") {
+  if (hre.network.name !== "local") {
     testInfrastructure = await getInfrastructure(deployer);
   } else {
     testInfrastructure = await deployInfrastructure(deployer);
