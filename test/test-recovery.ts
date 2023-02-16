@@ -273,7 +273,7 @@ describe("Recovery", () => {
   });
 
   describe("Escape overriding", () => {
-    it("Should allow owner to override a owner escape", async () => {
+    it("Should allow owner to override an owner escape", async () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress });
 
       // guardian triggers a owner escape

@@ -73,8 +73,7 @@ describe("Argent account", () => {
       const { abi } = argent.artifacts.implementation;
       const accountFromEoa = new zksync.Contract(account.address, abi, deployer.zkWallet);
       const promise = accountFromEoa.initialize(owner.address, guardian.address);
-      // await expect(promise).to.be.rejectedWith("argent/already-init");
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("argent/already-init");
     });
   });
 
