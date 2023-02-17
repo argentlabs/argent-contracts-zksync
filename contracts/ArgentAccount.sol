@@ -64,6 +64,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     event GuardianEscaped(address newGuardian);
     event EscapeCancelled();
 
+    /**************************************************** Modifiers ***************************************************/
     // inlined modifiers for consistency of requirements, easier auditing and some gas savings
 
     function requireOnlySelf() internal view {
@@ -77,6 +78,8 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     function requireOnlyBootloader() internal view {
         require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "argent/only-bootloader");
     }
+
+    /**************************************************** Lifecycle ***************************************************/
 
     constructor(uint32 _escapeSecurityPeriod) {
         require(_escapeSecurityPeriod != 0, "argent/null-escape-security-period");
@@ -108,16 +111,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         // reserved upgrade callback for future account versions
     }
 
-    function multicall(Call[] memory _calls) external {
-        requireOnlySelf();
-        for (uint256 i = 0; i < _calls.length; i++) {
-            Call memory call = _calls[i];
-            require(call.to != address(this), "argent/no-multicall-to-self");
-            _execute(call.to, call.value, call.data);
-        }
-    }
-
-    // Recovery
+    /**************************************************** Recovery ****************************************************/
 
     function changeOwner(address _newOwner) public {
         requireOnlySelf();
@@ -203,14 +197,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         return _selector == this.escapeGuardian.selector || _selector == this.triggerEscapeGuardian.selector;
     }
 
-    function requiredSignatureLength(bytes4 _selector) internal view returns (uint256) {
-        if (guardian == address(0) || isOwnerEscapeCall(_selector) || isGuardianEscapeCall(_selector)) {
-            return 65;
-        }
-        return 130;
-    }
-
-    // IAccount implementation
+    /*************************************************** Validation ***************************************************/
 
     function validateTransaction(
         bytes32, // _transactionHash
@@ -272,6 +259,13 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         }
     }
 
+    function requiredSignatureLength(bytes4 _selector) internal view returns (uint256) {
+        if (guardian == address(0) || isOwnerEscapeCall(_selector) || isGuardianEscapeCall(_selector)) {
+            return 65;
+        }
+        return 130;
+    }
+
     function isValidTransaction(
         bytes32 _transactionHash,
         Transaction calldata _transaction,
@@ -303,6 +297,29 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         }
         address recovered = Signatures.recoverSigner(_hash, _guardianSignature);
         return recovered != address(0) && (recovered == guardian || recovered == guardianBackup);
+    }
+
+    function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {
+        (bytes memory ownerSignature, bytes memory guardianSignature) = Signatures.splitSignatures(_signature);
+        return isValidOwnerSignature(_hash, ownerSignature) && isValidGuardianSignature(_hash, guardianSignature);
+    }
+
+    // IERC1271
+    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4 _magic) {
+        if (_isValidSignature(_hash, _signature)) {
+            _magic = IERC1271.isValidSignature.selector;
+        }
+    }
+
+    /**************************************************** Execution ***************************************************/
+
+    function multicall(Call[] memory _calls) external {
+        requireOnlySelf();
+        for (uint256 i = 0; i < _calls.length; i++) {
+            Call memory call = _calls[i];
+            require(call.to != address(this), "argent/no-multicall-to-self");
+            _execute(call.to, call.value, call.data);
+        }
     }
 
     function executeTransaction(
@@ -356,8 +373,9 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         _transaction.processPaymasterInput();
     }
 
-    // IERC165 implementation
+    /****************************************************** Misc ******************************************************/
 
+    // IERC165
     function supportsInterface(bytes4 _interfaceId) external pure override returns (bool) {
         // NOTE: it'll be more efficient to use a mapping based implementation if there are more than 3 interfaces
         return
@@ -365,21 +383,6 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
             _interfaceId == type(IERC1271).interfaceId ||
             _interfaceId == type(IAccount).interfaceId;
     }
-
-    // IERC1271 implementation
-
-    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4 _magic) {
-        if (_isValidSignature(_hash, _signature)) {
-            _magic = IERC1271.isValidSignature.selector;
-        }
-    }
-
-    function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {
-        (bytes memory ownerSignature, bytes memory guardianSignature) = Signatures.splitSignatures(_signature);
-        return isValidOwnerSignature(_hash, ownerSignature) && isValidGuardianSignature(_hash, guardianSignature);
-    }
-
-    // fallback & receive
 
     fallback() external {
         // fallback of default account shouldn't be called by bootloader under no circumstances
