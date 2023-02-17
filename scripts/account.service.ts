@@ -1,5 +1,5 @@
 import { BigNumber, BytesLike } from "ethers";
-import hre, { ethers } from "hardhat";
+import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount } from "../typechain-types";
 import { getEnv } from "./config.service";
@@ -8,11 +8,7 @@ import { AccountDeploymentParams, ArgentInfrastructure } from "./model";
 import { ArgentSigner, Signatory } from "./signer.service";
 
 export const argentAccountContract = (deployedAddress: string, argent: ArgentInfrastructure) => {
-  const network = hre.config.networks[hre.network.name];
-  if (!("url" in network && network.url)) {
-    throw new Error(`Current network (${hre.network.name}) needs to have a 'url' property`);
-  }
-  const provider = new zksync.Provider(network.url);
+  const { provider } = argent.deployer.zkWallet;
   const account = new zksync.Contract(deployedAddress, argent.implementation.interface, provider) as ArgentAccount;
   return account;
 };
