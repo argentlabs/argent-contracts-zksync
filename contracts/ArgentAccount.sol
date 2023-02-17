@@ -208,10 +208,6 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
             return 65;
         }
         return 130;
-        
-            return 130;
-        }
-        return 65;
     }
 
     // IAccount implementation
@@ -307,9 +303,6 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         }
         address recovered = Signatures.recoverSigner(_hash, _guardianSignature);
         return recovered != address(0) && (recovered == guardian || recovered == guardianBackup);
-            return false;
-        }
-        return recovered == guardian || recovered == guardianBackup;
     }
 
     function executeTransaction(

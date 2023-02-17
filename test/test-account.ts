@@ -64,7 +64,8 @@ describe("Argent account", () => {
     });
 
     it("Should be initialized properly", async () => {
-      await expect(account.VERSION()).to.eventually.equal(ethers.utils.keccak256("0.0.1"));
+      const version = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("0.0.1"));
+      await expect(account.VERSION()).to.eventually.equal(version);
       await expect(account.owner()).to.eventually.equal(owner.address);
       await expect(account.guardian()).to.eventually.equal(guardian.address);
     });

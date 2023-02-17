@@ -36,7 +36,7 @@ contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
         bytes data;
     }
 
-    string public constant VERSION = "0.0.2";
+    bytes32 public constant VERSION = keccak256("0.0.2");
 
     uint8 public constant NO_ESCAPE = uint8(EscapeType.None);
     uint8 public constant GUARDIAN_ESCAPE = uint8(EscapeType.Guardian);
@@ -104,7 +104,8 @@ contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
-    function executeAfterUpgrade(string calldata _previousVersion, bytes calldata _data) external {
+    function executeAfterUpgrade(bytes32 _previousVersion, bytes calldata _data) external {
+        requireOnlySelf();
         newStorage = abi.decode(_data, (uint256));
     }
 
