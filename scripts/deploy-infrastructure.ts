@@ -1,7 +1,7 @@
 import "@nomiclabs/hardhat-ethers";
-import { saveConfig } from "./config.service";
-import { checkDeployer, getDeployer } from "./deployer.service";
-import { deployInfrastructure } from "./infrastructure.service";
+import { saveConfig } from "../src/config.service";
+import { checkDeployer, getDeployer } from "../src/deployer.service";
+import { deployInfrastructure } from "../src/infrastructure.service";
 
 (async () => {
   const { deployer } = getDeployer();

@@ -1,9 +1,9 @@
 import "@nomiclabs/hardhat-ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
-import { deployAccount } from "./account.service";
-import { checkDeployer, getDeployer } from "./deployer.service";
-import { getInfrastructure } from "./infrastructure.service";
+import { deployAccount } from "../src/account.service";
+import { checkDeployer, getDeployer } from "../src/deployer.service";
+import { getInfrastructure } from "../src/infrastructure.service";
 
 (async () => {
   const { deployer } = getDeployer();

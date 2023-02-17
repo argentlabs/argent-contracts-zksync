@@ -1,9 +1,9 @@
 import "@nomiclabs/hardhat-ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
-import { argentAccountContract, connect } from "./account.service";
-import { checkDeployer, getDeployer } from "./deployer.service";
-import { getInfrastructure } from "./infrastructure.service";
+import { argentAccountContract, connect } from "../src/account.service";
+import { checkDeployer, getDeployer } from "../src/deployer.service";
+import { getInfrastructure } from "../src/infrastructure.service";
 
 const drainAccountBalance = async () => {
   const { deployer, provider } = getDeployer();

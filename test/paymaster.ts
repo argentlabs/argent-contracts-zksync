@@ -5,12 +5,12 @@ import { BigNumber, BytesLike } from "ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { PaymasterParams, TransactionRequest } from "zksync-web3/build/src/types";
-import { deployAccount } from "../scripts/account.service";
-import { CustomDeployer, getDeployer } from "../scripts/deployer.service";
-import { deployTestDapp, getTestInfrastructure } from "../scripts/infrastructure.service";
-import { ArgentInfrastructure } from "../scripts/model";
-import { hashMeaningfulTransaction } from "../scripts/paymaster.service";
-import { ArgentSigner } from "../scripts/signer.service";
+import { deployAccount } from "../src/account.service";
+import { CustomDeployer, getDeployer } from "../src/deployer.service";
+import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
+import { ArgentInfrastructure } from "../src/model";
+import { hashMeaningfulTransaction } from "../src/paymaster.service";
+import { ArgentSigner } from "../src/signer.service";
 import { ArgentAccount, TestDapp } from "../typechain-types";
 
 const owner = zksync.Wallet.createRandom();

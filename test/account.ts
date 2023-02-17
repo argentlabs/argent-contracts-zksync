@@ -4,11 +4,11 @@ import { expect } from "chai";
 import { PopulatedTransaction } from "ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
-import { computeCreate2AddressFromSdk, connect, deployAccount } from "../scripts/account.service";
-import { checkDeployer, CustomDeployer, getDeployer } from "../scripts/deployer.service";
-import { deployTestDapp, getTestInfrastructure } from "../scripts/infrastructure.service";
-import { ArgentInfrastructure } from "../scripts/model";
-import { ArgentSigner } from "../scripts/signer.service";
+import { computeCreate2AddressFromSdk, connect, deployAccount } from "../src/account.service";
+import { checkDeployer, CustomDeployer, getDeployer } from "../src/deployer.service";
+import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
+import { ArgentInfrastructure } from "../src/model";
+import { ArgentSigner } from "../src/signer.service";
 import { ArgentAccount, TestDapp, UpgradedArgentAccount } from "../typechain-types";
 
 const { AddressZero } = ethers.constants;

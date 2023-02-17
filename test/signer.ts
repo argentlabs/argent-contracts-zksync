@@ -3,11 +3,11 @@ import "@nomiclabs/hardhat-ethers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
-import { deployAccount } from "../scripts/account.service";
-import { checkDeployer, getDeployer } from "../scripts/deployer.service";
-import { getTestInfrastructure } from "../scripts/infrastructure.service";
-import { ArgentInfrastructure } from "../scripts/model";
-import { ArgentSigner, Signatory } from "../scripts/signer.service";
+import { deployAccount } from "../src/account.service";
+import { checkDeployer, getDeployer } from "../src/deployer.service";
+import { getTestInfrastructure } from "../src/infrastructure.service";
+import { ArgentInfrastructure } from "../src/model";
+import { ArgentSigner, Signatory } from "../src/signer.service";
 import { ArgentAccount } from "../typechain-types";
 
 const { AddressZero } = ethers.constants;
