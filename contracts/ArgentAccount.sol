@@ -199,6 +199,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
 
     /*************************************************** Validation ***************************************************/
 
+    // IAccount
     function validateTransaction(
         bytes32, // _transactionHash
         bytes32 _suggestedSignedHash,
@@ -322,6 +323,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         }
     }
 
+    // IAccount
     function executeTransaction(
         bytes32, // _transactionHash
         bytes32, // _suggestedSignedHash
@@ -331,6 +333,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
     }
 
+    // IAccount
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
         requireOnlyBootloader();
         _validateTransaction(bytes32(0), _transaction); // The account recalculates the hash on its own
@@ -352,6 +355,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         }
     }
 
+    // IAccount
     function payForTransaction(
         bytes32, // _transactionHash
         bytes32, // _suggestedSignedHash
@@ -362,6 +366,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         require(success, "argent/failed-fee-payment");
     }
 
+    // IAccount
     // Here, the user should prepare for the transaction to be paid for by a paymaster
     // Here, the account should set the allowance for the smart contracts
     function prepareForPaymaster(

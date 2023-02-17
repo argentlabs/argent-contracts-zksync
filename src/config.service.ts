@@ -20,6 +20,9 @@ export const loadConfig = async (): Promise<IConfig> => {
 };
 
 export const saveConfig = async (newConfig: Partial<IConfig>) => {
+  if (hre.network.name === "local") {
+    return;
+  }
   const config = await loadConfig();
   const updated = JSON.stringify({ ...config, ...newConfig }, null, 2);
   fs.writeFileSync(`./config/${getEnv()}.json`, updated);
