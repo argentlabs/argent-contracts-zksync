@@ -12,13 +12,10 @@ export const getEnv = (): Env => {
 };
 
 export const loadConfig = async (): Promise<IConfig> => {
-  if (hre.network.name === "zkSyncMainnet") {
-    return JSON.parse(fs.readFileSync(`./config/mainnet.json`, "utf8"));
-  }
   try {
-    return JSON.parse(fs.readFileSync(`./config/${getEnv()}.json`, "utf8"));
+    return JSON.parse(fs.readFileSync(`./config/${hre.network.name}.json`, "utf8"));
   } catch {
-    return {} as IConfig;
+    throw new Error(`No config for network ${hre.network.name}`);
   }
 };
 

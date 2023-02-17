@@ -11,7 +11,6 @@ import { getTestInfrastructure } from "./infrastructure.service";
   const { deployer, provider } = getDeployer();
   await checkDeployer(deployer);
   const argent = await getTestInfrastructure(deployer);
-  const wallet = deployer.zkWallet;
 
   const eoa1 = zksync.Wallet.createRandom().connect(provider);
   const eoa2 = zksync.Wallet.createRandom().connect(provider);
@@ -24,6 +23,10 @@ import { getTestInfrastructure } from "./infrastructure.service";
   const guardianAddress = guardian.address;
   // const guardianAddress = ethers.constants.AddressZero;
 
+  const feeData = await deployer.zkWallet.provider.getFeeData();
+  console.log(`gasPrice: ${ethers.utils.formatUnits(feeData.gasPrice!, "gwei")} gwei`);
+
+  const wallet = deployer.zkWallet;
   const balanceBefore = await wallet.getBalance();
 
   const connect = [owner, guardian];
@@ -50,9 +53,6 @@ import { getTestInfrastructure } from "./infrastructure.service";
   let response, receipt;
   const ethusd = 1650;
 
-  const feeData = await deployer.zkWallet.provider.getFeeData();
-  console.log(`gasPrice: ${feeData.gasPrice}`);
-
   console.log("testing");
 
   const rows = [];
@@ -67,6 +67,7 @@ import { getTestInfrastructure } from "./infrastructure.service";
       gasUsed: gasUsed.toNumber(),
       fee: `${ethers.utils.formatEther(fee)} ETH`,
       feeUsd: formatUsd(fee.mul(ethusd)),
+      hash: receipt.transactionHash,
     };
   };
 

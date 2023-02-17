@@ -28,7 +28,7 @@ const drainAccountBalance = async () => {
   if (!feeData.gasPrice) {
     throw new Error("feeData.gasPrice is undefined");
   }
-  console.log(`gasPrice ${ethers.utils.formatEther(feeData.gasPrice)}`);
+  console.log(`gasPrice: ${ethers.utils.formatUnits(feeData.gasPrice!, "gwei")} gwei`);
   const fee = feeData.gasPrice.mul(gas).mul(1005).div(1000);
   console.log(`fee ${ethers.utils.formatEther(fee)}`);
   const value = balance.sub(fee);
