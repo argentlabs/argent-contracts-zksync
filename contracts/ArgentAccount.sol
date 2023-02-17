@@ -204,7 +204,11 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     function requiredSignatureLength(bytes4 _selector) internal view returns (uint256) {
-        if (guardian != address(0) && !isOwnerEscapeCall(_selector) && !isGuardianEscapeCall(_selector)) {
+        if (guardian == address(0) || isOwnerEscapeCall(_selector) || isGuardianEscapeCall(_selector)) {
+            return 65;
+        }
+        return 130;
+        
             return 130;
         }
         return 65;
