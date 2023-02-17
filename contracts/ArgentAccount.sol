@@ -305,7 +305,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
             return true;
         }
         address recovered = Signatures.recoverSigner(_hash, _guardianSignature);
-        if (recovered == address(0)) {
+        return recovered != address(0) && (recovered == guardian || recovered == guardianBackup);
             return false;
         }
         return recovered == guardian || recovered == guardianBackup;
