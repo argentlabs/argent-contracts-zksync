@@ -7,6 +7,22 @@ import { deployAccount } from "./account.service";
 import { checkDeployer, getDeployer } from "./deployer.service";
 import { getTestInfrastructure } from "./infrastructure.service";
 
+const ethusd = 1650;
+
+const formatUsd = (value: BigNumberish) => `$${ethers.utils.formatEther(value)}`.slice(0, 5);
+
+const toRow = (name: string, receipt: TransactionReceipt) => {
+  const { gasUsed, effectiveGasPrice } = receipt;
+  const fee = gasUsed.mul(effectiveGasPrice);
+  return {
+    name,
+    gasUsed: gasUsed.toNumber(),
+    fee: `${ethers.utils.formatEther(fee)} ETH`,
+    feeUsd: formatUsd(fee.mul(ethusd)),
+    hash: receipt.transactionHash,
+  };
+};
+
 (async () => {
   const { deployer, provider } = getDeployer();
   await checkDeployer(deployer);
@@ -50,26 +66,9 @@ import { getTestInfrastructure } from "./infrastructure.service";
   response4 = await account2.signer.sendTransaction({ to: wallet.address, value: 1 });
   await Promise.all([response1.wait(), response2.wait(), response3.wait(), response4.wait()]);
 
-  let response, receipt;
-  const ethusd = 1650;
-
   console.log("testing");
-
   const rows = [];
-
-  const formatUsd = (value: BigNumberish) => `$${ethers.utils.formatEther(value)}`.slice(0, 5);
-
-  const toRow = (name: string, receipt: TransactionReceipt) => {
-    const { gasUsed, effectiveGasPrice } = receipt;
-    const fee = gasUsed.mul(effectiveGasPrice);
-    return {
-      name,
-      gasUsed: gasUsed.toNumber(),
-      fee: `${ethers.utils.formatEther(fee)} ETH`,
-      feeUsd: formatUsd(fee.mul(ethusd)),
-      hash: receipt.transactionHash,
-    };
-  };
+  let response, receipt;
 
   response = await eoa1.sendTransaction({ to: eoa2.address, value: 51 });
   receipt = await response.wait();
@@ -91,5 +90,5 @@ import { getTestInfrastructure } from "./infrastructure.service";
 
   const balanceAfter = await wallet.getBalance();
   const cost = balanceBefore.sub(balanceAfter);
-  console.log(`Total cost: ${ethers.utils.formatEther(cost)} ETH, ${formatUsd(cost.mul(ethusd))}`);
+  console.log(`Total testing cost: ${ethers.utils.formatEther(cost)} ETH, ${formatUsd(cost.mul(ethusd))}`);
 })();
