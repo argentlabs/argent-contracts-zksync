@@ -229,7 +229,8 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         bytes32 _suggestedSignedHash,
         Transaction calldata _transaction
     ) internal returns (bytes4 _magic) {
-        // no need to check if account is initialized because it's done during proxy deployment
+        require(owner != address(0), "argent/uninitialized");
+
         _magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
 
         SystemContractsCaller.systemCallWithPropagatedRevert(
