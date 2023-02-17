@@ -11,8 +11,13 @@ const env = getEnv();
 let showPreamble = true;
 
 export const getDeployer = () => {
-  let privateKey = process.env[`PRIVATE_KEY_${env}`.toUpperCase()];
-  if (!privateKey && env === "local") {
+  let privateKey;
+  const network = hre.network.name;
+  if (network === "zkSyncMainnet") {
+    privateKey = process.env[`PRIVATE_KEY_MAINNET`];
+  } else if (network === "zkSyncTestnet") {
+    privateKey = process.env[`PRIVATE_KEY_GOERLI`];
+  } else if (network === "local") {
     try {
       [{ privateKey }] = require("../local-setup/rich-wallets.json");
     } catch {}
@@ -40,8 +45,8 @@ export const checkDeployer = async ({ zkWallet: { provider, address } }: Deploye
       showPreamble = false;
     }
 
-    if (balance.lt(ethers.utils.parseEther("0.01"))) {
-      throw new Error("Deployer has insufficient funds");
+    if (balance.lt(ethers.utils.parseEther("0.005"))) {
+      throw new Error("Deployer has very low funds");
     }
   } catch (error) {
     if (`${error}`.includes("noNetwork") && getEnv() === "local") {
@@ -89,7 +94,8 @@ export const verifyContract = async (
   { contractName, sourceName }: ZkSyncArtifact,
   constructorArguments: unknown[] = [],
 ) => {
-  if (getEnv() === "goerli") {
+  const network = hre.config.networks[hre.network.name];
+  if (network.verifyURL) {
     const fullyQualifiedName = `${sourceName}:${contractName}`;
     console.log(`Verifying source code of ${fullyQualifiedName} on zkSync explorer`);
     await hre.run("verify:verify", { address, contract: fullyQualifiedName, constructorArguments });

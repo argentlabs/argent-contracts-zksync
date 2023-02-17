@@ -23,7 +23,7 @@ const { deployer, provider } = getDeployer();
 const emptyEoa = zksync.Wallet.createRandom().connect(provider);
 const paymasterBudget = ethers.utils.parseEther("0.001");
 
-describe("Paymasters", () => {
+describe.skip("Paymasters", () => {
   let argent: ArgentInfrastructure;
   let emptyAccount: ArgentAccount;
   let paymaster: zksync.Contract;

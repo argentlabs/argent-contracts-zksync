@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.16;
 
-import {Transaction} from "@matterlabs/zksync-contracts/l2/system-contracts/TransactionHelper.sol";
+import {Transaction} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
 
 import {SponsorPaymaster} from "./SponsorPaymaster.sol";
 

@@ -5,37 +5,37 @@ import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomiclabs/hardhat-ethers";
 import "@typechain/hardhat";
 import "chai-as-promised";
-import dotenv from "dotenv";
-import { getEnv } from "./scripts/config.service";
-
-dotenv.config();
-
-const zkSyncTestnet =
-  getEnv() === "local"
-    ? {
-        url: "http://localhost:3050",
-        ethNetwork: "http://localhost:8545",
-        zksync: true,
-      }
-    : {
-        url: "https://zksync2-testnet.zksync.dev",
-        ethNetwork: "goerli", // Can also be the RPC URL of the network (e.g. `https://goerli.infura.io/v3/<API_KEY>`)
-        zksync: true,
-        verifyURL: "https://zksync2-testnet-explorer.zksync.dev/contract_verification",
-      };
+import "dotenv/config";
 
 module.exports = {
   zksolc: {
-    version: "1.2.3",
+    version: "1.3.1",
     compilerSource: "binary",
-    settings: {},
+    settings: {
+      isSystem: true,
+    },
   },
-  defaultNetwork: "zkSyncTestnet",
+  defaultNetwork: "local",
   networks: {
     hardhat: {
       zksync: true,
     },
-    zkSyncTestnet,
+    local: {
+      url: "http://localhost:3050",
+      ethNetwork: "http://localhost:8545",
+      zksync: true,
+    },
+    zkSyncTestnet: {
+      url: "https://zksync2-testnet.zksync.dev",
+      ethNetwork: `https://eth-goerli.alchemyapi.io/v2/${process.env.ALCHEMY_KEY}`,
+      verifyURL: "https://zksync2-testnet-explorer.zksync.dev/contract_verification",
+      zksync: true,
+    },
+    zkSyncMainnet: {
+      url: "https://zksync2-mainnet.zksync.io",
+      ethNetwork: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_KEY}`,
+      zksync: true,
+    },
   },
   solidity: {
     version: "0.8.16",

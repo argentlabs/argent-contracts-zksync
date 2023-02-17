@@ -13,9 +13,9 @@ import {SystemContractHelper} from "@matterlabs/zksync-contracts/l2/system-contr
 import {Transaction, TransactionHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
 import {Utils} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/Utils.sol";
 
-import {Signatures} from "./Signatures.sol";
+import {Signatures} from "../Signatures.sol";
 
-contract ArgentAccount is IAccount, IERC165, IERC1271 {
+contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
 
@@ -36,7 +36,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         bytes data;
     }
 
-    string public constant VERSION = "0.0.1";
+    string public constant VERSION = "0.0.2";
 
     uint8 public constant NO_ESCAPE = uint8(EscapeType.None);
     uint8 public constant GUARDIAN_ESCAPE = uint8(EscapeType.Guardian);
@@ -49,6 +49,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     address public guardian;
     address public guardianBackup;
     Escape public escape;
+    uint256 public newStorage; // !!! new storage slot
 
     event AccountCreated(address account, address owner, address guardian);
     event AccountUpgraded(address newImplementation);
@@ -104,7 +105,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
 
     // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
     function onAfterUpgrade(string calldata _previousVersion, bytes calldata _data) external {
-        // reserved upgrade callback for future account versions
+        newStorage = abi.decode(_data, (uint256));
     }
 
     function multicall(Call[] memory _calls) external {

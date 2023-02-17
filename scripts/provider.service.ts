@@ -1,12 +1,12 @@
+import hre from "hardhat";
 import * as zksync from "zksync-web3";
 import { TransactionResponse } from "zksync-web3/build/src/types";
-import { getEnv } from "./config.service";
 import { getDeployer } from "./deployer.service";
 
 type seconds = number;
 
 export const waitForTimestamp = async (deadline: seconds, provider: zksync.Provider, timeout: seconds = 60) => {
-  if (getEnv() === "local") {
+  if (hre.network.name === "local") {
     return waitForTimestampLocal(deadline, provider, timeout);
   }
   return waitForTimestampPublic(deadline, provider, timeout);

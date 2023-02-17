@@ -1,4 +1,5 @@
 import fs from "fs";
+import hre from "hardhat";
 import { IConfig } from "./model";
 
 export type Env = "local" | "goerli";
@@ -12,9 +13,9 @@ export const getEnv = (): Env => {
 
 export const loadConfig = async (): Promise<IConfig> => {
   try {
-    return JSON.parse(fs.readFileSync(`./config/${getEnv()}.json`, "utf8"));
+    return JSON.parse(fs.readFileSync(`./config/${hre.network.name}.json`, "utf8"));
   } catch {
-    return {} as IConfig;
+    throw new Error(`No config for network ${hre.network.name}`);
   }
 };
 

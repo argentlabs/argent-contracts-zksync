@@ -1,17 +1,24 @@
 import { BigNumber, BytesLike } from "ethers";
-import hre, { ethers } from "hardhat";
+import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount } from "../typechain-types";
+import { getEnv } from "./config.service";
 import { verifyContract } from "./deployer.service";
 import { AccountDeploymentParams, ArgentInfrastructure } from "./model";
 import { ArgentSigner, Signatory } from "./signer.service";
+
+export const argentAccountContract = (deployedAddress: string, argent: ArgentInfrastructure) => {
+  const { provider } = argent.deployer.zkWallet;
+  const account = new zksync.Contract(deployedAddress, argent.implementation.interface, provider) as ArgentAccount;
+  return account;
+};
 
 export const deployAccount = async ({
   argent,
   ownerAddress,
   guardianAddress,
   connect: signatories,
-  funds = "0.0001",
+  funds = undefined,
   salt = ethers.utils.randomBytes(32),
 }: AccountDeploymentParams): Promise<ArgentAccount> => {
   const { deployer, factory, implementation, artifacts } = argent;
@@ -22,13 +29,11 @@ export const deployAccount = async ({
   const initData = implementation.interface.encodeFunctionData("initialize", [ownerAddress, guardianAddress]);
   await verifyContract(deployedAddress, artifacts.proxy, [implementation.address, initData]);
 
-  const network = hre.config.networks.zkSyncTestnet;
-  if (!("url" in network && network.url)) {
-    throw new Error("network needs a 'url' property set");
-  }
-  const provider = new zksync.Provider(network.url);
-  const account = new zksync.Contract(deployedAddress, implementation.interface, provider) as ArgentAccount;
+  const account = argentAccountContract(deployedAddress, argent);
 
+  if (getEnv() === "local" && funds === undefined) {
+    funds = "0.001";
+  }
   if (funds) {
     const response = await deployer.zkWallet.transfer({
       to: account.address,
