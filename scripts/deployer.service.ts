@@ -94,7 +94,8 @@ export const verifyContract = async (
   { contractName, sourceName }: ZkSyncArtifact,
   constructorArguments: unknown[] = [],
 ) => {
-  if (getEnv() === "goerli") {
+  const network = hre.config.networks[hre.network.name];
+  if (network.verifyURL) {
     const fullyQualifiedName = `${sourceName}:${contractName}`;
     console.log(`Verifying source code of ${fullyQualifiedName} on zkSync explorer`);
     await hre.run("verify:verify", { address, contract: fullyQualifiedName, constructorArguments });
