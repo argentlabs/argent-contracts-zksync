@@ -98,13 +98,13 @@ contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
         require(isSupported, "argent/invalid-implementation");
         implementation = _newImplementation;
         emit AccountUpgraded(_newImplementation);
-        // using delegatecall to run the `onAfterUpgrade` function of the new implementation
-        (bool success, ) = _newImplementation.delegatecall(abi.encodeCall(this.onAfterUpgrade, (VERSION, _data)));
+        // using delegatecall to run the `executeAfterUpgrade` function of the new implementation
+        (bool success, ) = _newImplementation.delegatecall(abi.encodeCall(this.executeAfterUpgrade, (VERSION, _data)));
         require(success, "argent/upgrade-callback-failed");
     }
 
     // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
-    function onAfterUpgrade(string calldata _previousVersion, bytes calldata _data) external {
+    function executeAfterUpgrade(string calldata _previousVersion, bytes calldata _data) external {
         newStorage = abi.decode(_data, (uint256));
     }
 
@@ -284,7 +284,7 @@ contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
             if (isOwnerEscapeCall(selector)) {
                 return isValidGuardianSignature(_transactionHash, _signature);
             }
-            if (selector == this.onAfterUpgrade.selector) {
+            if (selector == this.executeAfterUpgrade.selector) {
                 return false;
             }
         }
