@@ -36,7 +36,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         bytes data;
     }
 
-    string public constant VERSION = "0.0.1";
+    bytes32 public constant VERSION = bytes32(abi.encodePacked("0.0.1-alpha.1"));
 
     uint8 public constant NO_ESCAPE = uint8(EscapeType.None);
     uint8 public constant GUARDIAN_ESCAPE = uint8(EscapeType.Guardian);
@@ -97,13 +97,14 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         require(isSupported, "argent/invalid-implementation");
         implementation = _newImplementation;
         emit AccountUpgraded(_newImplementation);
-        // using delegatecall to run the `onAfterUpgrade` function of the new implementation
-        (bool success, ) = _newImplementation.delegatecall(abi.encodeCall(this.onAfterUpgrade, (VERSION, _data)));
+        // using delegatecall to run the `executeAfterUpgrade` function of the new implementation
+        (bool success, ) = _newImplementation.delegatecall(abi.encodeCall(this.executeAfterUpgrade, (VERSION, _data)));
         require(success, "argent/upgrade-callback-failed");
     }
 
     // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
-    function onAfterUpgrade(string calldata _previousVersion, bytes calldata _data) external {
+    function executeAfterUpgrade(bytes32 _previousVersion, bytes calldata _data) external {
+        requireOnlySelf();
         // reserved upgrade callback for future account versions
     }
 
@@ -203,10 +204,10 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     function requiredSignatureLength(bytes4 _selector) internal view returns (uint256) {
-        if (guardian != address(0) && !isOwnerEscapeCall(_selector) && !isGuardianEscapeCall(_selector)) {
-            return 130;
+        if (guardian == address(0) || isOwnerEscapeCall(_selector) || isGuardianEscapeCall(_selector)) {
+            return 65;
         }
-        return 65;
+        return 130;
     }
 
     // IAccount implementation
@@ -224,7 +225,8 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         bytes32 _suggestedSignedHash,
         Transaction calldata _transaction
     ) internal returns (bytes4 _magic) {
-        // no need to check if account is initialized because it's done during proxy deployment
+        require(owner != address(0), "argent/uninitialized");
+
         _magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
 
         SystemContractsCaller.systemCallWithPropagatedRevert(
@@ -283,7 +285,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
             if (isOwnerEscapeCall(selector)) {
                 return isValidGuardianSignature(_transactionHash, _signature);
             }
-            if (selector == this.onAfterUpgrade.selector) {
+            if (selector == this.executeAfterUpgrade.selector) {
                 return false;
             }
         }
@@ -300,10 +302,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
             return true;
         }
         address recovered = Signatures.recoverSigner(_hash, _guardianSignature);
-        if (recovered == address(0)) {
-            return false;
-        }
-        return recovered == guardian || recovered == guardianBackup;
+        return recovered != address(0) && (recovered == guardian || recovered == guardianBackup);
     }
 
     function executeTransaction(

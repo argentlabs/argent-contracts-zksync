@@ -64,7 +64,9 @@ describe("Argent account", () => {
     });
 
     it("Should be initialized properly", async () => {
-      await expect(account.VERSION()).to.eventually.equal("0.0.1");
+      const version = new Uint8Array(32);
+      version.set(ethers.utils.toUtf8Bytes("0.0.1-alpha.1"));
+      await expect(account.VERSION()).to.eventually.equal(ethers.utils.hexlify(version));
       await expect(account.owner()).to.eventually.equal(owner.address);
       await expect(account.guardian()).to.eventually.equal(guardian.address);
     });
@@ -73,8 +75,7 @@ describe("Argent account", () => {
       const { abi } = argent.artifacts.implementation;
       const accountFromEoa = new zksync.Contract(account.address, abi, deployer.zkWallet);
       const promise = accountFromEoa.initialize(owner.address, guardian.address);
-      // await expect(promise).to.be.rejectedWith("argent/already-init");
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("argent/already-init");
     });
   });
 
@@ -103,12 +104,14 @@ describe("Argent account", () => {
     });
 
     it("Should revert when calling upgrade callback directly", async () => {
-      const promise = connect(account, [owner, guardian]).onAfterUpgrade("0.0.2", "0x");
+      const version = await account.VERSION();
+      const promise = connect(account, [owner, guardian]).executeAfterUpgrade(version, "0x");
       await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
     });
 
     it("Should revert when calling upgrade callback via multicall", async () => {
-      const call = makeCall(await account.populateTransaction.onAfterUpgrade("0.0.2", "0x"));
+      const version = await account.VERSION();
+      const call = makeCall(await account.populateTransaction.executeAfterUpgrade(version, "0x"));
       const promise = connect(account, [owner, guardian]).multicall([call]);
       // await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
       await expect(promise).to.be.rejected;
