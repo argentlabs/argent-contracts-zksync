@@ -9,7 +9,7 @@ import "dotenv/config";
 
 module.exports = {
   zksolc: {
-    version: "1.3.4",
+    version: "1.3.1",
     compilerSource: "binary",
     settings: {
       isSystem: true,

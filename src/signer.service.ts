@@ -31,6 +31,9 @@ export class ArgentSigner extends Signer {
   }
 
   async signMessage(message: Bytes | string): Promise<string> {
+    if (ethers.utils.isHexString(message)) {
+      message = ethers.utils.arrayify(message);
+    }
     return this.concatSignatures((signer) => signer.signMessage(message));
   }
 
