@@ -41,6 +41,8 @@ export const checkDeployer = async ({ zkWallet: { provider, address } }: Deploye
     const balance = await provider.getBalance(address);
     if (showPreamble) {
       await logBalance(address, balance, "Deployer");
+      const feeData = await provider.getFeeData();
+      console.log(`Gas price ${ethers.utils.formatUnits(feeData.gasPrice!, "gwei")} gwei`);
       console.log();
       showPreamble = false;
     }

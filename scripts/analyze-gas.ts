@@ -39,9 +39,6 @@ const toRow = (name: string, receipt: TransactionReceipt) => {
   const guardianAddress = guardian.address;
   // const guardianAddress = ethers.constants.AddressZero;
 
-  const feeData = await deployer.zkWallet.provider.getFeeData();
-  console.log(`gasPrice: ${ethers.utils.formatUnits(feeData.gasPrice!, "gwei")} gwei`);
-
   const wallet = deployer.zkWallet;
   const balanceBefore = await wallet.getBalance();
 

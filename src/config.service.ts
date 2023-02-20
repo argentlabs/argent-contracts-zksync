@@ -25,5 +25,5 @@ export const saveConfig = async (newConfig: Partial<IConfig>) => {
   }
   const config = await loadConfig();
   const updated = JSON.stringify({ ...config, ...newConfig }, null, 2);
-  fs.writeFileSync(`./config/${getEnv()}.json`, updated);
+  fs.writeFileSync(`./config/${hre.network.name}.json`, updated);
 };
