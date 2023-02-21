@@ -40,7 +40,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         uint8 escapeType; // packed EscapeType enum
     }
 
-    bytes32 public constant VERSION = bytes32(abi.encodePacked("0.0.1-alpha.1"));
+    bytes32 public constant VERSION = bytes32(abi.encodePacked("0.0.1-alpha.2"));
 
     uint8 public constant NO_ESCAPE = uint8(EscapeType.None);
     uint8 public constant GUARDIAN_ESCAPE = uint8(EscapeType.Guardian);

@@ -65,7 +65,7 @@ describe("Argent account", () => {
 
     it("Should be initialized properly", async () => {
       const version = new Uint8Array(32);
-      version.set(ethers.utils.toUtf8Bytes("0.0.1-alpha.1"));
+      version.set(ethers.utils.toUtf8Bytes("0.0.1-alpha.2"));
       await expect(account.VERSION()).to.eventually.equal(ethers.utils.hexlify(version));
       await expect(account.owner()).to.eventually.equal(owner.address);
       await expect(account.guardian()).to.eventually.equal(guardian.address);
@@ -83,7 +83,13 @@ describe("Argent account", () => {
     let testDapp: TestDapp;
 
     before(async () => {
-      account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
+      account = await deployAccount({
+        argent,
+        ownerAddress,
+        guardianAddress,
+        connect: [owner, guardian],
+        funds: "0.002",
+      });
       testDapp = await deployTestDapp(deployer);
     });
 
@@ -149,7 +155,7 @@ describe("Argent account", () => {
 
     it("Should transfer ETH from EOA to account 1", async () => {
       const balanceBefore = await provider.getBalance(account1.address);
-      const value = ethers.utils.parseEther("0.001");
+      const value = ethers.utils.parseEther("0.0025");
       const response = await deployer.zkWallet.sendTransaction({ to: account1.address, value });
       await response.wait();
 

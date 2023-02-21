@@ -36,7 +36,7 @@ contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
         bytes data;
     }
 
-    bytes32 public constant VERSION = bytes32(abi.encodePacked("0.0.2"));
+    bytes32 public constant VERSION = bytes32(abi.encodePacked("next"));
 
     uint8 public constant NO_ESCAPE = uint8(EscapeType.None);
     uint8 public constant GUARDIAN_ESCAPE = uint8(EscapeType.Guardian);
