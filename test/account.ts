@@ -79,83 +79,48 @@ describe("Argent account", () => {
     });
   });
 
-  describe("Account upgrade", () => {
-    let newImplementation: zksync.Contract;
+  describe("Account multicall", () => {
+    let testDapp: TestDapp;
 
     before(async () => {
-      account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: "0.0005" });
-      newImplementation = await deployer.deploy(argent.artifacts.implementation, [10]);
+      account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
+      testDapp = await deployTestDapp(deployer);
     });
 
-    it("Should revert with the wrong owner", async () => {
-      const promise = connect(account, [wrongOwner, guardian]).upgrade(newImplementation.address, "0x");
-      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
-    });
+    it("Should revert when one of the calls is to the account", async () => {
+      const dappCall = makeCall(await testDapp.populateTransaction.setNumber(42));
+      const recoveryCall = makeCall(await account.populateTransaction.triggerEscapeGuardian());
 
-    it("Should revert with the wrong guardian", async () => {
-      const promise = connect(account, [owner, wrongGuardian]).upgrade(newImplementation.address, "0x");
-      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
-    });
-
-    it("Should revert when new implementation isn't an IAccount", async () => {
-      const promise = connect(account, [owner, guardian]).upgrade(wrongGuardian.address, "0x");
-      // await expect(promise).to.be.rejectedWith("argent/invalid-implementation");
+      let promise = account.multicall([dappCall, recoveryCall]);
+      // await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
       await expect(promise).to.be.rejected;
-    });
 
-    it("Should revert when calling upgrade callback directly", async () => {
-      const version = await account.VERSION();
-      const promise = connect(account, [owner, guardian]).executeAfterUpgrade(version, "0x");
-      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
-    });
-
-    it("Should revert when calling upgrade callback via multicall", async () => {
-      const version = await account.VERSION();
-      const call = makeCall(await account.populateTransaction.executeAfterUpgrade(version, "0x"));
-      const promise = connect(account, [owner, guardian]).multicall([call]);
+      promise = account.multicall([recoveryCall, dappCall]);
       // await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
       await expect(promise).to.be.rejected;
     });
 
-    it("Should upgrade the account", async () => {
-      await expect(account.implementation()).to.eventually.equal(argent.implementation.address);
+    it("Should revert when one of the calls reverts", async () => {
+      const dappCall = makeCall(await testDapp.populateTransaction.setNumber(42));
+      const revertingCall = makeCall(await testDapp.populateTransaction.doRevert());
 
-      const promise = connect(account, [owner, guardian]).upgrade(newImplementation.address, "0x");
-
-      await expect(promise).to.emit(account, "AccountUpgraded").withArgs(newImplementation.address);
-      await expect(account.implementation()).to.eventually.equal(newImplementation.address);
-    });
-
-    it("Should upgrade the account and run the callback", async () => {
-      account = await deployAccount({
-        argent,
-        ownerAddress,
-        guardianAddress,
-        funds: "0.0005",
-        connect: [owner, guardian],
-      });
-
-      const artifact = await deployer.loadArtifact("UpgradedArgentAccount");
-      const newImplementation = await deployer.deploy(artifact, [10]);
-      const upgradedAccount = new zksync.Contract(
-        account.address,
-        artifact.abi,
-        account.provider,
-      ) as UpgradedArgentAccount;
-
-      await expect(upgradedAccount.newStorage()).to.be.reverted;
-
-      const promise = account.upgrade(newImplementation.address, "0x");
-      // await expect(promise).to.be.rejectedWith("argent/upgrade-callback-failed");
+      let promise = account.multicall([dappCall, revertingCall]);
       await expect(promise).to.be.rejected;
 
-      const value = 42;
-      const data = new ethers.utils.AbiCoder().encode(["uint256"], [value]);
+      promise = account.multicall([revertingCall, dappCall]);
+      await expect(promise).to.be.rejected;
+    });
 
-      const response = await account.upgrade(newImplementation.address, data);
+    it("Should successfully execute multiple calls", async () => {
+      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
+
+      const response = await account.multicall([
+        makeCall(await testDapp.populateTransaction.setNumber(59)),
+        makeCall(await testDapp.populateTransaction.increaseNumber(10)),
+      ]);
       await response.wait();
 
-      await expect(upgradedAccount.newStorage()).to.eventually.equal(value);
+      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(69n);
     });
   });
 
@@ -337,48 +302,83 @@ describe("Argent account", () => {
     });
   });
 
-  describe("Account multicall", () => {
-    let testDapp: TestDapp;
+  describe("Account upgrade", () => {
+    let newImplementation: zksync.Contract;
 
     before(async () => {
-      account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
-      testDapp = await deployTestDapp(deployer);
+      account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: "0.0005" });
+      newImplementation = await deployer.deploy(argent.artifacts.implementation, [10]);
     });
 
-    it("Should revert when one of the calls is to the account", async () => {
-      const dappCall = makeCall(await testDapp.populateTransaction.setNumber(42));
-      const recoveryCall = makeCall(await account.populateTransaction.triggerEscapeGuardian());
+    it("Should revert with the wrong owner", async () => {
+      const promise = connect(account, [wrongOwner, guardian]).upgrade(newImplementation.address, "0x");
+      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
+    });
 
-      let promise = account.multicall([dappCall, recoveryCall]);
+    it("Should revert with the wrong guardian", async () => {
+      const promise = connect(account, [owner, wrongGuardian]).upgrade(newImplementation.address, "0x");
+      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
+    });
+
+    it("Should revert when new implementation isn't an IAccount", async () => {
+      const promise = connect(account, [owner, guardian]).upgrade(wrongGuardian.address, "0x");
+      // await expect(promise).to.be.rejectedWith("argent/invalid-implementation");
+      await expect(promise).to.be.rejected;
+    });
+
+    it("Should revert when calling upgrade callback directly", async () => {
+      const version = await account.VERSION();
+      const promise = connect(account, [owner, guardian]).executeAfterUpgrade(version, "0x");
+      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
+    });
+
+    it("Should revert when calling upgrade callback via multicall", async () => {
+      const version = await account.VERSION();
+      const call = makeCall(await account.populateTransaction.executeAfterUpgrade(version, "0x"));
+      const promise = connect(account, [owner, guardian]).multicall([call]);
       // await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
       await expect(promise).to.be.rejected;
-
-      promise = account.multicall([recoveryCall, dappCall]);
-      // await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
-      await expect(promise).to.be.rejected;
     });
 
-    it("Should revert when one of the calls reverts", async () => {
-      const dappCall = makeCall(await testDapp.populateTransaction.setNumber(42));
-      const revertingCall = makeCall(await testDapp.populateTransaction.doRevert());
+    it("Should upgrade the account", async () => {
+      await expect(account.implementation()).to.eventually.equal(argent.implementation.address);
 
-      let promise = account.multicall([dappCall, revertingCall]);
-      await expect(promise).to.be.rejected;
+      const promise = connect(account, [owner, guardian]).upgrade(newImplementation.address, "0x");
 
-      promise = account.multicall([revertingCall, dappCall]);
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.emit(account, "AccountUpgraded").withArgs(newImplementation.address);
+      await expect(account.implementation()).to.eventually.equal(newImplementation.address);
     });
 
-    it("Should successfully execute multiple calls", async () => {
-      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
+    it("Should upgrade the account and run the callback", async () => {
+      account = await deployAccount({
+        argent,
+        ownerAddress,
+        guardianAddress,
+        funds: "0.0005",
+        connect: [owner, guardian],
+      });
 
-      const response = await account.multicall([
-        makeCall(await testDapp.populateTransaction.setNumber(59)),
-        makeCall(await testDapp.populateTransaction.increaseNumber(10)),
-      ]);
+      const artifact = await deployer.loadArtifact("UpgradedArgentAccount");
+      const newImplementation = await deployer.deploy(artifact, [10]);
+      const upgradedAccount = new zksync.Contract(
+        account.address,
+        artifact.abi,
+        account.provider,
+      ) as UpgradedArgentAccount;
+
+      await expect(upgradedAccount.newStorage()).to.be.reverted;
+
+      const promise = account.upgrade(newImplementation.address, "0x");
+      // await expect(promise).to.be.rejectedWith("argent/upgrade-callback-failed");
+      await expect(promise).to.be.rejected;
+
+      const value = 42;
+      const data = new ethers.utils.AbiCoder().encode(["uint256"], [value]);
+
+      const response = await account.upgrade(newImplementation.address, data);
       await response.wait();
 
-      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(69n);
+      await expect(upgradedAccount.newStorage()).to.eventually.equal(value);
     });
   });
 
