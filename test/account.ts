@@ -9,7 +9,7 @@ import { checkDeployer, CustomDeployer, getDeployer } from "../src/deployer.serv
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
 import { ArgentSigner } from "../src/signer.service";
-import { ArgentAccount, TestDapp, UpgradedArgentAccount } from "../typechain-types";
+import { ArgentAccount, IMulticall, TestDapp, UpgradedArgentAccount } from "../typechain-types";
 
 const { AddressZero } = ethers.constants;
 
@@ -26,7 +26,7 @@ const { deployer, deployerAddress, provider } = getDeployer();
 console.log(`owner private key: ${owner.privateKey} (${ownerAddress})`);
 console.log(`guardian private key: ${guardian.privateKey} (${guardianAddress})`);
 
-const makeCall = ({ to = AddressZero, data = "0x" }: PopulatedTransaction): ArgentAccount.CallStruct => ({
+const makeCall = ({ to = AddressZero, data = "0x" }: PopulatedTransaction): IMulticall.CallStruct => ({
   to,
   value: 0,
   data,
@@ -85,6 +85,11 @@ describe("Argent account", () => {
     before(async () => {
       account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
       testDapp = await deployTestDapp(deployer);
+    });
+
+    it("Should support the IMulticall interface", async () => {
+      const interfaceId = account.interface.getSighash("multicall");
+      await expect(account.supportsInterface(interfaceId)).to.eventually.be.true;
     });
 
     it("Should revert when one of the calls is to the account", async () => {
