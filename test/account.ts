@@ -9,7 +9,7 @@ import { checkDeployer, CustomDeployer, getDeployer } from "../src/deployer.serv
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
 import { ArgentSigner } from "../src/signer.service";
-import { ArgentAccount, TestDapp, UpgradedArgentAccount } from "../typechain-types";
+import { ArgentAccount, IMulticall, TestDapp, UpgradedArgentAccount } from "../typechain-types";
 
 const { AddressZero } = ethers.constants;
 
@@ -26,7 +26,7 @@ const { deployer, deployerAddress, provider } = getDeployer();
 console.log(`owner private key: ${owner.privateKey} (${ownerAddress})`);
 console.log(`guardian private key: ${guardian.privateKey} (${guardianAddress})`);
 
-const makeCall = ({ to = AddressZero, data = "0x" }: PopulatedTransaction): ArgentAccount.CallStruct => ({
+const makeCall = ({ to = AddressZero, data = "0x" }: PopulatedTransaction): IMulticall.CallStruct => ({
   to,
   value: 0,
   data,
@@ -65,7 +65,7 @@ describe("Argent account", () => {
 
     it("Should be initialized properly", async () => {
       const version = new Uint8Array(32);
-      version.set(ethers.utils.toUtf8Bytes("0.0.1-alpha.1"));
+      version.set(ethers.utils.toUtf8Bytes("0.0.1-alpha.2"));
       await expect(account.VERSION()).to.eventually.equal(ethers.utils.hexlify(version));
       await expect(account.owner()).to.eventually.equal(owner.address);
       await expect(account.guardian()).to.eventually.equal(guardian.address);
@@ -83,8 +83,19 @@ describe("Argent account", () => {
     let testDapp: TestDapp;
 
     before(async () => {
-      account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
+      account = await deployAccount({
+        argent,
+        ownerAddress,
+        guardianAddress,
+        connect: [owner, guardian],
+        funds: "0.002",
+      });
       testDapp = await deployTestDapp(deployer);
+    });
+
+    it("Should support the IMulticall interface", async () => {
+      const interfaceId = account.interface.getSighash("multicall");
+      await expect(account.supportsInterface(interfaceId)).to.eventually.be.true;
     });
 
     it("Should revert when one of the calls is to the account", async () => {
@@ -144,7 +155,7 @@ describe("Argent account", () => {
 
     it("Should transfer ETH from EOA to account 1", async () => {
       const balanceBefore = await provider.getBalance(account1.address);
-      const value = ethers.utils.parseEther("0.001");
+      const value = ethers.utils.parseEther("0.0025");
       const response = await deployer.zkWallet.sendTransaction({ to: account1.address, value });
       await response.wait();
 

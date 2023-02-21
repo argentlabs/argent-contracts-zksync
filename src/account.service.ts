@@ -1,8 +1,7 @@
 import { BigNumber, BytesLike } from "ethers";
-import { ethers } from "hardhat";
+import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount } from "../typechain-types";
-import { getEnv } from "./config.service";
 import { verifyContract } from "./deployer.service";
 import { AccountDeploymentParams, ArgentInfrastructure } from "./model";
 import { ArgentSigner, Signatory } from "./signer.service";
@@ -31,7 +30,7 @@ export const deployAccount = async ({
 
   const account = argentAccountContract(deployedAddress, argent);
 
-  if (getEnv() === "local" && funds === undefined) {
+  if (hre.network.name === "local" && funds === undefined) {
     funds = "0.001";
   }
   if (funds) {

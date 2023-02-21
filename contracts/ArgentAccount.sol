@@ -15,7 +15,17 @@ import {Utils} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/
 
 import {Signatures} from "./Signatures.sol";
 
-contract ArgentAccount is IAccount, IERC165, IERC1271 {
+interface IMulticall {
+    struct Call {
+        address to;
+        uint256 value;
+        bytes data;
+    }
+
+    function multicall(Call[] memory _calls) external;
+}
+
+contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
 
@@ -30,13 +40,7 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
         uint8 escapeType; // packed EscapeType enum
     }
 
-    struct Call {
-        address to;
-        uint256 value;
-        bytes data;
-    }
-
-    bytes32 public constant VERSION = bytes32(abi.encodePacked("0.0.1-alpha.1"));
+    bytes32 public constant VERSION = bytes32(abi.encodePacked("0.0.1-alpha.2"));
 
     uint8 public constant NO_ESCAPE = uint8(EscapeType.None);
     uint8 public constant GUARDIAN_ESCAPE = uint8(EscapeType.Guardian);
@@ -314,10 +318,11 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
 
     /**************************************************** Execution ***************************************************/
 
-    function multicall(Call[] memory _calls) external {
+    // IMulticall
+    function multicall(IMulticall.Call[] memory _calls) external {
         requireOnlySelf();
         for (uint256 i = 0; i < _calls.length; i++) {
-            Call memory call = _calls[i];
+            IMulticall.Call memory call = _calls[i];
             require(call.to != address(this), "argent/no-multicall-to-self");
             _execute(call.to, call.value, call.data);
         }
@@ -382,10 +387,11 @@ contract ArgentAccount is IAccount, IERC165, IERC1271 {
 
     // IERC165
     function supportsInterface(bytes4 _interfaceId) external pure override returns (bool) {
-        // NOTE: it'll be more efficient to use a mapping based implementation if there are more than 3 interfaces
+        // NOTE: it's more efficient to use a mapping based implementation if there are more than 3 interfaces
         return
             _interfaceId == type(IERC165).interfaceId ||
             _interfaceId == type(IERC1271).interfaceId ||
+            _interfaceId == type(IMulticall).interfaceId ||
             _interfaceId == type(IAccount).interfaceId;
     }
 
