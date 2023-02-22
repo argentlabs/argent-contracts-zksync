@@ -2,7 +2,7 @@
 pragma solidity 0.8.18;
 
 contract TestDapp {
-    mapping(address => uint256) public userNumbers;
+    mapping(address user => uint256 number) public userNumbers;
 
     function setNumber(uint256 _number) external {
         userNumbers[msg.sender] = _number;
