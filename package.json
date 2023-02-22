@@ -9,6 +9,7 @@
     "stop": "cd local-setup && docker-compose down",
     "test": "hardhat test --typecheck",
     "lint": "solhint contracts/**/*.sol",
+    "recompile": "hardhat clean && hardhat compile",
     "format": "prettier --write test scripts",
     "format:check": "prettier --check test scripts",
     "postinstall": "./bin/postinstall.sh",

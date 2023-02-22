@@ -104,7 +104,7 @@ contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
-    function executeAfterUpgrade(bytes32 _previousVersion, bytes calldata _data) external {
+    function executeAfterUpgrade(bytes32 /*_previousVersion*/, bytes calldata _data) external {
         requireOnlySelf();
         newStorage = abi.decode(_data, (uint256));
     }
