@@ -9,7 +9,7 @@ import "dotenv/config";
 
 module.exports = {
   zksolc: {
-    version: "1.3.1",
+    version: "1.3.5",
     compilerSource: "binary",
     settings: {
       isSystem: true,
@@ -38,7 +38,7 @@ module.exports = {
     },
   },
   solidity: {
-    version: "0.8.16",
+    version: "0.8.18",
   },
   mocha: {
     timeout: 60_000,
