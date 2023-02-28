@@ -190,6 +190,22 @@ describe("Recovery", () => {
       expect(escapeAfter.activeAt).to.equal(activeAtExpected);
       expect(escapeAfter.escapeType).to.equal(ownerEscape);
     });
+
+    it("Should run trigger methods twice", async () => {
+      const account = await deployAccount({ argent, ownerAddress, guardianAddress });
+
+      let promise = connect(account, [guardian]).triggerEscapeOwner();
+      await expect(promise).to.emit(account, "EscapeOwnerTriggerred");
+
+      promise = connect(account, [guardian]).triggerEscapeOwner();
+      await expect(promise).to.emit(account, "EscapeOwnerTriggerred");
+
+      promise = connect(account, [owner]).triggerEscapeGuardian();
+      await expect(promise).to.emit(account, "EscapeGuardianTriggerred");
+
+      promise = connect(account, [owner]).triggerEscapeGuardian();
+      await expect(promise).to.emit(account, "EscapeGuardianTriggerred");
+    });
   });
 
   describe("Escaping", () => {
@@ -319,26 +335,28 @@ describe("Recovery", () => {
     });
   });
 
-  it("Should cancel an escape", async () => {
-    const account = await deployAccount({ argent, ownerAddress, guardianAddress });
+  describe("Canceling escape", () => {
+    it("Should cancel an escape", async () => {
+      const account = await deployAccount({ argent, ownerAddress, guardianAddress });
 
-    // guardian triggers a owner escape
-    const response = await connect(account, [guardian]).triggerEscapeOwner();
-    await response.wait();
+      // guardian triggers a owner escape
+      const response = await connect(account, [guardian]).triggerEscapeOwner();
+      await response.wait();
 
-    const escape = await account.escape();
-    expect(escape.activeAt).to.be.greaterThan(0n);
-    expect(escape.escapeType).to.equal(ownerEscape);
+      const escape = await account.escape();
+      expect(escape.activeAt).to.be.greaterThan(0n);
+      expect(escape.escapeType).to.equal(ownerEscape);
 
-    // should fail to cancel with just the owner signature
-    const rejectingPromise = connect(account, [owner]).cancelEscape();
-    await expect(rejectingPromise).to.be.rejectedWith("Account validation returned invalid magic value");
+      // should fail to cancel with just the owner signature
+      const rejectingPromise = connect(account, [owner]).cancelEscape();
+      await expect(rejectingPromise).to.be.rejectedWith("Account validation returned invalid magic value");
 
-    const resolvingPromise = connect(account, [owner, guardian]).cancelEscape();
-    await expect(resolvingPromise).to.emit(account, "EscapeCancelled");
+      const resolvingPromise = connect(account, [owner, guardian]).cancelEscape();
+      await expect(resolvingPromise).to.emit(account, "EscapeCancelled");
 
-    const secondEscape = await account.escape();
-    expect(secondEscape.activeAt).to.equal(0n);
-    expect(secondEscape.escapeType).to.equal(noEscape);
+      const secondEscape = await account.escape();
+      expect(secondEscape.activeAt).to.equal(0n);
+      expect(secondEscape.escapeType).to.equal(noEscape);
+    });
   });
 });

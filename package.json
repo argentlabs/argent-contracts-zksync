@@ -13,7 +13,7 @@
     "format": "prettier --write test scripts",
     "format:check": "prettier --check test scripts",
     "postinstall": "./bin/postinstall.sh",
-    "clean": "hardhat clean && cd local-setup && ./clear.sh"
+    "clear": "hardhat clean && cd local-setup && ./clear.sh"
   },
   "devDependencies": {
     "@matterlabs/hardhat-zksync-deploy": "^0.6.1",
