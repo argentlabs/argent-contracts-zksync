@@ -1,15 +1,16 @@
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomiclabs/hardhat-ethers";
 import { expect } from "chai";
-import { PopulatedTransaction } from "ethers";
+import { BytesLike, PopulatedTransaction } from "ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { computeCreate2AddressFromSdk, connect, deployAccount } from "../src/account.service";
 import { checkDeployer, CustomDeployer, getDeployer } from "../src/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
-import { ArgentSigner } from "../src/signer.service";
+import { ArgentSigner, TransactionRequest } from "../src/signer.service";
 import { ArgentAccount, IMulticall, TestDapp, UpgradedArgentAccount } from "../typechain-types";
+import { TransactionStruct } from "../typechain-types/@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccount";
 
 const { AddressZero } = ethers.constants;
 
@@ -409,6 +410,69 @@ describe("Argent account", () => {
 
       const balanceAfter = await provider.getBalance(account.address);
       expect(balanceAfter).to.be.lessThan(balanceBefore);
+    });
+  });
+
+  describe("Priority mode (from outside / L1)", () => {
+    let testDapp: TestDapp;
+    let signer: ArgentSigner;
+
+    const toSolidityTransaction = (transaction: TransactionRequest, signature: BytesLike): TransactionStruct => {
+      const signInput = zksync.EIP712Signer.getSignInput(transaction);
+      return {
+        ...signInput,
+        reserved: [0, 0, 0, 0],
+        signature,
+        factoryDeps: [],
+        paymasterInput: "0x",
+        reservedDynamic: "0x",
+      };
+    };
+
+    before(async () => {
+      account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
+      signer = account.signer as ArgentSigner;
+      testDapp = await deployTestDapp(deployer);
+    });
+
+    it("Should refuse to execute a priority transaction with invalid signature", async () => {
+      const transaction = await testDapp.populateTransaction.setNumber(42n);
+      const populated = await signer.populateTransaction(transaction);
+      const signature = await new ArgentSigner(account, ["random", "random"]).getSignature(populated);
+      const struct = toSolidityTransaction(populated, signature);
+      const calldata = account.interface.encodeFunctionData("executeTransactionFromOutside", [struct]);
+
+      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
+
+      // initiating L2 transfer via L1 execute from zksync wallet
+      const response = await deployer.zkWallet.requestExecute({
+        contractAddress: account.address,
+        calldata,
+        l2GasLimit: zksync.utils.RECOMMENDED_DEPOSIT_L2_GAS_LIMIT,
+      });
+      await expect(response.wait()).to.be.rejected;
+
+      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
+    });
+
+    it("Should execute a priority transaction", async () => {
+      const transaction = await testDapp.populateTransaction.setNumber(42n);
+      const populated = await signer.populateTransaction(transaction);
+      const signature = await signer.getSignature(populated);
+      const struct = toSolidityTransaction(populated, signature);
+      const calldata = account.interface.encodeFunctionData("executeTransactionFromOutside", [struct]);
+
+      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
+
+      // initiating L2 transfer via L1 execute from zksync wallet
+      const response = await deployer.zkWallet.requestExecute({
+        contractAddress: account.address,
+        calldata,
+        l2GasLimit: zksync.utils.RECOMMENDED_DEPOSIT_L2_GAS_LIMIT,
+      });
+      await response.wait();
+
+      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(42n);
     });
   });
 });
