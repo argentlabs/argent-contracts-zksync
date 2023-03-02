@@ -32,7 +32,7 @@ export const getDeployer = () => {
   return { deployer, deployerAddress: address, provider };
 };
 
-export const checkDeployer = async ({ zkWallet: { provider, address } }: Deployer) => {
+export const checkDeployer = async ({ zkWallet: { provider, providerL1, address } }: Deployer) => {
   try {
     if (showPreamble) {
       console.log(`Using env "${env}" and hardhat network "${hre.network.name}"`);
@@ -41,8 +41,10 @@ export const checkDeployer = async ({ zkWallet: { provider, address } }: Deploye
     const balance = await provider.getBalance(address);
     if (showPreamble) {
       await logBalance(address, balance, "Deployer");
-      const feeData = await provider.getFeeData();
-      console.log(`Gas price ${ethers.utils.formatUnits(feeData.gasPrice!, "gwei")} gwei`);
+      let feeData = await provider.getFeeData();
+      console.log(`L2 gas price ${ethers.utils.formatUnits(feeData.gasPrice!, "gwei")} gwei`);
+      feeData = await providerL1!.getFeeData();
+      console.log(`L1 gas price ${ethers.utils.formatUnits(feeData.gasPrice!, "gwei")} gwei`);
       console.log();
       showPreamble = false;
     }
