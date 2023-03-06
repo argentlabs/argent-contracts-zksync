@@ -474,5 +474,21 @@ describe("Argent account", () => {
 
       await expect(testDapp.userNumbers(account.address)).to.eventually.equal(42n);
     });
+
+    it("Should execute a priority transaction from L2", async () => {
+      testDapp = await deployTestDapp(deployer);
+      const transaction = await testDapp.populateTransaction.setNumber(42n);
+      const populated = await signer.populateTransaction(transaction);
+      const signature = await signer.getSignature(populated);
+      const struct = toSolidityTransaction(populated, signature);
+
+      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
+
+      const fromEoa = new zksync.Contract(account.address, account.interface, deployer.zkWallet) as ArgentAccount;
+      const response = await fromEoa.executeTransactionFromOutside(struct);
+      await response.wait();
+
+      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(42n);
+    });
   });
 });
