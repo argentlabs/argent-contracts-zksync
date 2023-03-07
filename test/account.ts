@@ -103,12 +103,10 @@ describe("Argent account", () => {
       const recoveryCall = makeCall(await account.populateTransaction.triggerEscapeGuardian());
 
       let promise = account.multicall([dappCall, recoveryCall]);
-      // await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
 
       promise = account.multicall([recoveryCall, dappCall]);
-      // await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
     });
 
     it("Should revert when one of the calls reverts", async () => {
@@ -116,10 +114,10 @@ describe("Argent account", () => {
       const revertingCall = makeCall(await testDapp.populateTransaction.doRevert());
 
       let promise = account.multicall([dappCall, revertingCall]);
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("foobarbaz");
 
       promise = account.multicall([revertingCall, dappCall]);
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("foobarbaz");
     });
 
     it("Should successfully execute multiple calls", async () => {
@@ -298,8 +296,7 @@ describe("Argent account", () => {
 
       it("Should revert calls that require the guardian to be set", async () => {
         account = connect(account, [newOwner]);
-        // await expect(account.triggerEscapeGuardian()).to.be.rejectedWith("argent/guardian-required");
-        await expect(account.triggerEscapeGuardian()).to.be.rejected;
+        await expect(account.triggerEscapeGuardian()).to.be.rejectedWith("argent/guardian-required");
       });
 
       it("Should add a guardian", async () => {
@@ -333,8 +330,7 @@ describe("Argent account", () => {
 
     it("Should revert when new implementation isn't an IAccount", async () => {
       const promise = connect(account, [owner, guardian]).upgrade(wrongGuardian.address, "0x");
-      // await expect(promise).to.be.rejectedWith("argent/invalid-implementation");
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("argent/invalid-implementation");
     });
 
     it("Should revert when calling upgrade callback directly", async () => {
@@ -347,8 +343,7 @@ describe("Argent account", () => {
       const version = await account.VERSION();
       const call = makeCall(await account.populateTransaction.executeAfterUpgrade(version, "0x"));
       const promise = connect(account, [owner, guardian]).multicall([call]);
-      // await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
     });
 
     it("Should upgrade the account", async () => {
@@ -380,8 +375,7 @@ describe("Argent account", () => {
       await expect(upgradedAccount.newStorage()).to.be.reverted;
 
       const promise = account.upgrade(newImplementation.address, "0x");
-      // await expect(promise).to.be.rejectedWith("argent/upgrade-callback-failed");
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("argent/upgrade-callback-failed");
 
       const value = 42;
       const data = new ethers.utils.AbiCoder().encode(["uint256"], [value]);
