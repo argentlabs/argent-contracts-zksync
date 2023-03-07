@@ -13,6 +13,6 @@ contract TestDapp {
     }
 
     function doRevert() external pure {
-        revert();
+        revert("foobarbaz");
     }
 }

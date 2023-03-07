@@ -132,8 +132,7 @@ describe("Recovery", () => {
     it("Should fail when no guardian", async () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress: AddressZero, connect: [owner] });
       const promise = account.changeGuardianBackup(newGuardianBackup.address);
-      // await expect(promise).to.be.rejectedWith("argent/guardian-required");
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("argent/guardian-required");
     });
   });
 
@@ -230,8 +229,7 @@ describe("Recovery", () => {
       expect(escape.escapeType).to.equal(guardianEscape);
 
       // should fail to escape before the end of the period
-      // await expect(account.escapeGuardian(newGuardian.address)).to.be.rejectedWith("argent/inactive-escape");
-      await expect(account.escapeGuardian(newGuardian.address)).to.be.rejected;
+      await expect(account.escapeGuardian(newGuardian.address)).to.be.rejectedWith("argent/inactive-escape");
 
       // wait security period
       await waitForTimestamp(escape.activeAt, provider);
@@ -267,8 +265,7 @@ describe("Recovery", () => {
       expect(escape.escapeType).to.equal(ownerEscape);
 
       // should fail to escape before the end of the period
-      // await expect(account.escapeOwner(newOwner.address)).to.be.rejectedWith("argent/inactive-escape");
-      await expect(account.escapeOwner(newOwner.address)).to.be.rejected;
+      await expect(account.escapeOwner(newOwner.address)).to.be.rejectedWith("argent/inactive-escape");
 
       // wait security period
       await waitForTimestamp(escape.activeAt, provider);
@@ -326,8 +323,7 @@ describe("Recovery", () => {
 
       // guardian cannot override
       const promise = connect(account, [guardian]).triggerEscapeOwner();
-      // await expect(promise).to.be.rejectedWith("argent/cannot-override-owner-escape");
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("argent/cannot-override-owner-escape");
 
       const secondEscape = await account.escape();
       expect(secondEscape.activeAt).to.equal(escape.activeAt);

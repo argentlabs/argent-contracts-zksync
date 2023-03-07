@@ -352,11 +352,14 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
             SystemContractsCaller.systemCallWithPropagatedRevert(gas, to, value128, data);
         } else {
             // using assembly saves us a returndatacopy of the entire return data
-            bool success;
             assembly {
-                success := call(gas(), to, value128, add(data, 0x20), mload(data), 0, 0)
+                let success := call(gas(), to, value, add(data, 0x20), mload(data), 0, 0)
+                if iszero(success) {
+                    let size := returndatasize()
+                    returndatacopy(0, 0, size)
+                    revert(0, size)
+                }
             }
-            require(success);
         }
     }
 
