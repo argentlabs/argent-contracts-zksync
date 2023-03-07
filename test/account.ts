@@ -432,7 +432,7 @@ describe("Argent account", () => {
     before(async () => {
       account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
       signer = account.signer as ArgentSigner;
-      testDapp = await deployTestDapp(deployer);
+      testDapp = (await deployTestDapp(deployer)).connect(signer);
     });
 
     it("Should refuse to execute a priority transaction with invalid signature", async () => {
@@ -476,7 +476,7 @@ describe("Argent account", () => {
     });
 
     it("Should execute a priority transaction from L2", async () => {
-      testDapp = await deployTestDapp(deployer);
+      testDapp = (await deployTestDapp(deployer)).connect(signer);
       const transaction = await testDapp.populateTransaction.setNumber(42n);
       const populated = await signer.populateTransaction(transaction);
       const signature = await signer.getSignature(populated);
