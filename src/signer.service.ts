@@ -47,6 +47,9 @@ export class ArgentSigner extends Signer {
 
   async populateTransaction(transaction: TransactionRequest): Promise<TransactionRequest> {
     const from = this.address;
+    if (transaction.from && transaction.from !== from) {
+      throw new Error(`This signer can only sign transactions from ${from}, got ${transaction.from} instead.`);
+    }
     return {
       ...transaction,
       type: zksync.utils.EIP712_TX_TYPE,
