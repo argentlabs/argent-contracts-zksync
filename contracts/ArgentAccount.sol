@@ -150,28 +150,28 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Recovery ****************************************************/
 
-    function changeOwner(address _newOwner) public {
+    function changeOwner(address _newOwner) external {
         requireOnlySelf();
         require(_newOwner != address(0), "argent/null-owner");
         owner = _newOwner;
         emit OwnerChanged(_newOwner);
     }
 
-    function changeGuardian(address _newGuardian) public {
+    function changeGuardian(address _newGuardian) external {
         requireOnlySelf();
         require(_newGuardian != address(0) || guardianBackup == address(0), "argent/backup-should-be-null");
         guardian = _newGuardian;
         emit GuardianChanged(_newGuardian);
     }
 
-    function changeGuardianBackup(address _newGuardianBackup) public {
+    function changeGuardianBackup(address _newGuardianBackup) external {
         requireOnlySelf();
         requireGuardian();
         guardianBackup = _newGuardianBackup;
         emit GuardianBackupChanged(_newGuardianBackup);
     }
 
-    function triggerEscapeOwner() public {
+    function triggerEscapeOwner() external {
         requireOnlySelf();
         requireGuardian();
         // no escape if there is an guardian escape triggered by the owner in progress
@@ -184,7 +184,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         emit EscapeOwnerTriggerred(activeAt);
     }
 
-    function triggerEscapeGuardian() public {
+    function triggerEscapeGuardian() external {
         requireOnlySelf();
         requireGuardian();
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
@@ -192,7 +192,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         emit EscapeGuardianTriggerred(activeAt);
     }
 
-    function cancelEscape() public {
+    function cancelEscape() external {
         requireOnlySelf();
         require(escape.activeAt != 0 && escape.escapeType != NO_ESCAPE, "argent/not-escaping");
 
@@ -200,7 +200,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         emit EscapeCancelled();
     }
 
-    function escapeOwner(address _newOwner) public {
+    function escapeOwner(address _newOwner) external {
         requireOnlySelf();
         requireGuardian();
         require(_newOwner != address(0), "argent/null-owner");
@@ -213,7 +213,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         emit OwnerEscaped(_newOwner);
     }
 
-    function escapeGuardian(address _newGuardian) public {
+    function escapeGuardian(address _newGuardian) external {
         requireOnlySelf();
         requireGuardian();
         require(_newGuardian != address(0), "argent/null-guardian");
