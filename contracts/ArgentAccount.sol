@@ -311,8 +311,6 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     ) internal returns (bytes4 _magic) {
         require(owner != address(0), "argent/uninitialized");
 
-        _magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
-
         SystemContractsCaller.systemCallWithPropagatedRevert(
             uint32(gasleft()),
             address(NONCE_HOLDER_SYSTEM_CONTRACT),
@@ -351,8 +349,8 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
             }
         }
 
-        if (!isValidTransaction(transactionHash, _transaction, signature)) {
-            _magic = bytes4(0);
+        if (isValidTransaction(transactionHash, _transaction, signature)) {
+            _magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
         }
     }
 
