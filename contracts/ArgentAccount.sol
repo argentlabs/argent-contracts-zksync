@@ -13,17 +13,8 @@ import {SystemContractHelper} from "@matterlabs/zksync-contracts/l2/system-contr
 import {Transaction, TransactionHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
 import {Utils} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/Utils.sol";
 
+import {IMulticall} from "./IMulticall.sol";
 import {Signatures} from "./Signatures.sol";
-
-interface IMulticall {
-    struct Call {
-        address to;
-        uint256 value;
-        bytes data;
-    }
-
-    function multicall(Call[] memory _calls) external;
-}
 
 contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
