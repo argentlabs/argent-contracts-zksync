@@ -340,8 +340,10 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
 
     // IAccount
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
-        requireOnlyBootloader();
-        _validateTransaction(bytes32(0), _transaction); // The account recalculates the hash on its own
+        bytes4 result = _validateTransaction(bytes32(0), _transaction); // The account recalculates the hash on its own
+        if (result != ACCOUNT_VALIDATION_SUCCESS_MAGIC) {
+            revert("argent/invalid-transaction");
+        }
         _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
     }
 
