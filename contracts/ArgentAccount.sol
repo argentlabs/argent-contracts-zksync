@@ -56,7 +56,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     event AccountCreated(address account, address owner, address guardian);
-    event AccountUpgraded(address newImplementation);
+    event AccountUpgraded(address newImplementation, bytes callbackReturnData);
     event TransactionExecuted(bytes32 hashed, bytes response);
 
     event OwnerChanged(address newOwner);
@@ -115,16 +115,21 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         bool isSupported = _newImplementation.supportsInterface(type(IAccount).interfaceId);
         require(isSupported, "argent/invalid-implementation");
         implementation = _newImplementation;
-        emit AccountUpgraded(_newImplementation);
         // using delegatecall to run the `executeAfterUpgrade` function of the new implementation
-        (bool success, ) = _newImplementation.delegatecall(abi.encodeCall(this.executeAfterUpgrade, (VERSION, _data)));
+        bytes memory callbackCall = abi.encodeCall(this.executeAfterUpgrade, (VERSION, _data));
+        (bool success, bytes memory returnData) = _newImplementation.delegatecall(callbackCall);
         require(success, "argent/upgrade-callback-failed");
+        emit AccountUpgraded(_newImplementation, returnData);
     }
 
     // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
-    function executeAfterUpgrade(bytes32 /*_previousVersion*/, bytes calldata /*_data*/) external {
+    function executeAfterUpgrade(
+        bytes32 /*_previousVersion*/,
+        bytes calldata /*_data*/
+    ) external returns (bytes memory _returnData) {
         requireOnlySelf();
         // reserved upgrade callback for future account versions
+        return _returnData;
     }
 
     // IAccount

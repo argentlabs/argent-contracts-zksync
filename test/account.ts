@@ -314,6 +314,8 @@ describe("Argent account", () => {
   describe("Account upgrade", () => {
     let newImplementation: zksync.Contract;
 
+    const coder = new ethers.utils.AbiCoder();
+
     before(async () => {
       account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: "0.0005" });
       newImplementation = await deployer.deploy(argent.artifacts.implementation, [10]);
@@ -351,8 +353,9 @@ describe("Argent account", () => {
       await expect(account.implementation()).to.eventually.equal(argent.implementation.address);
 
       const promise = connect(account, [owner, guardian]).upgrade(newImplementation.address, "0x");
+      const outputData = coder.encode(["bytes"], ["0x"]);
+      await expect(promise).to.emit(account, "AccountUpgraded").withArgs(newImplementation.address, outputData);
 
-      await expect(promise).to.emit(account, "AccountUpgraded").withArgs(newImplementation.address);
       await expect(account.implementation()).to.eventually.equal(newImplementation.address);
     });
 
@@ -375,16 +378,16 @@ describe("Argent account", () => {
 
       await expect(upgradedAccount.newStorage()).to.be.reverted;
 
-      const promise = account.upgrade(newImplementation.address, "0x");
+      let promise = account.upgrade(newImplementation.address, "0x");
       await expect(promise).to.be.rejectedWith("argent/upgrade-callback-failed");
 
-      const value = 42;
-      const data = new ethers.utils.AbiCoder().encode(["uint256"], [value]);
+      const inputData = coder.encode(["uint256"], [42]);
+      const outputData = coder.encode(["bytes"], [coder.encode(["uint256"], [69])]);
 
-      const response = await account.upgrade(newImplementation.address, data);
-      await response.wait();
+      promise = account.upgrade(newImplementation.address, inputData);
+      await expect(promise).to.emit(account, "AccountUpgraded").withArgs(newImplementation.address, outputData);
 
-      await expect(upgradedAccount.newStorage()).to.eventually.equal(value);
+      await expect(upgradedAccount.newStorage()).to.eventually.equal(42);
     });
   });
 
