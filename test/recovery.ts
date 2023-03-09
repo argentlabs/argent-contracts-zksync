@@ -132,8 +132,7 @@ describe("Recovery", () => {
     it("Should fail when no guardian", async () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress: AddressZero, connect: [owner] });
       const promise = account.changeGuardianBackup(newGuardianBackup.address);
-      // await expect(promise).to.be.rejectedWith("argent/guardian-required");
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("argent/guardian-required");
     });
   });
 
@@ -190,6 +189,22 @@ describe("Recovery", () => {
       expect(escapeAfter.activeAt).to.equal(activeAtExpected);
       expect(escapeAfter.escapeType).to.equal(ownerEscape);
     });
+
+    it("Should run trigger methods twice", async () => {
+      const account = await deployAccount({ argent, ownerAddress, guardianAddress });
+
+      let promise = connect(account, [guardian]).triggerEscapeOwner();
+      await expect(promise).to.emit(account, "EscapeOwnerTriggerred");
+
+      promise = connect(account, [guardian]).triggerEscapeOwner();
+      await expect(promise).to.emit(account, "EscapeOwnerTriggerred");
+
+      promise = connect(account, [owner]).triggerEscapeGuardian();
+      await expect(promise).to.emit(account, "EscapeGuardianTriggerred");
+
+      promise = connect(account, [owner]).triggerEscapeGuardian();
+      await expect(promise).to.emit(account, "EscapeGuardianTriggerred");
+    });
   });
 
   describe("Escaping", () => {
@@ -214,8 +229,7 @@ describe("Recovery", () => {
       expect(escape.escapeType).to.equal(guardianEscape);
 
       // should fail to escape before the end of the period
-      // await expect(account.escapeGuardian(newGuardian.address)).to.be.rejectedWith("argent/inactive-escape");
-      await expect(account.escapeGuardian(newGuardian.address)).to.be.rejected;
+      await expect(account.escapeGuardian(newGuardian.address)).to.be.rejectedWith("argent/inactive-escape");
 
       // wait security period
       await waitForTimestamp(escape.activeAt, provider);
@@ -251,8 +265,7 @@ describe("Recovery", () => {
       expect(escape.escapeType).to.equal(ownerEscape);
 
       // should fail to escape before the end of the period
-      // await expect(account.escapeOwner(newOwner.address)).to.be.rejectedWith("argent/inactive-escape");
-      await expect(account.escapeOwner(newOwner.address)).to.be.rejected;
+      await expect(account.escapeOwner(newOwner.address)).to.be.rejectedWith("argent/inactive-escape");
 
       // wait security period
       await waitForTimestamp(escape.activeAt, provider);
@@ -310,8 +323,7 @@ describe("Recovery", () => {
 
       // guardian cannot override
       const promise = connect(account, [guardian]).triggerEscapeOwner();
-      // await expect(promise).to.be.rejectedWith("argent/cannot-override-owner-escape");
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("argent/cannot-override-owner-escape");
 
       const secondEscape = await account.escape();
       expect(secondEscape.activeAt).to.equal(escape.activeAt);
@@ -319,26 +331,28 @@ describe("Recovery", () => {
     });
   });
 
-  it("Should cancel an escape", async () => {
-    const account = await deployAccount({ argent, ownerAddress, guardianAddress });
+  describe("Canceling escape", () => {
+    it("Should cancel an escape", async () => {
+      const account = await deployAccount({ argent, ownerAddress, guardianAddress });
 
-    // guardian triggers a owner escape
-    const response = await connect(account, [guardian]).triggerEscapeOwner();
-    await response.wait();
+      // guardian triggers a owner escape
+      const response = await connect(account, [guardian]).triggerEscapeOwner();
+      await response.wait();
 
-    const escape = await account.escape();
-    expect(escape.activeAt).to.be.greaterThan(0n);
-    expect(escape.escapeType).to.equal(ownerEscape);
+      const escape = await account.escape();
+      expect(escape.activeAt).to.be.greaterThan(0n);
+      expect(escape.escapeType).to.equal(ownerEscape);
 
-    // should fail to cancel with just the owner signature
-    const rejectingPromise = connect(account, [owner]).cancelEscape();
-    await expect(rejectingPromise).to.be.rejectedWith("Account validation returned invalid magic value");
+      // should fail to cancel with just the owner signature
+      const rejectingPromise = connect(account, [owner]).cancelEscape();
+      await expect(rejectingPromise).to.be.rejectedWith("Account validation returned invalid magic value");
 
-    const resolvingPromise = connect(account, [owner, guardian]).cancelEscape();
-    await expect(resolvingPromise).to.emit(account, "EscapeCancelled");
+      const resolvingPromise = connect(account, [owner, guardian]).cancelEscape();
+      await expect(resolvingPromise).to.emit(account, "EscapeCancelled");
 
-    const secondEscape = await account.escape();
-    expect(secondEscape.activeAt).to.equal(0n);
-    expect(secondEscape.escapeType).to.equal(noEscape);
+      const secondEscape = await account.escape();
+      expect(secondEscape.activeAt).to.equal(0n);
+      expect(secondEscape.escapeType).to.equal(noEscape);
+    });
   });
 });

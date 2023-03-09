@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: Unlicense
-pragma solidity 0.8.16;
+pragma solidity 0.8.18;
 
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
@@ -13,17 +13,8 @@ import {SystemContractHelper} from "@matterlabs/zksync-contracts/l2/system-contr
 import {Transaction, TransactionHelper, IPaymasterFlow} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
 import {Utils} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/Utils.sol";
 
+import {IMulticall} from "./IMulticall.sol";
 import {Signatures} from "./Signatures.sol";
-
-interface IMulticall {
-    struct Call {
-        address to;
-        uint256 value;
-        bytes data;
-    }
-
-    function multicall(Call[] memory _calls) external;
-}
 
 contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
@@ -50,11 +41,19 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
 
     uint32 public immutable escapeSecurityPeriod;
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //                                                     Storage                                                    //
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     address public implementation; // !!! storage slot shared with proxy
     address public owner;
     address public guardian;
     address public guardianBackup;
     Escape public escape;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //                                                     Events                                                     //
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     event AccountCreated(address account, address owner, address guardian);
     event AccountUpgraded(address newImplementation);
@@ -70,7 +69,10 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     event GuardianEscaped(address newGuardian);
     event EscapeCancelled();
 
-    /**************************************************** Modifiers ***************************************************/
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //                                                    Modifiers                                                   //
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     // inlined modifiers for consistency of requirements, easier auditing and some gas savings
 
     function requireOnlySelf() internal view {
@@ -85,12 +87,20 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "argent/only-bootloader");
     }
 
-    /**************************************************** Lifecycle ***************************************************/
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //                                                   Constructor                                                  //
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     constructor(uint32 _escapeSecurityPeriod) {
         require(_escapeSecurityPeriod != 0, "argent/null-escape-security-period");
         escapeSecurityPeriod = _escapeSecurityPeriod;
     }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //                                                External methods                                                //
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**************************************************** Lifecycle ***************************************************/
 
     function initialize(address _owner, address _guardian) external {
         require(_owner != address(0), "argent/null-owner");
@@ -112,9 +122,40 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     }
 
     // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
-    function executeAfterUpgrade(bytes32 _previousVersion, bytes calldata _data) external {
+    function executeAfterUpgrade(bytes32 /*_previousVersion*/, bytes calldata /*_data*/) external {
         requireOnlySelf();
         // reserved upgrade callback for future account versions
+    }
+
+    // IAccount
+    function payForTransaction(
+        bytes32, // _transactionHash
+        bytes32, // _suggestedSignedHash
+        Transaction calldata _transaction
+    ) external payable override {
+        requireOnlyBootloader();
+        bool success = _transaction.payToTheBootloader();
+        require(success, "argent/failed-fee-payment");
+    }
+
+    // IAccount
+    // Here, the user should prepare for the transaction to be paid for by a paymaster
+    // Here, the account should set the allowance for the smart contracts
+    function prepareForPaymaster(
+        bytes32, // _transactionHash
+        bytes32, // _suggestedSignedHash
+        Transaction calldata _transaction
+    ) external payable override {
+        requireOnlyBootloader();
+        require(_transaction.paymasterInput.length >= 4, "The standard paymaster input must be at least 4 bytes long");
+        bytes4 paymasterInputSelector = bytes4(_transaction.paymasterInput[0:4]);
+        if (paymasterInputSelector == IPaymasterFlow.approvalBased.selector && guardian != address(0)) {
+            require(
+                _transaction.signature.length == SINGLE_SIGNATURE_SIZE * 2,
+                "argent/no-paymaster-with-single-signature"
+            );
+        }
+        _transaction.processPaymasterInput();
     }
 
     /**************************************************** Recovery ****************************************************/
@@ -128,7 +169,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
 
     function changeGuardian(address _newGuardian) public {
         requireOnlySelf();
-        require(_newGuardian != address(0) || guardianBackup == address(0), "argent/guardian-backup-required");
+        require(_newGuardian != address(0) || guardianBackup == address(0), "argent/backup-should-be-null");
         guardian = _newGuardian;
         emit GuardianChanged(_newGuardian);
     }
@@ -195,14 +236,6 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         emit GuardianEscaped(_newGuardian);
     }
 
-    function isOwnerEscapeCall(bytes4 _selector) internal pure returns (bool) {
-        return _selector == this.escapeOwner.selector || _selector == this.triggerEscapeOwner.selector;
-    }
-
-    function isGuardianEscapeCall(bytes4 _selector) internal pure returns (bool) {
-        return _selector == this.escapeGuardian.selector || _selector == this.triggerEscapeGuardian.selector;
-    }
-
     /*************************************************** Validation ***************************************************/
 
     // IAccount
@@ -214,6 +247,73 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         requireOnlyBootloader();
         return _validateTransaction(_suggestedSignedHash, _transaction);
     }
+
+    // IERC1271
+    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4 _magic) {
+        if (_isValidSignature(_hash, _signature)) {
+            _magic = IERC1271.isValidSignature.selector;
+        }
+    }
+
+    /**************************************************** Execution ***************************************************/
+
+    // IMulticall
+    function multicall(IMulticall.Call[] memory _calls) external {
+        requireOnlySelf();
+        for (uint256 i = 0; i < _calls.length; i++) {
+            IMulticall.Call memory call = _calls[i];
+            require(call.to != address(this), "argent/no-multicall-to-self");
+            _execute(call.to, call.value, call.data);
+        }
+    }
+
+    // IAccount
+    function executeTransaction(
+        bytes32, // _transactionHash
+        bytes32, // _suggestedSignedHash
+        Transaction calldata _transaction
+    ) external payable override {
+        requireOnlyBootloader();
+        _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
+    }
+
+    // IAccount
+    function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
+        bytes4 result = _validateTransaction(bytes32(0), _transaction); // The account recalculates the hash on its own
+        if (result != ACCOUNT_VALIDATION_SUCCESS_MAGIC) {
+            revert("argent/invalid-transaction");
+        }
+        _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
+    }
+
+    /************************************************** Miscellaneous *************************************************/
+
+    // IERC165
+    function supportsInterface(bytes4 _interfaceId) external pure override returns (bool) {
+        // NOTE: it's more efficient to use a mapping based implementation if there are more than 3 interfaces
+        return
+            _interfaceId == type(IERC165).interfaceId ||
+            _interfaceId == type(IERC1271).interfaceId ||
+            _interfaceId == type(IMulticall).interfaceId ||
+            _interfaceId == type(IAccount).interfaceId;
+    }
+
+    fallback() external {
+        // fallback of default account shouldn't be called by bootloader under no circumstances
+        assert(msg.sender != BOOTLOADER_FORMAL_ADDRESS);
+
+        // If the contract is called directly, behave like an EOA
+    }
+
+    receive() external payable {
+        // If the contract is called directly, behave like an EOA
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //                                                    Internal                                                    //
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /*************************************************** Validation ***************************************************/
 
     function _validateTransaction(
         bytes32 _suggestedSignedHash,
@@ -312,41 +412,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         return isValidOwnerSignature(_hash, ownerSignature) && isValidGuardianSignature(_hash, guardianSignature);
     }
 
-    // IERC1271
-    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4 _magic) {
-        if (_isValidSignature(_hash, _signature)) {
-            _magic = IERC1271.isValidSignature.selector;
-        }
-    }
-
     /**************************************************** Execution ***************************************************/
-
-    // IMulticall
-    function multicall(IMulticall.Call[] memory _calls) external {
-        requireOnlySelf();
-        for (uint256 i = 0; i < _calls.length; i++) {
-            IMulticall.Call memory call = _calls[i];
-            require(call.to != address(this), "argent/no-multicall-to-self");
-            _execute(call.to, call.value, call.data);
-        }
-    }
-
-    // IAccount
-    function executeTransaction(
-        bytes32, // _transactionHash
-        bytes32, // _suggestedSignedHash
-        Transaction calldata _transaction
-    ) external payable override {
-        requireOnlyBootloader();
-        _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
-    }
-
-    // IAccount
-    function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
-        requireOnlyBootloader();
-        _validateTransaction(bytes32(0), _transaction); // The account recalculates the hash on its own
-        _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
-    }
 
     function _execute(address to, uint256 value, bytes memory data) internal {
         uint128 value128 = Utils.safeCastToU128(value);
@@ -355,63 +421,24 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
             SystemContractsCaller.systemCallWithPropagatedRevert(gas, to, value128, data);
         } else {
             // using assembly saves us a returndatacopy of the entire return data
-            bool success;
             assembly {
-                success := call(gas(), to, value128, add(data, 0x20), mload(data), 0, 0)
+                let success := call(gas(), to, value, add(data, 0x20), mload(data), 0, 0)
+                if iszero(success) {
+                    let size := returndatasize()
+                    returndatacopy(0, 0, size)
+                    revert(0, size)
+                }
             }
-            require(success);
         }
     }
 
-    // IAccount
-    function payForTransaction(
-        bytes32, // _transactionHash
-        bytes32, // _suggestedSignedHash
-        Transaction calldata _transaction
-    ) external payable override {
-        requireOnlyBootloader();
-        bool success = _transaction.payToTheBootloader();
-        require(success, "argent/failed-fee-payment");
+    /**************************************************** Recovery ****************************************************/
+
+    function isOwnerEscapeCall(bytes4 _selector) internal pure returns (bool) {
+        return _selector == this.escapeOwner.selector || _selector == this.triggerEscapeOwner.selector;
     }
 
-    // IAccount
-    // Here, the user should prepare for the transaction to be paid for by a paymaster
-    // Here, the account should set the allowance for the smart contracts
-    function prepareForPaymaster(
-        bytes32, // _transactionHash
-        bytes32, // _suggestedSignedHash
-        Transaction calldata _transaction
-    ) external payable override {
-        requireOnlyBootloader();
-
-        require(_transaction.paymasterInput.length >= 4, "The standard paymaster input must be at least 4 bytes long");
-        bytes4 paymasterInputSelector = bytes4(_transaction.paymasterInput[0:4]);
-        if (paymasterInputSelector == IPaymasterFlow.approvalBased.selector && guardian != address(0)) {
-            require(_transaction.signature.length == SINGLE_SIGNATURE_SIZE * 2, "argent/no-paymaster-with-single-signature");
-        }
-        _transaction.processPaymasterInput();
-    }
-
-    /****************************************************** Misc ******************************************************/
-
-    // IERC165
-    function supportsInterface(bytes4 _interfaceId) external pure override returns (bool) {
-        // NOTE: it's more efficient to use a mapping based implementation if there are more than 3 interfaces
-        return
-            _interfaceId == type(IERC165).interfaceId ||
-            _interfaceId == type(IERC1271).interfaceId ||
-            _interfaceId == type(IMulticall).interfaceId ||
-            _interfaceId == type(IAccount).interfaceId;
-    }
-
-    fallback() external {
-        // fallback of default account shouldn't be called by bootloader under no circumstances
-        assert(msg.sender != BOOTLOADER_FORMAL_ADDRESS);
-
-        // If the contract is called directly, behave like an EOA
-    }
-
-    receive() external payable {
-        // If the contract is called directly, behave like an EOA
+    function isGuardianEscapeCall(bytes4 _selector) internal pure returns (bool) {
+        return _selector == this.escapeGuardian.selector || _selector == this.triggerEscapeGuardian.selector;
     }
 }

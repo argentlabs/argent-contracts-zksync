@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: Unlicense
-pragma solidity 0.8.16;
+pragma solidity 0.8.18;
 
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
@@ -104,7 +104,7 @@ contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
-    function executeAfterUpgrade(bytes32 _previousVersion, bytes calldata _data) external {
+    function executeAfterUpgrade(bytes32 /*_previousVersion*/, bytes calldata _data) external {
         requireOnlySelf();
         newStorage = abi.decode(_data, (uint256));
     }

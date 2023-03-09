@@ -1,15 +1,16 @@
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomiclabs/hardhat-ethers";
 import { expect } from "chai";
-import { PopulatedTransaction } from "ethers";
+import { BytesLike, PopulatedTransaction } from "ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { computeCreate2AddressFromSdk, connect, deployAccount } from "../src/account.service";
 import { checkDeployer, CustomDeployer, getDeployer } from "../src/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
-import { ArgentSigner } from "../src/signer.service";
+import { ArgentSigner, TransactionRequest } from "../src/signer.service";
 import { ArgentAccount, IMulticall, TestDapp, UpgradedArgentAccount } from "../typechain-types";
+import { TransactionStruct } from "../typechain-types/@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccount";
 
 const { AddressZero } = ethers.constants;
 
@@ -103,12 +104,10 @@ describe("Argent account", () => {
       const recoveryCall = makeCall(await account.populateTransaction.triggerEscapeGuardian());
 
       let promise = account.multicall([dappCall, recoveryCall]);
-      // await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
 
       promise = account.multicall([recoveryCall, dappCall]);
-      // await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
     });
 
     it("Should revert when one of the calls reverts", async () => {
@@ -116,10 +115,10 @@ describe("Argent account", () => {
       const revertingCall = makeCall(await testDapp.populateTransaction.doRevert());
 
       let promise = account.multicall([dappCall, revertingCall]);
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("foobarbaz");
 
       promise = account.multicall([revertingCall, dappCall]);
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("foobarbaz");
     });
 
     it("Should successfully execute multiple calls", async () => {
@@ -298,8 +297,7 @@ describe("Argent account", () => {
 
       it("Should revert calls that require the guardian to be set", async () => {
         account = connect(account, [newOwner]);
-        // await expect(account.triggerEscapeGuardian()).to.be.rejectedWith("argent/guardian-required");
-        await expect(account.triggerEscapeGuardian()).to.be.rejected;
+        await expect(account.triggerEscapeGuardian()).to.be.rejectedWith("argent/guardian-required");
       });
 
       it("Should add a guardian", async () => {
@@ -333,8 +331,7 @@ describe("Argent account", () => {
 
     it("Should revert when new implementation isn't an IAccount", async () => {
       const promise = connect(account, [owner, guardian]).upgrade(wrongGuardian.address, "0x");
-      // await expect(promise).to.be.rejectedWith("argent/invalid-implementation");
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("argent/invalid-implementation");
     });
 
     it("Should revert when calling upgrade callback directly", async () => {
@@ -347,8 +344,7 @@ describe("Argent account", () => {
       const version = await account.VERSION();
       const call = makeCall(await account.populateTransaction.executeAfterUpgrade(version, "0x"));
       const promise = connect(account, [owner, guardian]).multicall([call]);
-      // await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
     });
 
     it("Should upgrade the account", async () => {
@@ -380,8 +376,7 @@ describe("Argent account", () => {
       await expect(upgradedAccount.newStorage()).to.be.reverted;
 
       const promise = account.upgrade(newImplementation.address, "0x");
-      // await expect(promise).to.be.rejectedWith("argent/upgrade-callback-failed");
-      await expect(promise).to.be.rejected;
+      await expect(promise).to.be.rejectedWith("argent/upgrade-callback-failed");
 
       const value = 42;
       const data = new ethers.utils.AbiCoder().encode(["uint256"], [value]);
@@ -415,6 +410,85 @@ describe("Argent account", () => {
 
       const balanceAfter = await provider.getBalance(account.address);
       expect(balanceAfter).to.be.lessThan(balanceBefore);
+    });
+  });
+
+  describe("Priority mode (from outside / L1)", () => {
+    let testDapp: TestDapp;
+    let signer: ArgentSigner;
+
+    const toSolidityTransaction = (transaction: TransactionRequest, signature: BytesLike): TransactionStruct => {
+      const signInput = zksync.EIP712Signer.getSignInput(transaction);
+      return {
+        ...signInput,
+        reserved: [0, 0, 0, 0],
+        signature,
+        factoryDeps: [],
+        paymasterInput: "0x",
+        reservedDynamic: "0x",
+      };
+    };
+
+    before(async () => {
+      account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
+      signer = account.signer as ArgentSigner;
+      testDapp = (await deployTestDapp(deployer)).connect(signer);
+    });
+
+    it("Should refuse to execute a priority transaction with invalid signature", async () => {
+      const transaction = await testDapp.populateTransaction.setNumber(42n);
+      const populated = await signer.populateTransaction(transaction);
+      const signature = await new ArgentSigner(account, ["random", "random"]).getSignature(populated);
+      const struct = toSolidityTransaction(populated, signature);
+      const calldata = account.interface.encodeFunctionData("executeTransactionFromOutside", [struct]);
+
+      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
+
+      // initiating L2 transfer via L1 execute from zksync wallet
+      const response = await deployer.zkWallet.requestExecute({
+        contractAddress: account.address,
+        calldata,
+        l2GasLimit: zksync.utils.RECOMMENDED_DEPOSIT_L2_GAS_LIMIT,
+      });
+      await expect(response.wait()).to.be.rejected;
+
+      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
+    });
+
+    it("Should execute a priority transaction", async () => {
+      const transaction = await testDapp.populateTransaction.setNumber(42n);
+      const populated = await signer.populateTransaction(transaction);
+      const signature = await signer.getSignature(populated);
+      const struct = toSolidityTransaction(populated, signature);
+      const calldata = account.interface.encodeFunctionData("executeTransactionFromOutside", [struct]);
+
+      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
+
+      // initiating L2 transfer via L1 execute from zksync wallet
+      const response = await deployer.zkWallet.requestExecute({
+        contractAddress: account.address,
+        calldata,
+        l2GasLimit: zksync.utils.RECOMMENDED_DEPOSIT_L2_GAS_LIMIT,
+      });
+      await response.wait();
+
+      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(42n);
+    });
+
+    it("Should execute a priority transaction from L2", async () => {
+      testDapp = (await deployTestDapp(deployer)).connect(signer);
+      const transaction = await testDapp.populateTransaction.setNumber(42n);
+      const populated = await signer.populateTransaction(transaction);
+      const signature = await signer.getSignature(populated);
+      const struct = toSolidityTransaction(populated, signature);
+
+      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
+
+      const fromEoa = new zksync.Contract(account.address, account.interface, deployer.zkWallet) as ArgentAccount;
+      const response = await fromEoa.executeTransactionFromOutside(struct);
+      await response.wait();
+
+      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(42n);
     });
   });
 });

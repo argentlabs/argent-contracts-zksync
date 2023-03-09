@@ -18,7 +18,7 @@ const wrongGuardian = zksync.Wallet.createRandom();
 
 const ownerAddress = owner.address;
 const guardianAddress = guardian.address;
-const { deployer } = getDeployer();
+const { deployer, provider } = getDeployer();
 
 const eip1271MagicValue = zksync.utils.EIP1271_MAGIC_VALUE;
 
@@ -44,6 +44,12 @@ describe("Argent signer", () => {
     describe("Without guardian", () => {
       before(async () => {
         account = await deployAccount({ argent, ownerAddress, guardianAddress: AddressZero, funds: false });
+      });
+
+      it("Should verify using the zkSync SDK", async () => {
+        const signature = await new ArgentSigner(account, [owner]).signMessage(message);
+        const promise = zksync.utils.isMessageSignatureCorrect(provider, account.address, message, signature);
+        await expect(promise).to.eventually.be.true;
       });
 
       it("Should verify on the account", async () => {
@@ -72,6 +78,12 @@ describe("Argent signer", () => {
     describe("With guardian", () => {
       before(async () => {
         account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: false });
+      });
+
+      it("Should verify using the zkSync SDK", async () => {
+        const signature = await new ArgentSigner(account, [owner, guardian]).signMessage(message);
+        const promise = zksync.utils.isMessageSignatureCorrect(provider, account.address, message, signature);
+        await expect(promise).to.eventually.be.true;
       });
 
       it("Should verify on the account", async () => {
@@ -123,13 +135,26 @@ describe("Argent signer", () => {
     const hash = ethers.utils._TypedDataEncoder.hash(domain, types, value);
 
     const signAndCheck = async (signatories: Signatory[]) => {
-      const signer = new ArgentSigner(account, signatories);
-      const signature = await signer._signTypedData(domain, types, value);
+      const signature = await new ArgentSigner(account, signatories)._signTypedData(domain, types, value);
       return account.isValidSignature(hash, signature);
     };
 
     before(async () => {
       account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: false });
+    });
+
+    it("Should verify using the zkSync SDK", async () => {
+      const signer = new ArgentSigner(account, [owner, guardian]);
+      const signature = await signer._signTypedData(domain, types, value);
+      const promise = zksync.utils.isTypedDataSignatureCorrect(
+        provider,
+        account.address,
+        domain,
+        types,
+        value,
+        signature,
+      );
+      await expect(promise).to.eventually.be.true;
     });
 
     it("Should verify on the account", async () => {

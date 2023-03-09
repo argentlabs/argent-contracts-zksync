@@ -17,6 +17,9 @@ jobs:
       - name: Formatting
         run: yarn format:check
 
+      - name: Compile
+        run: yarn hardhat compile
+
       - name: Lint
         run: yarn lint
 
@@ -24,6 +27,4 @@ jobs:
         run: ./bin/start-ci-node.sh
 
       - name: Tests
-        run: |
-          yarn hardhat typechain
-          yarn test
+        run: yarn test

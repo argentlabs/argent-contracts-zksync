@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.16;
+pragma solidity 0.8.18;
 
 import {IPaymaster, ExecutionResult, PAYMASTER_VALIDATION_SUCCESS_MAGIC} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IPaymaster.sol";
 import {IPaymasterFlow} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IPaymasterFlow.sol";
@@ -24,13 +24,13 @@ contract BadPaymaster is IPaymaster {
     ) external payable returns (bytes4 _magic, bytes memory _context) {
         require(_transaction.paymasterInput.length >= 4, "The standard paymaster input must be at least 4 bytes long");
 
-        bytes4 paymasterInputSelector = bytes4(_transaction.paymasterInput[0 : 4]);
+        bytes4 paymasterInputSelector = bytes4(_transaction.paymasterInput[0:4]);
         if (paymasterInputSelector != IPaymasterFlow.approvalBased.selector) {
             revert("Unsupported paymaster flow");
         }
 
         (address token, uint256 amount, bytes memory data) = abi.decode(
-            _transaction.paymasterInput[4 :],
+            _transaction.paymasterInput[4:],
             (address, uint256, bytes)
         );
 
@@ -43,7 +43,7 @@ contract BadPaymaster is IPaymaster {
         IERC20(token).transferFrom(userAddress, thisAddress, providedAllowance);
 
         uint256 requiredEth = _transaction.gasLimit * _transaction.maxFeePerGas;
-        (bool success,) = payable(BOOTLOADER_FORMAL_ADDRESS).call{value : requiredEth}("");
+        (bool success, ) = payable(BOOTLOADER_FORMAL_ADDRESS).call{value: requiredEth}("");
         require(success, "Failed to transfer funds to the bootloader");
         _magic = PAYMASTER_VALIDATION_SUCCESS_MAGIC;
     }
@@ -55,8 +55,7 @@ contract BadPaymaster is IPaymaster {
         bytes32,
         ExecutionResult _txResult,
         uint256 _maxRefundedGas
-    ) external payable override {
-    }
+    ) external payable override {}
 
     receive() external payable {}
 }

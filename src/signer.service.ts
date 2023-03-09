@@ -5,7 +5,7 @@ import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount } from "../typechain-types";
 
-type TransactionRequest = zksync.types.TransactionRequest;
+export type TransactionRequest = zksync.types.TransactionRequest;
 export type Signatory = (Signer & TypedDataSigner) | "zeros" | "random";
 
 export class ArgentSigner extends Signer {
@@ -47,6 +47,9 @@ export class ArgentSigner extends Signer {
 
   async populateTransaction(transaction: TransactionRequest): Promise<TransactionRequest> {
     const from = this.address;
+    if (transaction.from && transaction.from !== from) {
+      throw new Error(`This signer can only sign transactions from ${from}, got ${transaction.from} instead.`);
+    }
     return {
       ...transaction,
       type: zksync.utils.EIP712_TX_TYPE,
@@ -65,18 +68,18 @@ export class ArgentSigner extends Signer {
   }
 
   async signTransaction(transaction: TransactionRequest): Promise<string> {
-    const chainId = await this.getChainId();
-    const customSignature = await this.concatSignatures((signer) =>
-      new zksync.EIP712Signer(signer, chainId).sign(transaction),
-    );
-
     return zksync.utils.serialize({
       ...transaction,
       customData: {
         ...transaction.customData,
-        customSignature,
-      },
+        customSignature: await this.getSignature(transaction),
+      } as zksync.types.Eip712Meta,
     });
+  }
+
+  async getSignature(transaction: TransactionRequest): Promise<string> {
+    const chainId = await this.getChainId();
+    return this.concatSignatures((signer) => new zksync.EIP712Signer(signer, chainId).sign(transaction));
   }
 
   private async concatSignatures(sign: (signer: Signer & TypedDataSigner) => Promise<BytesLike>): Promise<string> {
