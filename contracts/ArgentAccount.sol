@@ -271,7 +271,8 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
 
     // IAccount
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
-        bytes4 result = _validateTransaction(bytes32(0), _transaction); // The account recalculates the hash on its own
+        bytes32 transactionHash = _transaction.encodeHash(); // The account recalculates the hash on its own
+        bytes4 result = _validateTransaction(transactionHash, _transaction);
         if (result != ACCOUNT_VALIDATION_SUCCESS_MAGIC) {
             revert("argent/invalid-transaction");
         }
@@ -308,7 +309,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     /*************************************************** Validation ***************************************************/
 
     function _validateTransaction(
-        bytes32 _suggestedSignedHash,
+        bytes32 _transactionHash,
         Transaction calldata _transaction
     ) internal returns (bytes4 _magic) {
         require(owner != address(0), "argent/uninitialized");
@@ -319,13 +320,6 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
             0,
             abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
         );
-
-        bytes32 transactionHash;
-        if (_suggestedSignedHash == bytes32(0)) {
-            transactionHash = _transaction.encodeHash();
-        } else {
-            transactionHash = _suggestedSignedHash;
-        }
 
         if (_transaction.to == uint256(uint160(address(DEPLOYER_SYSTEM_CONTRACT)))) {
             require(_transaction.data.length >= 4, "argent/invalid-call-to-deployer");
@@ -351,7 +345,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
             }
         }
 
-        if (isValidTransaction(transactionHash, _transaction, signature)) {
+        if (isValidTransaction(_transactionHash, _transaction, signature)) {
             _magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
         }
     }
