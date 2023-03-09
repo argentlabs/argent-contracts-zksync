@@ -1,29 +1,27 @@
-import "@nomicfoundation/hardhat-chai-matchers";
-import "@nomiclabs/hardhat-ethers";
 import { expect } from "chai";
-import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { TransactionResponse } from "zksync-web3/build/src/types";
 import { connect, deployAccount } from "../src/account.service";
-import { checkDeployer, getDeployer } from "../src/deployer.service";
+import { checkDeployer } from "../src/deployer.service";
 import { getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
 import { waitForL1BatchBlock, waitForTimestamp } from "../src/provider.service";
 import { ArgentAccount } from "../typechain-types";
+import {
+  AddressZero,
+  deployer,
+  guardian,
+  guardianAddress,
+  owner,
+  ownerAddress,
+  provider,
+  wrongGuardian,
+  wrongOwner,
+} from "./fixtures";
 
-const { AddressZero } = ethers.constants;
-
-const owner = zksync.Wallet.createRandom();
-const guardian = zksync.Wallet.createRandom();
 const newOwner = zksync.Wallet.createRandom();
 const newGuardian = zksync.Wallet.createRandom();
 const newGuardianBackup = zksync.Wallet.createRandom();
-const wrongOwner = zksync.Wallet.createRandom();
-const wrongGuardian = zksync.Wallet.createRandom();
-
-const ownerAddress = owner.address;
-const guardianAddress = guardian.address;
-const { deployer, provider } = getDeployer();
 
 describe("Recovery", () => {
   let argent: ArgentInfrastructure;

@@ -1,37 +1,23 @@
-import "@nomicfoundation/hardhat-chai-matchers";
-import "@nomiclabs/hardhat-ethers";
 import { expect } from "chai";
-import { BytesLike, PopulatedTransaction } from "ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { computeCreate2AddressFromSdk, connect, deployAccount } from "../src/account.service";
-import { checkDeployer, CustomDeployer, getDeployer } from "../src/deployer.service";
+import { checkDeployer, CustomDeployer } from "../src/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
-import { ArgentSigner, TransactionRequest } from "../src/signer.service";
-import { ArgentAccount, IMulticall, TestDapp, UpgradedArgentAccount } from "../typechain-types";
-import { TransactionStruct } from "../typechain-types/@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccount";
-
-const { AddressZero } = ethers.constants;
-
-const owner = zksync.Wallet.createRandom();
-const guardian = zksync.Wallet.createRandom();
-const newOwner = zksync.Wallet.createRandom();
-const wrongOwner = zksync.Wallet.createRandom();
-const wrongGuardian = zksync.Wallet.createRandom();
-
-const ownerAddress = owner.address;
-const guardianAddress = guardian.address;
-const { deployer, deployerAddress, provider } = getDeployer();
-
-console.log(`owner private key: ${owner.privateKey} (${ownerAddress})`);
-console.log(`guardian private key: ${guardian.privateKey} (${guardianAddress})`);
-
-const makeCall = ({ to = AddressZero, data = "0x" }: PopulatedTransaction): IMulticall.CallStruct => ({
-  to,
-  value: 0,
-  data,
-});
+import { ArgentSigner } from "../src/signer.service";
+import { ArgentAccount, TestDapp } from "../typechain-types";
+import {
+  AddressZero,
+  deployer,
+  deployerAddress,
+  guardian,
+  guardianAddress,
+  owner,
+  ownerAddress,
+  provider,
+  wrongGuardian,
+} from "./fixtures";
 
 describe("Argent account", () => {
   let argent: ArgentInfrastructure;
@@ -77,60 +63,6 @@ describe("Argent account", () => {
       const accountFromEoa = new zksync.Contract(account.address, abi, deployer.zkWallet);
       const promise = accountFromEoa.initialize(owner.address, guardian.address);
       await expect(promise).to.be.rejectedWith("argent/already-init");
-    });
-  });
-
-  describe("Account multicall", () => {
-    let testDapp: TestDapp;
-
-    before(async () => {
-      account = await deployAccount({
-        argent,
-        ownerAddress,
-        guardianAddress,
-        connect: [owner, guardian],
-        funds: "0.002",
-      });
-      testDapp = await deployTestDapp(deployer);
-    });
-
-    it("Should support the IMulticall interface", async () => {
-      const interfaceId = account.interface.getSighash("multicall");
-      await expect(account.supportsInterface(interfaceId)).to.eventually.be.true;
-    });
-
-    it("Should revert when one of the calls is to the account", async () => {
-      const dappCall = makeCall(await testDapp.populateTransaction.setNumber(42));
-      const recoveryCall = makeCall(await account.populateTransaction.triggerEscapeGuardian());
-
-      let promise = account.multicall([dappCall, recoveryCall]);
-      await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
-
-      promise = account.multicall([recoveryCall, dappCall]);
-      await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
-    });
-
-    it("Should revert when one of the calls reverts", async () => {
-      const dappCall = makeCall(await testDapp.populateTransaction.setNumber(42));
-      const revertingCall = makeCall(await testDapp.populateTransaction.doRevert());
-
-      let promise = account.multicall([dappCall, revertingCall]);
-      await expect(promise).to.be.rejectedWith("foobarbaz");
-
-      promise = account.multicall([revertingCall, dappCall]);
-      await expect(promise).to.be.rejectedWith("foobarbaz");
-    });
-
-    it("Should successfully execute multiple calls", async () => {
-      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
-
-      const response = await account.multicall([
-        makeCall(await testDapp.populateTransaction.setNumber(59)),
-        makeCall(await testDapp.populateTransaction.increaseNumber(10)),
-      ]);
-      await response.wait();
-
-      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(69n);
     });
   });
 
@@ -267,6 +199,8 @@ describe("Argent account", () => {
     });
 
     describe("Calling the dapp without using a guardian", () => {
+      const newOwner = zksync.Wallet.createRandom();
+
       before(async () => {
         account = await deployAccount({
           argent,
@@ -311,83 +245,6 @@ describe("Argent account", () => {
     });
   });
 
-  describe("Account upgrade", () => {
-    let newImplementation: zksync.Contract;
-
-    before(async () => {
-      account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: "0.0005" });
-      newImplementation = await deployer.deploy(argent.artifacts.implementation, [10]);
-    });
-
-    it("Should revert with the wrong owner", async () => {
-      const promise = connect(account, [wrongOwner, guardian]).upgrade(newImplementation.address, "0x");
-      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
-    });
-
-    it("Should revert with the wrong guardian", async () => {
-      const promise = connect(account, [owner, wrongGuardian]).upgrade(newImplementation.address, "0x");
-      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
-    });
-
-    it("Should revert when new implementation isn't an IAccount", async () => {
-      const promise = connect(account, [owner, guardian]).upgrade(wrongGuardian.address, "0x");
-      await expect(promise).to.be.rejectedWith("argent/invalid-implementation");
-    });
-
-    it("Should revert when calling upgrade callback directly", async () => {
-      const version = await account.VERSION();
-      const promise = connect(account, [owner, guardian]).executeAfterUpgrade(version, "0x");
-      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
-    });
-
-    it("Should revert when calling upgrade callback via multicall", async () => {
-      const version = await account.VERSION();
-      const call = makeCall(await account.populateTransaction.executeAfterUpgrade(version, "0x"));
-      const promise = connect(account, [owner, guardian]).multicall([call]);
-      await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
-    });
-
-    it("Should upgrade the account", async () => {
-      await expect(account.implementation()).to.eventually.equal(argent.implementation.address);
-
-      const promise = connect(account, [owner, guardian]).upgrade(newImplementation.address, "0x");
-
-      await expect(promise).to.emit(account, "AccountUpgraded").withArgs(newImplementation.address);
-      await expect(account.implementation()).to.eventually.equal(newImplementation.address);
-    });
-
-    it("Should upgrade the account and run the callback", async () => {
-      account = await deployAccount({
-        argent,
-        ownerAddress,
-        guardianAddress,
-        funds: "0.0005",
-        connect: [owner, guardian],
-      });
-
-      const artifact = await deployer.loadArtifact("UpgradedArgentAccount");
-      const newImplementation = await deployer.deploy(artifact, [10]);
-      const upgradedAccount = new zksync.Contract(
-        account.address,
-        artifact.abi,
-        account.provider,
-      ) as UpgradedArgentAccount;
-
-      await expect(upgradedAccount.newStorage()).to.be.reverted;
-
-      const promise = account.upgrade(newImplementation.address, "0x");
-      await expect(promise).to.be.rejectedWith("argent/upgrade-callback-failed");
-
-      const value = 42;
-      const data = new ethers.utils.AbiCoder().encode(["uint256"], [value]);
-
-      const response = await account.upgrade(newImplementation.address, data);
-      await response.wait();
-
-      await expect(upgradedAccount.newStorage()).to.eventually.equal(value);
-    });
-  });
-
   describe("Deploying contracts from account", () => {
     before(async () => {
       account = await deployAccount({
@@ -410,85 +267,6 @@ describe("Argent account", () => {
 
       const balanceAfter = await provider.getBalance(account.address);
       expect(balanceAfter).to.be.lessThan(balanceBefore);
-    });
-  });
-
-  describe("Priority mode (from outside / L1)", () => {
-    let testDapp: TestDapp;
-    let signer: ArgentSigner;
-
-    const toSolidityTransaction = (transaction: TransactionRequest, signature: BytesLike): TransactionStruct => {
-      const signInput = zksync.EIP712Signer.getSignInput(transaction);
-      return {
-        ...signInput,
-        reserved: [0, 0, 0, 0],
-        signature,
-        factoryDeps: [],
-        paymasterInput: "0x",
-        reservedDynamic: "0x",
-      };
-    };
-
-    before(async () => {
-      account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
-      signer = account.signer as ArgentSigner;
-      testDapp = (await deployTestDapp(deployer)).connect(signer);
-    });
-
-    it("Should refuse to execute a priority transaction with invalid signature", async () => {
-      const transaction = await testDapp.populateTransaction.setNumber(42n);
-      const populated = await signer.populateTransaction(transaction);
-      const signature = await new ArgentSigner(account, ["random", "random"]).getSignature(populated);
-      const struct = toSolidityTransaction(populated, signature);
-      const calldata = account.interface.encodeFunctionData("executeTransactionFromOutside", [struct]);
-
-      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
-
-      // initiating L2 transfer via L1 execute from zksync wallet
-      const response = await deployer.zkWallet.requestExecute({
-        contractAddress: account.address,
-        calldata,
-        l2GasLimit: zksync.utils.RECOMMENDED_DEPOSIT_L2_GAS_LIMIT,
-      });
-      await expect(response.wait()).to.be.rejected;
-
-      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
-    });
-
-    it("Should execute a priority transaction", async () => {
-      const transaction = await testDapp.populateTransaction.setNumber(42n);
-      const populated = await signer.populateTransaction(transaction);
-      const signature = await signer.getSignature(populated);
-      const struct = toSolidityTransaction(populated, signature);
-      const calldata = account.interface.encodeFunctionData("executeTransactionFromOutside", [struct]);
-
-      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
-
-      // initiating L2 transfer via L1 execute from zksync wallet
-      const response = await deployer.zkWallet.requestExecute({
-        contractAddress: account.address,
-        calldata,
-        l2GasLimit: zksync.utils.RECOMMENDED_DEPOSIT_L2_GAS_LIMIT,
-      });
-      await response.wait();
-
-      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(42n);
-    });
-
-    it("Should execute a priority transaction from L2", async () => {
-      testDapp = (await deployTestDapp(deployer)).connect(signer);
-      const transaction = await testDapp.populateTransaction.setNumber(42n);
-      const populated = await signer.populateTransaction(transaction);
-      const signature = await signer.getSignature(populated);
-      const struct = toSolidityTransaction(populated, signature);
-
-      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
-
-      const fromEoa = new zksync.Contract(account.address, account.interface, deployer.zkWallet) as ArgentAccount;
-      const response = await fromEoa.executeTransactionFromOutside(struct);
-      await response.wait();
-
-      await expect(testDapp.userNumbers(account.address)).to.eventually.equal(42n);
     });
   });
 });
