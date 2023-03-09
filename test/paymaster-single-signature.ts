@@ -1,5 +1,7 @@
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomiclabs/hardhat-ethers";
+import { expect } from "chai";
+import { Contract } from "ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { deployAccount } from "../src/account.service";
@@ -7,13 +9,10 @@ import { checkDeployer, getDeployer } from "../src/deployer.service";
 import { getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
 import { ArgentAccount } from "../typechain-types";
-import { Contract } from "ethers";
-import { expect } from "chai";
 
 const owner = zksync.Wallet.createRandom();
 const guardian = zksync.Wallet.createRandom();
 const { deployer, provider } = getDeployer();
-
 
 describe("Poc", () => {
   let argent: ArgentInfrastructure;
@@ -23,10 +22,9 @@ describe("Poc", () => {
     argent = await getTestInfrastructure(deployer);
   });
 
-
   describe("No approve paymaster for tx signed only by one party", async () => {
     let account: ArgentAccount;
-    let token: Contract
+    let token: Contract;
     before(async () => {
       account = await deployAccount({
         argent,
@@ -39,10 +37,10 @@ describe("Poc", () => {
       token = await deployer.deploy(tokenArtifact, ["TestToken", "TestToken", 0]);
     });
 
-
     it("Guardian alone cannot use the approval paymaster", async () => {
-
-      await (await token.mint(account.address, 50000)).wait;
+      await (
+        await token.mint(account.address, 50000)
+      ).wait;
 
       const paymaster = await deployer.deploy(await deployer.loadArtifact("BadPaymaster"));
 
@@ -59,8 +57,9 @@ describe("Poc", () => {
         innerInput: "0x",
       });
 
-      const gasLimit = (await account.estimateGas.triggerEscapeOwner({ customData: { genericPaymasterParams } }))
-        .mul(8); // Extra for the transfer to the paymaster
+      const gasLimit = (await account.estimateGas.triggerEscapeOwner({ customData: { genericPaymasterParams } })).mul(
+        8,
+      ); // Extra for the transfer to the paymaster
 
       const paymasterParams = zksync.utils.getPaymasterParams(paymaster.address, {
         type: "ApprovalBased",
@@ -88,8 +87,6 @@ describe("Poc", () => {
       console.log(`Paymaster after       ${await provider.getBalance(paymaster.address)}`);
       console.log(`Account token after   ${await token.balanceOf(account.address)}`);
       console.log(`Paymaster token after ${await token.balanceOf(paymaster.address)}`);
-
     });
   });
-
 });
