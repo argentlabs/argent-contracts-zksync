@@ -245,7 +245,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         Transaction calldata _transaction
     ) external payable override returns (bytes4) {
         requireOnlyBootloader();
-        return _validateTransaction(_suggestedSignedHash, _transaction);
+        return _validateTransaction(_suggestedSignedHash, _transaction, false);
     }
 
     // IERC1271
@@ -280,7 +280,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     // IAccount
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
         bytes32 transactionHash = _transaction.encodeHash(); // The account recalculates the hash on its own
-        bytes4 result = _validateTransaction(transactionHash, _transaction);
+        bytes4 result = _validateTransaction(transactionHash, _transaction, true);
         if (result != ACCOUNT_VALIDATION_SUCCESS_MAGIC) {
             revert("argent/invalid-transaction");
         }
@@ -318,16 +318,19 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
 
     function _validateTransaction(
         bytes32 _transactionHash,
-        Transaction calldata _transaction
+        Transaction calldata _transaction,
+        bool _isFromOutside
     ) internal returns (bytes4) {
         require(owner != address(0), "argent/uninitialized");
 
-        SystemContractsCaller.systemCallWithPropagatedRevert(
-            uint32(gasleft()),
-            address(NONCE_HOLDER_SYSTEM_CONTRACT),
-            0,
-            abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
-        );
+        if (!_isFromOutside) {
+            SystemContractsCaller.systemCallWithPropagatedRevert(
+                uint32(gasleft()),
+                address(NONCE_HOLDER_SYSTEM_CONTRACT),
+                0,
+                abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
+            );
+        }
 
         address to = address(uint160(_transaction.to));
         bytes4 selector = bytes4(_transaction.data);
@@ -337,11 +340,13 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
             require(_transaction.data.length >= 4, "argent/invalid-call-to-deployer");
         }
 
-        // The fact there is are enough balance for the account
-        // should be checked explicitly to prevent user paying for fee for a
-        // transaction that wouldn't be included on Ethereum.
-        uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
-        require(totalRequiredBalance <= address(this).balance, "argent/insufficient-funds-for-gas-plus-value");
+        if (!_isFromOutside) {
+            // The fact there is are enough balance for the account
+            // should be checked explicitly to prevent user paying for fee for a
+            // transaction that wouldn't be included on Ethereum.
+            uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
+            require(totalRequiredBalance <= address(this).balance, "argent/insufficient-funds-for-gas-plus-value");
+        }
 
         // in gas estimation mode, we're called with a single signature filled with zeros
         // substituting the signature with some signature-like array to make sure that the
