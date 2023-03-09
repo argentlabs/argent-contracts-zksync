@@ -147,9 +147,11 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         Transaction calldata _transaction
     ) external payable override {
         requireOnlyBootloader();
-        require(_transaction.paymasterInput.length >= 4, "The standard paymaster input must be at least 4 bytes long");
+        require(_transaction.paymasterInput.length >= 4, "argent/invalid-paymaster-data");
         bytes4 paymasterInputSelector = bytes4(_transaction.paymasterInput[0:4]);
         if (paymasterInputSelector == IPaymasterFlow.approvalBased.selector && guardian != address(0)) {
+            // The approval paymaster can take account tokens, up to the approved amount.
+            // It should be only allowed if both parties agree to the token amount (unless there is no guardian)
             require(
                 _transaction.signature.length == SINGLE_SIGNATURE_SIZE * 2,
                 "argent/no-paymaster-with-single-signature"
