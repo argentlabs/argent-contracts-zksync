@@ -389,16 +389,18 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     }
 
     function isValidGuardianSignature(bytes32 _hash, bytes memory _guardianSignature) internal view returns (bool) {
-        if (guardian == address(0) && _guardianSignature.length == 0) {
-            return true;
-        }
         address recovered = Signatures.recoverSigner(_hash, _guardianSignature);
         return recovered != address(0) && (recovered == guardian || recovered == guardianBackup);
     }
 
     function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {
         (bytes memory ownerSignature, bytes memory guardianSignature) = Signatures.splitSignatures(_signature);
-        return isValidOwnerSignature(_hash, ownerSignature) && isValidGuardianSignature(_hash, guardianSignature);
+        bool ownerIsValid = isValidOwnerSignature(_hash, ownerSignature);
+        if (guardian == address(0)) {
+            return guardianSignature.length == 0 && ownerIsValid;
+        }
+        bool guardianIsValid = isValidGuardianSignature(_hash, guardianSignature);
+        return ownerIsValid && guardianIsValid;
     }
 
     /**************************************************** Execution ***************************************************/
