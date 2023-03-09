@@ -339,9 +339,9 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         uint256 requiredLength = requiredSignatureLength(bytes4(_transaction.data));
         if (signature.length < requiredLength) {
             signature = new bytes(requiredLength);
-            signature[64] = bytes1(uint8(27));
-            if (requiredLength == 130) {
-                signature[129] = bytes1(uint8(27));
+            signature[Signatures.LENGTH - 1] = bytes1(uint8(27));
+            if (requiredLength == 2 * Signatures.LENGTH) {
+                signature[(2 * Signatures.LENGTH) - 1] = bytes1(uint8(27));
             }
         }
 
@@ -352,9 +352,9 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
 
     function requiredSignatureLength(bytes4 _selector) internal view returns (uint256) {
         if (guardian == address(0) || isOwnerEscapeCall(_selector) || isGuardianEscapeCall(_selector)) {
-            return 65;
+            return Signatures.LENGTH;
         }
-        return 130;
+        return 2 * Signatures.LENGTH;
     }
 
     function isValidTransaction(
