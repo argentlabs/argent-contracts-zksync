@@ -26,12 +26,14 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         Owner
     }
 
+    // prettier-ignore
     struct Escape {
-        uint32 activeAt; // timestamp for activation of escape mode, 0 otherwise
-        uint8 escapeType; // packed EscapeType enum
+        uint32 activeAt;       // bits [0...32]   timestamp for activation of escape mode, 0 otherwise
+        uint8 escapeType;      // bits [31...40]  packed EscapeType enum
+        // address newSigner;  // bits [41...200] new owner or new guardian
     }
 
-    bytes32 public constant VERSION = bytes32(abi.encodePacked("0.0.1-alpha.2"));
+    bytes32 public constant VERSION = "0.0.1-alpha.2";
 
     uint8 public constant NO_ESCAPE = uint8(EscapeType.None);
     uint8 public constant GUARDIAN_ESCAPE = uint8(EscapeType.Guardian);
