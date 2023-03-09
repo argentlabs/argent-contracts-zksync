@@ -14,7 +14,7 @@ const owner = zksync.Wallet.createRandom();
 const guardian = zksync.Wallet.createRandom();
 const { deployer, provider } = getDeployer();
 
-describe("Poc", () => {
+describe("Paymaster tests", () => {
   let argent: ArgentInfrastructure;
 
   before(async () => {
@@ -38,9 +38,7 @@ describe("Poc", () => {
     });
 
     it("Guardian alone cannot use the approval paymaster", async () => {
-      await (
-        await token.mint(account.address, 50000)
-      ).wait;
+      await (await token.mint(account.address, 50000)).wait();
 
       const paymaster = await deployer.deploy(await deployer.loadArtifact("BadPaymaster"));
 
@@ -69,10 +67,6 @@ describe("Poc", () => {
       });
 
       const gasPrice = await provider.getGasPrice();
-      console.log(`Account token before     ${await token.balanceOf(account.address)}`);
-      console.log(`Paymaster token before   ${await token.balanceOf(paymaster.address)}`);
-      console.log(`Account balance before   ${await provider.getBalance(account.address)}`);
-      console.log(`Paymaster balance before ${await provider.getBalance(paymaster.address)}`);
 
       const txSubmission = account.triggerEscapeOwner({
         maxFeePerGas: gasPrice,
@@ -82,11 +76,6 @@ describe("Poc", () => {
       });
 
       await expect(txSubmission).to.be.rejectedWith("argent/no-paymaster-with-single-signature");
-
-      console.log(`Account after        ${await provider.getBalance(account.address)}`);
-      console.log(`Paymaster after       ${await provider.getBalance(paymaster.address)}`);
-      console.log(`Account token after   ${await token.balanceOf(account.address)}`);
-      console.log(`Paymaster token after ${await token.balanceOf(paymaster.address)}`);
     });
   });
 });
