@@ -25,39 +25,40 @@ describe("Paymaster tests", () => {
   describe("No approve paymaster for tx signed only by one party", async () => {
     let account: ArgentAccount;
     let token: Contract;
+
     before(async () => {
       account = await deployAccount({
         argent,
         ownerAddress: owner.address,
         guardianAddress: guardian.address,
-        funds: "1",
-        connect: [guardian], // Important, the guardian ALONE can sign this
+        funds: "0.05",
+        connect: [guardian], // Important, the guardian ALONE is signing
       });
       const tokenArtifact = await deployer.loadArtifact("TestErc20");
       token = await deployer.deploy(tokenArtifact, ["TestToken", "TestToken", 0]);
     });
 
     it("Guardian alone cannot use the approval paymaster", async () => {
-      await (await token.mint(account.address, 50000)).wait();
+      const mintingResponse = await token.mint(account.address, 50000);
+      await mintingResponse.wait();
 
       const paymaster = await deployer.deploy(await deployer.loadArtifact("BadPaymaster"));
 
       const tokenBalance = await token.balanceOf(account.address);
 
-      const responseFundPaymaster = await deployer.zkWallet.transfer({
+      const fundingResponse = await deployer.zkWallet.transfer({
         to: paymaster.address,
         amount: ethers.utils.parseEther("0.01"),
       });
-      await responseFundPaymaster.wait();
+      await fundingResponse.wait();
 
       const genericPaymasterParams = zksync.utils.getPaymasterParams(paymaster.address, {
         type: "General",
         innerInput: "0x",
       });
 
-      const gasLimit = (await account.estimateGas.triggerEscapeOwner({ customData: { genericPaymasterParams } })).mul(
-        8,
-      ); // Extra for the transfer to the paymaster
+      const estimation = await account.estimateGas.triggerEscapeOwner({ customData: { genericPaymasterParams } });
+      const gasLimit = estimation.mul(8); // Extra for the transfer to the paymaster
 
       const paymasterParams = zksync.utils.getPaymasterParams(paymaster.address, {
         type: "ApprovalBased",
@@ -68,14 +69,14 @@ describe("Paymaster tests", () => {
 
       const gasPrice = await provider.getGasPrice();
 
-      const txSubmission = account.triggerEscapeOwner({
+      const promise = account.triggerEscapeOwner({
         maxFeePerGas: gasPrice,
         maxPriorityFeePerGas: gasPrice,
         gasLimit,
         customData: { paymasterParams },
       });
 
-      await expect(txSubmission).to.be.rejectedWith("argent/no-paymaster-with-single-signature");
+      await expect(promise).to.be.rejectedWith("argent/no-paymaster-with-single-signature");
     });
   });
 });

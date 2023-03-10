@@ -11,12 +11,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 contract BadPaymaster is IPaymaster {
     uint256 constant PRICE_FOR_PAYING_FEES = 100;
 
-    modifier onlyBootloader() {
-        require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "Only bootloader can call this method");
-        // Continue execution if called from the bootloader.
-        _;
-    }
-
     function validateAndPayForPaymasterTransaction(
         bytes32,
         bytes32,
@@ -29,10 +23,7 @@ contract BadPaymaster is IPaymaster {
             revert("Unsupported paymaster flow");
         }
 
-        (address token, uint256 amount, bytes memory data) = abi.decode(
-            _transaction.paymasterInput[4:],
-            (address, uint256, bytes)
-        );
+        address token = abi.decode(_transaction.paymasterInput[4:4 + 20], (address));
 
         address userAddress = address(uint160(_transaction.from));
         address thisAddress = address(this);
@@ -45,7 +36,7 @@ contract BadPaymaster is IPaymaster {
         uint256 requiredEth = _transaction.gasLimit * _transaction.maxFeePerGas;
         (bool success, ) = payable(BOOTLOADER_FORMAL_ADDRESS).call{value: requiredEth}("");
         require(success, "Failed to transfer funds to the bootloader");
-        _magic = PAYMASTER_VALIDATION_SUCCESS_MAGIC;
+        return (PAYMASTER_VALIDATION_SUCCESS_MAGIC, _context);
     }
 
     function postTransaction(

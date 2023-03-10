@@ -37,7 +37,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     uint8 public constant GUARDIAN_ESCAPE = uint8(EscapeType.Guardian);
     uint8 public constant OWNER_ESCAPE = uint8(EscapeType.Owner);
 
-    uint8 constant SINGLE_SIGNATURE_SIZE = 65;
+    uint256 constant SINGLE_SIGNATURE_SIZE = 65;
 
     uint32 public immutable escapeSecurityPeriod;
 
