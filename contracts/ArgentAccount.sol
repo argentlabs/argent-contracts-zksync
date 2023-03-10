@@ -319,7 +319,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     function _validateTransaction(
         bytes32 _transactionHash,
         Transaction calldata _transaction
-    ) internal returns (bytes4 _magic) {
+    ) internal returns (bytes4) {
         require(owner != address(0), "argent/uninitialized");
 
         SystemContractsCaller.systemCallWithPropagatedRevert(
@@ -355,9 +355,22 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
             }
         }
 
-        if (isValidCall(to, selector, _transactionHash, signature)) {
-            _magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+        if (to == address(this)) {
+            if (isGuardianEscapeCall(selector) && isValidOwnerSignature(_transactionHash, signature)) {
+                return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+            }
+            if (isOwnerEscapeCall(selector) && isValidGuardianSignature(_transactionHash, signature)) {
+                return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+            }
+            if (selector == this.executeAfterUpgrade.selector) {
+                return bytes4(0);
+            }
         }
+
+        if (_isValidSignature(_transactionHash, signature)) {
+            return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+        }
+        return bytes4(0);
     }
 
     function requiredSignatureLength(bytes4 _selector) internal view returns (uint256) {
@@ -365,26 +378,6 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
             return Signatures.SINGLE_LENGTH;
         }
         return 2 * Signatures.SINGLE_LENGTH;
-    }
-
-    function isValidCall(
-        address _to,
-        bytes4 _selector,
-        bytes32 _transactionHash,
-        bytes memory _signature
-    ) internal view returns (bool) {
-        if (_to == address(this)) {
-            if (isGuardianEscapeCall(_selector)) {
-                return isValidOwnerSignature(_transactionHash, _signature);
-            }
-            if (isOwnerEscapeCall(_selector)) {
-                return isValidGuardianSignature(_transactionHash, _signature);
-            }
-            if (_selector == this.executeAfterUpgrade.selector) {
-                return false;
-            }
-        }
-        return _isValidSignature(_transactionHash, _signature);
     }
 
     function isValidOwnerSignature(bytes32 _hash, bytes memory _ownerSignature) internal view returns (bool) {
@@ -399,7 +392,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
 
     function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {
         (bytes memory ownerSignature, bytes memory guardianSignature) = Signatures.splitSignatures(_signature);
-        // always doing both ecrecovers to have proper validation gas estimation
+        // always doing both ecrecovers to have proper gas estimation of validation step
         bool ownerIsValid = isValidOwnerSignature(_hash, ownerSignature);
         bool guardianIsValid = isValidGuardianSignature(_hash, guardianSignature);
         if (!ownerIsValid) {
