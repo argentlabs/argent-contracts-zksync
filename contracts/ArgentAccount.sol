@@ -321,7 +321,11 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
             abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
         );
 
-        if (_transaction.to == uint256(uint160(address(DEPLOYER_SYSTEM_CONTRACT)))) {
+        address to = address(uint160(_transaction.to));
+        bytes4 selector = bytes4(_transaction.data);
+        bytes memory signature = _transaction.signature;
+
+        if (to == address(DEPLOYER_SYSTEM_CONTRACT)) {
             require(_transaction.data.length >= 4, "argent/invalid-call-to-deployer");
         }
 
@@ -331,12 +335,10 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
         require(totalRequiredBalance <= address(this).balance, "argent/insufficient-funds-for-gas-plus-value");
 
-        bytes memory signature = _transaction.signature;
-
         // in gas estimation mode, we're called with a single signature filled with zeros
         // substituting the signature with some signature-like array to make sure that the
         // validation step uses as much steps as the validation with the correct signature provided
-        uint256 requiredLength = requiredSignatureLength(bytes4(_transaction.data));
+        uint256 requiredLength = requiredSignatureLength(selector);
         if (signature.length < requiredLength) {
             signature = new bytes(requiredLength);
             signature[Signatures.LENGTH - 1] = bytes1(uint8(27));
@@ -345,7 +347,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
             }
         }
 
-        if (isValidTransaction(_transactionHash, _transaction, signature)) {
+        if (isValidCall(to, selector, _transactionHash, signature)) {
             _magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
         }
     }
@@ -357,20 +359,20 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         return 2 * Signatures.LENGTH;
     }
 
-    function isValidTransaction(
+    function isValidCall(
+        address _to,
+        bytes4 _selector,
         bytes32 _transactionHash,
-        Transaction calldata _transaction,
         bytes memory _signature
     ) internal view returns (bool) {
-        if (_transaction.to == uint256(uint160(address(this)))) {
-            bytes4 selector = bytes4(_transaction.data);
-            if (isGuardianEscapeCall(selector)) {
+        if (_to == address(this)) {
+            if (isGuardianEscapeCall(_selector)) {
                 return isValidOwnerSignature(_transactionHash, _signature);
             }
-            if (isOwnerEscapeCall(selector)) {
+            if (isOwnerEscapeCall(_selector)) {
                 return isValidGuardianSignature(_transactionHash, _signature);
             }
-            if (selector == this.executeAfterUpgrade.selector) {
+            if (_selector == this.executeAfterUpgrade.selector) {
                 return false;
             }
         }
