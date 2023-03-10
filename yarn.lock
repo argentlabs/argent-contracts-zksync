@@ -675,10 +675,10 @@
   resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-ethers/-/hardhat-ethers-2.2.2.tgz#812d48929c3bf8fe840ec29eab4b613693467679"
   integrity sha512-NLDlDFL2us07C0jB/9wzvR0kuLivChJWCXTKcj3yqjZqMoYp7g7wwS157F70VHx/+9gHIBGzak5pKDwG8gEefA==
 
-"@nomiclabs/hardhat-etherscan@^3.1.6":
-  version "3.1.6"
-  resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-etherscan/-/hardhat-etherscan-3.1.6.tgz#7e50aeb06501a0060655664599d9e35cfd475929"
-  integrity sha512-5WFIZeLLgWPiCJqm/4ie7UNXn7FXfzYmqnKwOKU2MLETGolzY1cueSYUTww/P8f+Zc9xfJLmzqSYcGLW/3j/IQ==
+"@nomiclabs/hardhat-etherscan@^3.1.7":
+  version "3.1.7"
+  resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-etherscan/-/hardhat-etherscan-3.1.7.tgz#72e3d5bd5d0ceb695e097a7f6f5ff6fcbf062b9a"
+  integrity sha512-tZ3TvSgpvsQ6B6OGmo1/Au6u8BrAkvs1mIC/eURA3xgIfznUZBhmpne8hv7BXUzw9xNL3fXdpOYgOQlVMTcoHQ==
   dependencies:
     "@ethersproject/abi" "^5.1.2"
     "@ethersproject/address" "^5.0.2"
@@ -691,10 +691,10 @@
     table "^6.8.0"
     undici "^5.14.0"
 
-"@openzeppelin/contracts@^4.8.1":
-  version "4.8.1"
-  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.8.1.tgz#709cfc4bbb3ca9f4460d60101f15dac6b7a2d5e4"
-  integrity sha512-xQ6eUZl+RDyb/FiZe1h+U7qr/f4p/SrTSQcTPH2bjur3C5DbuW/zFgCU/b1P/xcIaEqJep+9ju4xDRi3rmChdQ==
+"@openzeppelin/contracts@^4.8.2":
+  version "4.8.2"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.8.2.tgz#d815ade0027b50beb9bcca67143c6bcc3e3923d6"
+  integrity sha512-kEUOgPQszC0fSYWpbh2kT94ltOJwj1qfT2DWo+zVttmGmf97JZ99LspePNaeeaLhCImaHVeBbjaQFZQn7+Zc5g==
 
 "@scure/base@~1.1.0":
   version "1.1.1"
@@ -786,10 +786,10 @@
     "@sentry/types" "5.30.0"
     tslib "^1.9.3"
 
-"@solidity-parser/parser@^0.15.0":
-  version "0.15.0"
-  resolved "https://registry.yarnpkg.com/@solidity-parser/parser/-/parser-0.15.0.tgz#1d359be40be84f174dd616ccfadcf43346c6bf63"
-  integrity sha512-5UFJJTzWi1hgFk6aGCZ5rxG2DJkCJOzJ74qg7UkWSNCDSigW+CJLoYUb5bLiKrtI34Nr9rpFSUNHfkqtlL+N/w==
+"@solidity-parser/parser@^0.16.0":
+  version "0.16.0"
+  resolved "https://registry.yarnpkg.com/@solidity-parser/parser/-/parser-0.16.0.tgz#1fb418c816ca1fc3a1e94b08bcfe623ec4e1add4"
+  integrity sha512-ESipEcHyRHg4Np4SqBCfcXwyxxna1DgFVz69bgpLV8vzl/NP1DtcKsJ4dJZXWQhY/Z4J2LeKBiOkOVZn9ct33Q==
   dependencies:
     antlr4ts "^0.5.0-alpha.4"
 
@@ -874,10 +874,10 @@
   resolved "https://registry.yarnpkg.com/@types/node/-/node-18.11.10.tgz#4c64759f3c2343b7e6c4b9caf761c7a3a05cee34"
   integrity sha512-juG3RWMBOqcOuXC643OAdSA525V44cVgGV6dUDuiFtss+8Fk5x1hI93Rsld43VeJVIeqlP9I7Fn9/qaVqoEAuQ==
 
-"@types/node@^18.14.4":
-  version "18.14.4"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.14.4.tgz#0e64ec0b35a772e1e3d849f9a0ff61782d0cb647"
-  integrity sha512-VhCw7I7qO2X49+jaKcAUwi3rR+hbxT5VcYF493+Z5kMLI0DL568b7JI4IDJaxWFH0D/xwmGJNoXisyX+w7GH/g==
+"@types/node@^18.15.0":
+  version "18.15.0"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.15.0.tgz#286a65e3fdffd691e170541e6ecb0410b16a38be"
+  integrity sha512-z6nr0TTEOBGkzLGmbypWOGnpSpSIBorEhC4L+4HeQ2iezKCi4f77kyslRwvHeNitymGQ+oFyIWGP96l/DPSV9w==
 
 "@types/pbkdf2@^3.0.0":
   version "3.1.0"
@@ -2059,10 +2059,10 @@ graceful-fs@^4.1.2, graceful-fs@^4.1.6, graceful-fs@^4.1.9, graceful-fs@^4.2.0:
   resolved "https://registry.yarnpkg.com/graceful-fs/-/graceful-fs-4.2.10.tgz#147d3a006da4ca3ce14728c7aefc287c367d7a6c"
   integrity sha512-9ByhssR2fPVsNZj478qUUbKfmL0+t5BDVyjShtyZZLiK7ZDAArFFfopyOTj0M05wE2tJPisA4iTnnXl2YoPvOA==
 
-hardhat@^2.12.7:
-  version "2.12.7"
-  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.12.7.tgz#d8de2dc32e9a2956d53cf26ef4cd5857e57a3138"
-  integrity sha512-voWoN6zn5d8BOEaczSyK/1PyfdeOeI3SbGCFb36yCHTJUt6OIqLb+ZDX30VhA1UsYKzLqG7UnWl3fKJUuANc6A==
+hardhat@^2.13.0:
+  version "2.13.0"
+  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.13.0.tgz#d52a0ec9b733a651687e5b1c1b0ee9a11a30f3d0"
+  integrity sha512-ZlzBOLML1QGlm6JWyVAG8lVTEAoOaVm1in/RU2zoGAnYEoD1Rp4T+ZMvrLNhHaaeS9hfjJ1gJUBfiDr4cx+htQ==
   dependencies:
     "@ethersproject/abi" "^5.1.2"
     "@metamask/eth-sig-util" "^4.0.0"
@@ -3061,12 +3061,12 @@ solc@0.7.3:
     semver "^5.5.0"
     tmp "0.0.33"
 
-solhint@^3.4.0:
-  version "3.4.0"
-  resolved "https://registry.yarnpkg.com/solhint/-/solhint-3.4.0.tgz#a7e4f2d73e679cb197a1ca5279aa7534bd323e4d"
-  integrity sha512-FYEs/LoTxMsWFP/OGsEqR1CBDn3Bn7hrTWsgtjai17MzxITgearIdlo374KKZjjIycu8E2xBcJ+RSWeoBvQmkw==
+solhint@^3.4.1:
+  version "3.4.1"
+  resolved "https://registry.yarnpkg.com/solhint/-/solhint-3.4.1.tgz#8ea15b21c13d1be0b53fd46d605a24d0b36a0c46"
+  integrity sha512-pzZn2RlZhws1XwvLPVSsxfHrwsteFf5eySOhpAytzXwKQYbTCJV6z8EevYDiSVKMpWrvbKpEtJ055CuEmzp4Xg==
   dependencies:
-    "@solidity-parser/parser" "^0.15.0"
+    "@solidity-parser/parser" "^0.16.0"
     ajv "^6.12.6"
     antlr4 "^4.11.0"
     ast-parents "^0.0.1"
