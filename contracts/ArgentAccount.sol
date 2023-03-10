@@ -10,7 +10,7 @@ import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "@matterlabs/zksync-con
 import {INonceHolder} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/INonceHolder.sol";
 import {SystemContractsCaller} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/SystemContractsCaller.sol";
 import {SystemContractHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/SystemContractHelper.sol";
-import {Transaction, TransactionHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
+import {Transaction, TransactionHelper, IPaymasterFlow} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
 import {Utils} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/Utils.sol";
 
 import {IMulticall} from "./IMulticall.sol";
@@ -147,6 +147,14 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         Transaction calldata _transaction
     ) external payable override {
         requireOnlyBootloader();
+        require(_transaction.paymasterInput.length >= 4, "argent/invalid-paymaster-data");
+        bytes4 paymasterInputSelector = bytes4(_transaction.paymasterInput[0:4]);
+        if (paymasterInputSelector == IPaymasterFlow.approvalBased.selector && guardian != address(0)) {
+            // The approval paymaster can take account tokens, up to the approved amount.
+            // It should be only allowed if both parties agree to the token amount (unless there is no guardian)
+            bool isValid = _transaction.signature.length == 2 * Signatures.SINGLE_LENGTH;
+            require(isValid, "argent/no-paymaster-with-single-signature");
+        }
         _transaction.processPaymasterInput();
     }
 
@@ -341,9 +349,9 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         uint256 requiredLength = requiredSignatureLength(selector);
         if (signature.length < requiredLength) {
             signature = new bytes(requiredLength);
-            signature[Signatures.LENGTH - 1] = bytes1(uint8(27));
-            if (requiredLength == 2 * Signatures.LENGTH) {
-                signature[(2 * Signatures.LENGTH) - 1] = bytes1(uint8(27));
+            signature[Signatures.SINGLE_LENGTH - 1] = bytes1(uint8(27));
+            if (requiredLength == 2 * Signatures.SINGLE_LENGTH) {
+                signature[(2 * Signatures.SINGLE_LENGTH) - 1] = bytes1(uint8(27));
             }
         }
 
@@ -354,9 +362,9 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
 
     function requiredSignatureLength(bytes4 _selector) internal view returns (uint256) {
         if (guardian == address(0) || isOwnerEscapeCall(_selector) || isGuardianEscapeCall(_selector)) {
-            return Signatures.LENGTH;
+            return Signatures.SINGLE_LENGTH;
         }
-        return 2 * Signatures.LENGTH;
+        return 2 * Signatures.SINGLE_LENGTH;
     }
 
     function isValidCall(
@@ -392,11 +400,13 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {
         (bytes memory ownerSignature, bytes memory guardianSignature) = Signatures.splitSignatures(_signature);
         bool ownerIsValid = isValidOwnerSignature(_hash, ownerSignature);
-        if (guardian == address(0)) {
-            return guardianSignature.length == 0 && ownerIsValid;
+        if (!ownerIsValid) {
+            return false;
         }
-        bool guardianIsValid = isValidGuardianSignature(_hash, guardianSignature);
-        return ownerIsValid && guardianIsValid;
+        if (guardian == address(0)) {
+            return guardianSignature.length == 0;
+        }
+        return isValidGuardianSignature(_hash, guardianSignature);
     }
 
     /**************************************************** Execution ***************************************************/

@@ -7,11 +7,11 @@ import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {Transaction, TransactionHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
 
 library Signatures {
-    uint256 public constant LENGTH = 65;
+    uint256 public constant SINGLE_LENGTH = 65;
 
     // non-reverting version of ECDSA.recover that returns address(0) if anything is invalid
     function recoverSigner(bytes32 _hash, bytes memory _signature) internal pure returns (address) {
-        if (_signature.length != LENGTH) {
+        if (_signature.length != SINGLE_LENGTH) {
             return address(0);
         }
 
@@ -51,13 +51,13 @@ library Signatures {
     function splitSignatures(
         bytes memory _fullSignature
     ) internal pure returns (bytes memory _signature1, bytes memory _signature2) {
-        if (_fullSignature.length == LENGTH) {
+        if (_fullSignature.length == SINGLE_LENGTH) {
             return (_fullSignature, _signature2);
         }
 
-        require(_fullSignature.length == 2 * LENGTH, "argent/invalid-signature-length");
-        _signature1 = new bytes(LENGTH);
-        _signature2 = new bytes(LENGTH);
+        require(_fullSignature.length == 2 * SINGLE_LENGTH, "argent/invalid-signature-length");
+        _signature1 = new bytes(SINGLE_LENGTH);
+        _signature2 = new bytes(SINGLE_LENGTH);
 
         assembly {
             // Copying the first signature. Note, that we need an offset of 0x20
