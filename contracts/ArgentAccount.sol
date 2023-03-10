@@ -10,7 +10,7 @@ import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "@matterlabs/zksync-con
 import {INonceHolder} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/INonceHolder.sol";
 import {SystemContractsCaller} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/SystemContractsCaller.sol";
 import {SystemContractHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/SystemContractHelper.sol";
-import {Transaction, TransactionHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
+import {Transaction, TransactionHelper, IPaymasterFlow} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
 import {Utils} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/Utils.sol";
 
 import {IMulticall} from "./IMulticall.sol";
@@ -36,6 +36,8 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     uint8 public constant NO_ESCAPE = uint8(EscapeType.None);
     uint8 public constant GUARDIAN_ESCAPE = uint8(EscapeType.Guardian);
     uint8 public constant OWNER_ESCAPE = uint8(EscapeType.Owner);
+
+    uint256 constant SINGLE_SIGNATURE_SIZE = 65;
 
     uint32 public immutable escapeSecurityPeriod;
 
@@ -145,6 +147,16 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         Transaction calldata _transaction
     ) external payable override {
         requireOnlyBootloader();
+        require(_transaction.paymasterInput.length >= 4, "argent/invalid-paymaster-data");
+        bytes4 paymasterInputSelector = bytes4(_transaction.paymasterInput[0:4]);
+        if (paymasterInputSelector == IPaymasterFlow.approvalBased.selector && guardian != address(0)) {
+            // The approval paymaster can take account tokens, up to the approved amount.
+            // It should be only allowed if both parties agree to the token amount (unless there is no guardian)
+            require(
+                _transaction.signature.length == SINGLE_SIGNATURE_SIZE * 2,
+                "argent/no-paymaster-with-single-signature"
+            );
+        }
         _transaction.processPaymasterInput();
     }
 
@@ -345,9 +357,10 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         uint256 requiredLength = requiredSignatureLength(bytes4(_transaction.data));
         if (signature.length < requiredLength) {
             signature = new bytes(requiredLength);
-            signature[64] = bytes1(uint8(27));
-            if (requiredLength == 130) {
-                signature[129] = bytes1(uint8(27));
+            signature[SINGLE_SIGNATURE_SIZE - 1] = bytes1(uint8(27));
+            if (requiredLength == SINGLE_SIGNATURE_SIZE * 2) {
+                // this won't make a difference as it will fail with the first tx
+                signature[(SINGLE_SIGNATURE_SIZE * 2) - 1] = bytes1(uint8(27));
             }
         }
 
@@ -358,9 +371,9 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
 
     function requiredSignatureLength(bytes4 _selector) internal view returns (uint256) {
         if (guardian == address(0) || isOwnerEscapeCall(_selector) || isGuardianEscapeCall(_selector)) {
-            return 65;
+            return SINGLE_SIGNATURE_SIZE;
         }
-        return 130;
+        return SINGLE_SIGNATURE_SIZE * 2;
     }
 
     function isValidTransaction(
