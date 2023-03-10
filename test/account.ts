@@ -430,7 +430,13 @@ describe("Argent account", () => {
     };
 
     before(async () => {
-      account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
+      account = await deployAccount({
+        argent,
+        ownerAddress,
+        guardianAddress,
+        connect: [owner, guardian],
+        funds: false, // priority transaction should work even if the account has no funds
+      });
       signer = account.signer as ArgentSigner;
       testDapp = (await deployTestDapp(deployer)).connect(signer);
     });
