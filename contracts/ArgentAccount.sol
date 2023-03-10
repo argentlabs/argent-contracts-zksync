@@ -26,18 +26,18 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         Owner
     }
 
+    // prettier-ignore
     struct Escape {
-        uint32 activeAt; // timestamp for activation of escape mode, 0 otherwise
-        uint8 escapeType; // packed EscapeType enum
+        uint32 activeAt;       // bits [0...32]   timestamp for activation of escape mode, 0 otherwise
+        uint8 escapeType;      // bits [31...40]  packed EscapeType enum
+        // address newSigner;  // bits [41...200] new owner or new guardian
     }
 
-    bytes32 public constant VERSION = bytes32(abi.encodePacked("0.0.1-alpha.2"));
+    bytes32 public constant VERSION = "0.0.1-alpha.2";
 
     uint8 public constant NO_ESCAPE = uint8(EscapeType.None);
     uint8 public constant GUARDIAN_ESCAPE = uint8(EscapeType.Guardian);
     uint8 public constant OWNER_ESCAPE = uint8(EscapeType.Owner);
-
-    uint256 constant SINGLE_SIGNATURE_SIZE = 65;
 
     uint32 public immutable escapeSecurityPeriod;
 
@@ -152,38 +152,36 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         if (paymasterInputSelector == IPaymasterFlow.approvalBased.selector && guardian != address(0)) {
             // The approval paymaster can take account tokens, up to the approved amount.
             // It should be only allowed if both parties agree to the token amount (unless there is no guardian)
-            require(
-                _transaction.signature.length == SINGLE_SIGNATURE_SIZE * 2,
-                "argent/no-paymaster-with-single-signature"
-            );
+            bool isValid = _transaction.signature.length == 2 * Signatures.SINGLE_LENGTH;
+            require(isValid, "argent/no-paymaster-with-single-signature");
         }
         _transaction.processPaymasterInput();
     }
 
     /**************************************************** Recovery ****************************************************/
 
-    function changeOwner(address _newOwner) public {
+    function changeOwner(address _newOwner) external {
         requireOnlySelf();
         require(_newOwner != address(0), "argent/null-owner");
         owner = _newOwner;
         emit OwnerChanged(_newOwner);
     }
 
-    function changeGuardian(address _newGuardian) public {
+    function changeGuardian(address _newGuardian) external {
         requireOnlySelf();
         require(_newGuardian != address(0) || guardianBackup == address(0), "argent/backup-should-be-null");
         guardian = _newGuardian;
         emit GuardianChanged(_newGuardian);
     }
 
-    function changeGuardianBackup(address _newGuardianBackup) public {
+    function changeGuardianBackup(address _newGuardianBackup) external {
         requireOnlySelf();
         requireGuardian();
         guardianBackup = _newGuardianBackup;
         emit GuardianBackupChanged(_newGuardianBackup);
     }
 
-    function triggerEscapeOwner() public {
+    function triggerEscapeOwner() external {
         requireOnlySelf();
         requireGuardian();
         // no escape if there is an guardian escape triggered by the owner in progress
@@ -196,7 +194,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         emit EscapeOwnerTriggerred(activeAt);
     }
 
-    function triggerEscapeGuardian() public {
+    function triggerEscapeGuardian() external {
         requireOnlySelf();
         requireGuardian();
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
@@ -204,7 +202,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         emit EscapeGuardianTriggerred(activeAt);
     }
 
-    function cancelEscape() public {
+    function cancelEscape() external {
         requireOnlySelf();
         require(escape.activeAt != 0 && escape.escapeType != NO_ESCAPE, "argent/not-escaping");
 
@@ -212,7 +210,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         emit EscapeCancelled();
     }
 
-    function escapeOwner(address _newOwner) public {
+    function escapeOwner(address _newOwner) external {
         requireOnlySelf();
         requireGuardian();
         require(_newOwner != address(0), "argent/null-owner");
@@ -225,7 +223,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         emit OwnerEscaped(_newOwner);
     }
 
-    function escapeGuardian(address _newGuardian) public {
+    function escapeGuardian(address _newGuardian) external {
         requireOnlySelf();
         requireGuardian();
         require(_newGuardian != address(0), "argent/null-guardian");
@@ -281,7 +279,8 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
 
     // IAccount
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
-        bytes4 result = _validateTransaction(bytes32(0), _transaction); // The account recalculates the hash on its own
+        bytes32 transactionHash = _transaction.encodeHash(); // The account recalculates the hash on its own
+        bytes4 result = _validateTransaction(transactionHash, _transaction);
         if (result != ACCOUNT_VALIDATION_SUCCESS_MAGIC) {
             revert("argent/invalid-transaction");
         }
@@ -318,12 +317,10 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     /*************************************************** Validation ***************************************************/
 
     function _validateTransaction(
-        bytes32 _suggestedSignedHash,
+        bytes32 _transactionHash,
         Transaction calldata _transaction
-    ) internal returns (bytes4 _magic) {
+    ) internal returns (bytes4) {
         require(owner != address(0), "argent/uninitialized");
-
-        _magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
 
         SystemContractsCaller.systemCallWithPropagatedRevert(
             uint32(gasleft()),
@@ -332,14 +329,11 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
             abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
         );
 
-        bytes32 transactionHash;
-        if (_suggestedSignedHash == bytes32(0)) {
-            transactionHash = _transaction.encodeHash();
-        } else {
-            transactionHash = _suggestedSignedHash;
-        }
+        address to = address(uint160(_transaction.to));
+        bytes4 selector = bytes4(_transaction.data);
+        bytes memory signature = _transaction.signature;
 
-        if (_transaction.to == uint256(uint160(address(DEPLOYER_SYSTEM_CONTRACT)))) {
+        if (to == address(DEPLOYER_SYSTEM_CONTRACT)) {
             require(_transaction.data.length >= 4, "argent/invalid-call-to-deployer");
         }
 
@@ -349,51 +343,41 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
         require(totalRequiredBalance <= address(this).balance, "argent/insufficient-funds-for-gas-plus-value");
 
-        bytes memory signature = _transaction.signature;
-
         // in gas estimation mode, we're called with a single signature filled with zeros
         // substituting the signature with some signature-like array to make sure that the
         // validation step uses as much steps as the validation with the correct signature provided
-        uint256 requiredLength = requiredSignatureLength(bytes4(_transaction.data));
+        uint256 requiredLength = requiredSignatureLength(selector);
         if (signature.length < requiredLength) {
             signature = new bytes(requiredLength);
-            signature[SINGLE_SIGNATURE_SIZE - 1] = bytes1(uint8(27));
-            if (requiredLength == SINGLE_SIGNATURE_SIZE * 2) {
-                // this won't make a difference as it will fail with the first tx
-                signature[(SINGLE_SIGNATURE_SIZE * 2) - 1] = bytes1(uint8(27));
+            signature[Signatures.SINGLE_LENGTH - 1] = bytes1(uint8(27));
+            if (requiredLength == 2 * Signatures.SINGLE_LENGTH) {
+                signature[(2 * Signatures.SINGLE_LENGTH) - 1] = bytes1(uint8(27));
             }
         }
 
-        if (!isValidTransaction(transactionHash, _transaction, signature)) {
-            _magic = bytes4(0);
+        if (to == address(this)) {
+            if (isGuardianEscapeCall(selector) && isValidOwnerSignature(_transactionHash, signature)) {
+                return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+            }
+            if (isOwnerEscapeCall(selector) && isValidGuardianSignature(_transactionHash, signature)) {
+                return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+            }
+            if (selector == this.executeAfterUpgrade.selector) {
+                return bytes4(0);
+            }
         }
+
+        if (_isValidSignature(_transactionHash, signature)) {
+            return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+        }
+        return bytes4(0);
     }
 
     function requiredSignatureLength(bytes4 _selector) internal view returns (uint256) {
         if (guardian == address(0) || isOwnerEscapeCall(_selector) || isGuardianEscapeCall(_selector)) {
-            return SINGLE_SIGNATURE_SIZE;
+            return Signatures.SINGLE_LENGTH;
         }
-        return SINGLE_SIGNATURE_SIZE * 2;
-    }
-
-    function isValidTransaction(
-        bytes32 _transactionHash,
-        Transaction calldata _transaction,
-        bytes memory _signature
-    ) internal view returns (bool) {
-        if (_transaction.to == uint256(uint160(address(this)))) {
-            bytes4 selector = bytes4(_transaction.data);
-            if (isGuardianEscapeCall(selector)) {
-                return isValidOwnerSignature(_transactionHash, _signature);
-            }
-            if (isOwnerEscapeCall(selector)) {
-                return isValidGuardianSignature(_transactionHash, _signature);
-            }
-            if (selector == this.executeAfterUpgrade.selector) {
-                return false;
-            }
-        }
-        return _isValidSignature(_transactionHash, _signature);
+        return 2 * Signatures.SINGLE_LENGTH;
     }
 
     function isValidOwnerSignature(bytes32 _hash, bytes memory _ownerSignature) internal view returns (bool) {
@@ -402,16 +386,22 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     }
 
     function isValidGuardianSignature(bytes32 _hash, bytes memory _guardianSignature) internal view returns (bool) {
-        if (guardian == address(0) && _guardianSignature.length == 0) {
-            return true;
-        }
         address recovered = Signatures.recoverSigner(_hash, _guardianSignature);
         return recovered != address(0) && (recovered == guardian || recovered == guardianBackup);
     }
 
     function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {
         (bytes memory ownerSignature, bytes memory guardianSignature) = Signatures.splitSignatures(_signature);
-        return isValidOwnerSignature(_hash, ownerSignature) && isValidGuardianSignature(_hash, guardianSignature);
+        // always doing both ecrecovers to have proper gas estimation of validation step
+        bool ownerIsValid = isValidOwnerSignature(_hash, ownerSignature);
+        bool guardianIsValid = isValidGuardianSignature(_hash, guardianSignature);
+        if (!ownerIsValid) {
+            return false;
+        }
+        if (guardian == address(0)) {
+            return guardianSignature.length == 0;
+        }
+        return guardianIsValid;
     }
 
     /**************************************************** Execution ***************************************************/
