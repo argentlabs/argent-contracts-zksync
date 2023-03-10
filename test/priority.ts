@@ -31,7 +31,13 @@ describe("Priority mode (from outside / L1)", () => {
   before(async () => {
     await checkDeployer(deployer);
     argent = await getTestInfrastructure(deployer);
-    account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
+    account = await deployAccount({
+      argent,
+      ownerAddress,
+      guardianAddress,
+      connect: [owner, guardian],
+      funds: false, // priority transaction should work even if the account has no funds
+    });
     signer = account.signer as ArgentSigner;
     testDapp = (await deployTestDapp(deployer)).connect(signer);
   });
