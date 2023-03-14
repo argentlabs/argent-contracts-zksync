@@ -9,7 +9,6 @@ export interface IConfig {
   escapeSecurityPeriodInSeconds: number;
   implementation: string;
   factory: string;
-  dummyAccount: string;
   testDapp: string;
 }
 

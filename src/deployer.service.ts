@@ -4,10 +4,8 @@ import { ethers } from "ethers";
 import hre from "hardhat";
 import * as zksync from "zksync-web3";
 import { logBalance } from "./account.service";
-import { getEnv } from "./config.service";
 import { ArgentArtifacts } from "./model";
 
-const env = getEnv();
 let showPreamble = true;
 
 export const getDeployer = () => {
@@ -23,7 +21,7 @@ export const getDeployer = () => {
     } catch {}
   }
   if (!privateKey) {
-    throw new Error(`Add private key in .env for: ${env}`);
+    throw new Error(`Add private key in .env for network ${network}`);
   }
   const wallet = new zksync.Wallet(privateKey);
   const deployer = new Deployer(hre, wallet);
@@ -35,7 +33,7 @@ export const getDeployer = () => {
 export const checkDeployer = async ({ zkWallet: { provider, providerL1, address } }: Deployer) => {
   try {
     if (showPreamble) {
-      console.log(`Using env "${env}" and hardhat network "${hre.network.name}"`);
+      console.log(`Using hardhat network "${hre.network.name}"`);
     }
 
     const balance = await provider.getBalance(address);
@@ -53,7 +51,7 @@ export const checkDeployer = async ({ zkWallet: { provider, providerL1, address 
       throw new Error("Deployer has very low funds");
     }
   } catch (error) {
-    if (`${error}`.includes("noNetwork") && getEnv() === "local") {
+    if (`${error}`.includes("noNetwork") && hre.network.name === "local") {
       console.error(error);
       console.error("\nRun `yarn start` to start the local zkSync node.\n");
       process.exit(1);

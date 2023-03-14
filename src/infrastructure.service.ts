@@ -2,7 +2,6 @@ import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import hre from "hardhat";
 import * as zksync from "zksync-web3";
 import { AccountFactory, TestDapp } from "../typechain-types";
-import { deployAccount } from "./account.service";
 import { loadConfig } from "./config.service";
 import { checkDeployer, loadArtifacts, verifyContract } from "./deployer.service";
 import { ArgentInfrastructure } from "./model";
@@ -19,22 +18,10 @@ export const deployInfrastructure = async (deployer: Deployer): Promise<ArgentIn
   const { bytecode } = artifacts.proxy;
   const proxyBytecodeHash = zksync.utils.hashBytecode(bytecode);
   const factory = await deployer.deploy(artifacts.factory, [proxyBytecodeHash], undefined, [bytecode]);
-  console.log(`Account factory deployed to ${factory.address}`);
+  console.log(`Account factory deployed to ${factory.address}\n`);
   await verifyContract(factory.address, artifacts.factory, [proxyBytecodeHash]);
 
-  const argent = { deployer, artifacts, implementation, factory: factory as AccountFactory };
-
-  // deploying a dummy account here in order pay for L1 data costs here and not
-  // during the deployment of the first actual wallet
-  const dummyAccount = await deployAccount({
-    argent,
-    ownerAddress: zksync.Wallet.createRandom().address,
-    guardianAddress: zksync.Wallet.createRandom().address,
-    funds: false,
-  });
-  console.log(`Dummy account deployed to: ${dummyAccount.address}`);
-
-  return argent;
+  return { deployer, artifacts, implementation, factory: factory as AccountFactory };
 };
 
 export const getInfrastructure: typeof deployInfrastructure = async (deployer) => {
