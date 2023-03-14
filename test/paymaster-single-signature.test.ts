@@ -1,18 +1,13 @@
-import "@nomicfoundation/hardhat-chai-matchers";
-import "@nomiclabs/hardhat-ethers";
 import { expect } from "chai";
 import { Contract } from "ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { deployAccount } from "../src/account.service";
-import { checkDeployer, getDeployer } from "../src/deployer.service";
+import { checkDeployer } from "../src/deployer.service";
 import { getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
 import { ArgentAccount } from "../typechain-types";
-
-const owner = zksync.Wallet.createRandom();
-const guardian = zksync.Wallet.createRandom();
-const { deployer, provider } = getDeployer();
+import { deployer, guardian, owner, provider } from "./fixtures";
 
 describe("Paymaster tests", () => {
   let argent: ArgentInfrastructure;

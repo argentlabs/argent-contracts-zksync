@@ -1,31 +1,26 @@
-import "@nomicfoundation/hardhat-chai-matchers";
-import "@nomiclabs/hardhat-ethers";
 import { expect } from "chai";
 import { BytesLike, PopulatedTransaction } from "ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { computeCreate2AddressFromSdk, connect, deployAccount } from "../src/account.service";
-import { checkDeployer, CustomDeployer, getDeployer } from "../src/deployer.service";
+import { checkDeployer, CustomDeployer } from "../src/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
 import { ArgentSigner, TransactionRequest } from "../src/signer.service";
 import { ArgentAccount, IMulticall, TestDapp, UpgradedArgentAccount } from "../typechain-types";
-import { TransactionStruct } from "../typechain-types/@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccount";
-
-const { AddressZero } = ethers.constants;
-
-const owner = zksync.Wallet.createRandom();
-const guardian = zksync.Wallet.createRandom();
-const newOwner = zksync.Wallet.createRandom();
-const wrongOwner = zksync.Wallet.createRandom();
-const wrongGuardian = zksync.Wallet.createRandom();
-
-const ownerAddress = owner.address;
-const guardianAddress = guardian.address;
-const { deployer, deployerAddress, provider } = getDeployer();
-
-console.log(`owner private key: ${owner.privateKey} (${ownerAddress})`);
-console.log(`guardian private key: ${guardian.privateKey} (${guardianAddress})`);
+import { TransactionStruct } from "../typechain-types/contracts/ArgentAccount";
+import {
+  AddressZero,
+  deployer,
+  deployerAddress,
+  guardian,
+  guardianAddress,
+  owner,
+  ownerAddress,
+  provider,
+  wrongGuardian,
+  wrongOwner,
+} from "./fixtures";
 
 const makeCall = ({ to = AddressZero, data = "0x" }: PopulatedTransaction): IMulticall.CallStruct => ({
   to,
@@ -267,6 +262,8 @@ describe("Argent account", () => {
     });
 
     describe("Calling the dapp without using a guardian", () => {
+      const newOwner = zksync.Wallet.createRandom();
+
       before(async () => {
         account = await deployAccount({
           argent,
