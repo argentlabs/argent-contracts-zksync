@@ -279,8 +279,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
 
     // IAccount
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
-        bytes32 transactionHash = _transaction.encodeHash(); // The account recalculates the hash on its own
-        bytes4 result = _validateTransaction(transactionHash, _transaction, true);
+        bytes4 result = _validateTransaction(bytes32(0), _transaction, true); // The account recalculates the hash on its own
         if (result != ACCOUNT_VALIDATION_SUCCESS_MAGIC) {
             revert("argent/invalid-transaction");
         }
@@ -317,20 +316,18 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     /*************************************************** Validation ***************************************************/
 
     function _validateTransaction(
-        bytes32 _transactionHash,
+        bytes32 _suggestedSignedHash,
         Transaction calldata _transaction,
         bool _isFromOutside
     ) internal returns (bytes4) {
         require(owner != address(0), "argent/uninitialized");
 
-        if (!_isFromOutside) {
-            SystemContractsCaller.systemCallWithPropagatedRevert(
-                uint32(gasleft()),
-                address(NONCE_HOLDER_SYSTEM_CONTRACT),
-                0,
-                abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
-            );
-        }
+        SystemContractsCaller.systemCallWithPropagatedRevert(
+            uint32(gasleft()),
+            address(NONCE_HOLDER_SYSTEM_CONTRACT),
+            0,
+            abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
+        );
 
         address to = address(uint160(_transaction.to));
         bytes4 selector = bytes4(_transaction.data);
@@ -348,6 +345,8 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
             require(totalRequiredBalance <= address(this).balance, "argent/insufficient-funds-for-gas-plus-value");
         }
 
+        bytes32 transactionHash = _suggestedSignedHash != bytes32(0) ? _suggestedSignedHash : _transaction.encodeHash();
+
         // in gas estimation mode, we're called with a single signature filled with zeros
         // substituting the signature with some signature-like array to make sure that the
         // validation step uses as much steps as the validation with the correct signature provided
@@ -361,10 +360,10 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         }
 
         if (to == address(this)) {
-            if (isGuardianEscapeCall(selector) && isValidOwnerSignature(_transactionHash, signature)) {
+            if (isGuardianEscapeCall(selector) && isValidOwnerSignature(transactionHash, signature)) {
                 return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
             }
-            if (isOwnerEscapeCall(selector) && isValidGuardianSignature(_transactionHash, signature)) {
+            if (isOwnerEscapeCall(selector) && isValidGuardianSignature(transactionHash, signature)) {
                 return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
             }
             if (selector == this.executeAfterUpgrade.selector) {
@@ -372,7 +371,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
             }
         }
 
-        if (_isValidSignature(_transactionHash, signature)) {
+        if (_isValidSignature(transactionHash, signature)) {
             return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
         }
         return bytes4(0);
