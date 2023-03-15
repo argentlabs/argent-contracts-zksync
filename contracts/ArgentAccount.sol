@@ -4,6 +4,7 @@ pragma solidity 0.8.18;
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccount.sol";
@@ -19,6 +20,7 @@ import {Signatures} from "./Signatures.sol";
 contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
+    using ECDSA for bytes32;
 
     enum EscapeType {
         None,
@@ -63,8 +65,8 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     event GuardianChanged(address newGuardian);
     event GuardianBackupChanged(address newGuardianBackup);
 
-    event EscapeOwnerTriggerred(uint32 activeAt);
-    event EscapeGuardianTriggerred(uint32 activeAt);
+    event EscapeOwnerTriggerred(uint32 activeAt, address newOwner);
+    event EscapeGuardianTriggerred(uint32 activeAt, address newGuardian);
     event OwnerEscaped(address newOwner);
     event GuardianEscaped(address newGuardian);
     event EscapeCancelled();
@@ -181,25 +183,38 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         emit GuardianBackupChanged(_newGuardianBackup);
     }
 
-    function triggerEscapeOwner() external {
+    function triggerEscapeOwner(address _newOwner, bytes memory _newOwnerSignature) external {
         requireOnlySelf();
         requireGuardian();
+        requireValidEscapeSignature(_newOwner, _newOwnerSignature, this.triggerEscapeOwner.selector);
+
         // no escape if there is an guardian escape triggered by the owner in progress
         if (escape.activeAt != 0) {
-            require(escape.escapeType == OWNER_ESCAPE, "argent/cannot-override-owner-escape");
+            require(escape.escapeType == OWNER_ESCAPE, "argent/cannot-override-escape");
         }
 
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(activeAt, OWNER_ESCAPE);
-        emit EscapeOwnerTriggerred(activeAt);
+        emit EscapeOwnerTriggerred(activeAt, _newOwner);
     }
 
-    function triggerEscapeGuardian() external {
+    function requireValidEscapeSignature(address _newSigner, bytes memory _signature, bytes4 _selector) internal view {
+        uint256 nonce = INonceHolder(NONCE_HOLDER_SYSTEM_CONTRACT).getMinNonce(address(this));
+        bytes memory message = abi.encodePacked(_selector, block.chainid, address(this), nonce, _newSigner);
+        bytes32 messageHash = keccak256(message).toEthSignedMessageHash();
+        address signer = Signatures.recoverSigner(messageHash, _signature);
+        require(signer != address(0) && signer == _newSigner, "argent/invalid-escape-signature");
+    }
+
+    }
+
+    function triggerEscapeGuardian(address _newGuardian, bytes memory _newGuardianSignature) external {
         requireOnlySelf();
         requireGuardian();
+        requireValidEscapeSignature(_newGuardian, _newGuardianSignature, this.triggerEscapeGuardian.selector);
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(activeAt, GUARDIAN_ESCAPE);
-        emit EscapeGuardianTriggerred(activeAt);
+        emit EscapeGuardianTriggerred(activeAt, _newGuardian);
     }
 
     function cancelEscape() external {
@@ -386,13 +401,13 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     }
 
     function isValidOwnerSignature(bytes32 _hash, bytes memory _ownerSignature) internal view returns (bool) {
-        address recovered = Signatures.recoverSigner(_hash, _ownerSignature);
-        return recovered != address(0) && recovered == owner;
+        address signer = Signatures.recoverSigner(_hash, _ownerSignature);
+        return signer != address(0) && signer == owner;
     }
 
     function isValidGuardianSignature(bytes32 _hash, bytes memory _guardianSignature) internal view returns (bool) {
-        address recovered = Signatures.recoverSigner(_hash, _guardianSignature);
-        return recovered != address(0) && (recovered == guardian || recovered == guardianBackup);
+        address signer = Signatures.recoverSigner(_hash, _guardianSignature);
+        return signer != address(0) && (signer == guardian || signer == guardianBackup);
     }
 
     function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {

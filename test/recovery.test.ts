@@ -1,11 +1,11 @@
 import { expect } from "chai";
 import * as zksync from "zksync-web3";
-import { TransactionResponse } from "zksync-web3/build/src/types";
 import { connect, deployAccount } from "../src/account.service";
 import { checkDeployer } from "../src/deployer.service";
 import { getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
 import { waitForL1BatchBlock, waitForTimestamp } from "../src/provider.service";
+import { getEscapeSignature } from "../src/recovery.service";
 import { ArgentAccount } from "../typechain-types";
 import {
   AddressZero,
@@ -142,10 +142,14 @@ describe("Recovery", () => {
       expect(escapeBefore.activeAt).to.equal(0n);
       expect(escapeBefore.escapeType).to.equal(noEscape);
 
-      const response = (await account.triggerEscapeGuardian()) as TransactionResponse;
+      const signature = await getEscapeSignature(newGuardian, account, "triggerEscapeGuardian");
+
+      const response = await account.triggerEscapeGuardian(newGuardian.address, signature);
       const { timestamp } = await waitForL1BatchBlock(response, provider);
       const activeAtExpected = timestamp + escapeSecurityPeriod;
-      await expect(response).to.emit(account, "EscapeGuardianTriggerred").withArgs(activeAtExpected);
+      await expect(response)
+        .to.emit(account, "EscapeGuardianTriggerred")
+        .withArgs(activeAtExpected, newGuardian.address);
 
       const escapeAfter = await account.escape();
       expect(escapeAfter.activeAt).to.equal(activeAtExpected);
@@ -159,10 +163,12 @@ describe("Recovery", () => {
       expect(escapeBefore.activeAt).to.equal(0n);
       expect(escapeBefore.escapeType).to.equal(noEscape);
 
-      const response = (await account.triggerEscapeOwner()) as TransactionResponse;
+      const signature = await getEscapeSignature(newOwner, account, "triggerEscapeOwner");
+
+      const response = await account.triggerEscapeOwner(newOwner.address, signature);
       const { timestamp } = await waitForL1BatchBlock(response, provider);
       const activeAtExpected = timestamp + escapeSecurityPeriod;
-      await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAtExpected);
+      await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAtExpected, newOwner.address);
 
       const escapeAfter = await account.escape();
       expect(escapeAfter.activeAt).to.equal(activeAtExpected);
@@ -178,10 +184,12 @@ describe("Recovery", () => {
       expect(escapeBefore.activeAt).to.equal(0n);
       expect(escapeBefore.escapeType).to.equal(noEscape);
 
-      const response = (await connect(account, [newGuardianBackup]).triggerEscapeOwner()) as TransactionResponse;
+      const signature = await getEscapeSignature(newOwner, account, "triggerEscapeOwner");
+
+      const response = await connect(account, [newGuardianBackup]).triggerEscapeOwner(newOwner.address, signature);
       const { timestamp } = await waitForL1BatchBlock(response, provider);
       const activeAtExpected = timestamp + escapeSecurityPeriod;
-      await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAtExpected);
+      await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAtExpected, newOwner.address);
 
       const escapeAfter = await account.escape();
       expect(escapeAfter.activeAt).to.equal(activeAtExpected);
