@@ -15,9 +15,10 @@ import {Transaction, TransactionHelper, IPaymasterFlow} from "@matterlabs/zksync
 import {Utils} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/Utils.sol";
 
 import {IMulticall} from "./IMulticall.sol";
+import {IProxy} from "./Proxy.sol";
 import {Signatures} from "./Signatures.sol";
 
-contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
+contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
     using ECDSA for bytes32;
@@ -30,9 +31,9 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
 
     // prettier-ignore
     struct Escape {
-        uint32 activeAt;       // bits [0...32]   timestamp for activation of escape mode, 0 otherwise
-        uint8 escapeType;      // bits [31...40]  packed EscapeType enum
-        // address newSigner;  // bits [41...200] new owner or new guardian
+        uint32 activeAt;    // bits [0...32]   timestamp for activation of escape mode, 0 otherwise
+        uint8 escapeType;   // bits [31...40]  packed EscapeType enum
+        address newSigner;  // bits [41...200] new owner or new guardian
     }
 
     bytes32 public constant VERSION = "0.0.1-alpha.2";
@@ -194,26 +195,17 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         }
 
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
-        escape = Escape(activeAt, OWNER_ESCAPE);
+        escape = Escape(activeAt, OWNER_ESCAPE, _newOwner);
         emit EscapeOwnerTriggerred(activeAt, _newOwner);
-    }
-
-    function requireValidEscapeSignature(address _newSigner, bytes memory _signature, bytes4 _selector) internal view {
-        uint256 nonce = INonceHolder(NONCE_HOLDER_SYSTEM_CONTRACT).getMinNonce(address(this));
-        bytes memory message = abi.encodePacked(_selector, block.chainid, address(this), nonce, _newSigner);
-        bytes32 messageHash = keccak256(message).toEthSignedMessageHash();
-        address signer = Signatures.recoverSigner(messageHash, _signature);
-        require(signer != address(0) && signer == _newSigner, "argent/invalid-escape-signature");
-    }
-
     }
 
     function triggerEscapeGuardian(address _newGuardian, bytes memory _newGuardianSignature) external {
         requireOnlySelf();
         requireGuardian();
         requireValidEscapeSignature(_newGuardian, _newGuardianSignature, this.triggerEscapeGuardian.selector);
+
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
-        escape = Escape(activeAt, GUARDIAN_ESCAPE);
+        escape = Escape(activeAt, GUARDIAN_ESCAPE, _newGuardian);
         emit EscapeGuardianTriggerred(activeAt, _newGuardian);
     }
 
@@ -232,6 +224,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
         require(escape.escapeType == OWNER_ESCAPE, "argent/invalid-escape-type");
+        require(escape.newSigner == _newOwner, "argent/invalid-escape-signer");
 
         delete escape;
         owner = _newOwner;
@@ -245,6 +238,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
         require(escape.escapeType == GUARDIAN_ESCAPE, "argent/invalid-escape-type");
+        require(escape.newSigner == _newGuardian, "argent/invalid-escape-signer");
 
         delete escape;
         guardian = _newGuardian;
@@ -445,6 +439,15 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     }
 
     /**************************************************** Recovery ****************************************************/
+
+    function requireValidEscapeSignature(address _newSigner, bytes memory _signature, bytes4 _selector) internal view {
+        // uint256 nonce = INonceHolder(NONCE_HOLDER_SYSTEM_CONTRACT).getMinNonce(address(this));
+        uint256 nonce = 0;
+        bytes memory message = abi.encodePacked(_selector, block.chainid, address(this), nonce, _newSigner);
+        bytes32 messageHash = keccak256(message).toEthSignedMessageHash();
+        address signer = Signatures.recoverSigner(messageHash, _signature);
+        require(signer != address(0) && signer == _newSigner, "argent/invalid-escape-signature");
+    }
 
     function isOwnerEscapeCall(bytes4 _selector) internal pure returns (bool) {
         return _selector == this.escapeOwner.selector || _selector == this.triggerEscapeOwner.selector;
