@@ -3,9 +3,9 @@ import "@nomiclabs/hardhat-ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { getDeployer } from "../src/deployer.service";
-import { ArgentAccount as ArgentAccountDummy } from "../typechain-types/contracts/test/TypechainDummy";
+import { ArgentAccount } from "../typechain-types/contracts/ArgentAccount";
 
-export type EscapeStruct = ArgentAccountDummy.EscapeStruct;
+export type EscapeStruct = ArgentAccount.EscapeStruct;
 
 export const owner = zksync.Wallet.createRandom();
 export const guardian = zksync.Wallet.createRandom();
