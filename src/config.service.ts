@@ -2,15 +2,6 @@ import fs from "fs";
 import hre from "hardhat";
 import { IConfig } from "./model";
 
-export type Env = "local" | "goerli";
-
-export const getEnv = (): Env => {
-  if (!process.env.NODE_ENV) {
-    return "local";
-  }
-  return process.env.NODE_ENV as Env;
-};
-
 export const loadConfig = async (): Promise<IConfig> => {
   try {
     return JSON.parse(fs.readFileSync(`./config/${hre.network.name}.json`, "utf8"));
