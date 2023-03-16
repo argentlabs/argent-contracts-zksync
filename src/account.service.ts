@@ -1,7 +1,6 @@
 import { BigNumber, BytesLike, PopulatedTransaction } from "ethers";
 import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
-import { AddressZero } from "../test/fixtures";
 import { ArgentAccount, IMulticall } from "../typechain-types";
 import { verifyContract } from "./deployer.service";
 import { AccountDeploymentParams, ArgentInfrastructure } from "./model";
@@ -68,14 +67,15 @@ export const computeCreate2AddressFromSdk = (
 };
 
 export const makeCall = ({
-  to = AddressZero,
+  to,
   value = BigNumber.from(0),
   data = "0x",
-}: PopulatedTransaction): IMulticall.CallStruct => ({
-  to,
-  value,
-  data,
-});
+}: PopulatedTransaction): IMulticall.CallStruct => {
+  if (!to) {
+    throw new Error(`Transaction 'to' is required, was ${to}`);
+  }
+  return { to, value, data };
+};
 
 export const logBalance = async (address: string, balanceOrProvider: zksync.Provider | BigNumber, name?: string) => {
   const balance = "getBalance" in balanceOrProvider ? await balanceOrProvider.getBalance(address) : balanceOrProvider;
