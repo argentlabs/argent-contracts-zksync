@@ -469,10 +469,14 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         if (block.timestamp < _escape.activeAt) {
             return EscapeStatus.TooEarly;
         }
-        if (_escape.activeAt + (2 * escapeSecurityPeriod) < block.timestamp) {
+        if (_escape.activeAt + escapeExpiryPeriod() < block.timestamp) {
             return EscapeStatus.Expired;
         }
         return EscapeStatus.Active;
+    }
+
+    function escapeExpiryPeriod() public view returns (uint32) {
+        return 2 * escapeSecurityPeriod;
     }
 
     function requireValidEscapeSignature(address _newSigner, bytes memory _signature, bytes4 _selector) internal view {
