@@ -245,7 +245,8 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         Transaction calldata _transaction
     ) external payable override returns (bytes4) {
         requireOnlyBootloader();
-        return _validateTransaction(_suggestedSignedHash, _transaction, false);
+        bytes32 transactionHash = _suggestedSignedHash != bytes32(0) ? _suggestedSignedHash : _transaction.encodeHash();
+        return _validateTransaction(transactionHash, _transaction, false);
     }
 
     // IERC1271
@@ -279,7 +280,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
 
     // IAccount
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
-        bytes4 result = _validateTransaction(bytes32(0), _transaction, true); // The account recalculates the hash on its own
+        bytes4 result = _validateTransaction(_transaction.encodeHash(), _transaction, true);
         if (result != ACCOUNT_VALIDATION_SUCCESS_MAGIC) {
             revert("argent/invalid-transaction");
         }
@@ -316,7 +317,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     /*************************************************** Validation ***************************************************/
 
     function _validateTransaction(
-        bytes32 _suggestedSignedHash,
+        bytes32 _transactionHash,
         Transaction calldata _transaction,
         bool _isFromOutside
     ) internal returns (bytes4) {
@@ -345,8 +346,6 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
             require(totalRequiredBalance <= address(this).balance, "argent/insufficient-funds-for-gas-plus-value");
         }
 
-        bytes32 transactionHash = _suggestedSignedHash != bytes32(0) ? _suggestedSignedHash : _transaction.encodeHash();
-
         // in gas estimation mode, we're called with a single signature filled with zeros
         // substituting the signature with some signature-like array to make sure that the
         // validation step uses as much steps as the validation with the correct signature provided
@@ -360,10 +359,10 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         }
 
         if (to == address(this)) {
-            if (isGuardianEscapeCall(selector) && isValidOwnerSignature(transactionHash, signature)) {
+            if (isGuardianEscapeCall(selector) && isValidOwnerSignature(_transactionHash, signature)) {
                 return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
             }
-            if (isOwnerEscapeCall(selector) && isValidGuardianSignature(transactionHash, signature)) {
+            if (isOwnerEscapeCall(selector) && isValidGuardianSignature(_transactionHash, signature)) {
                 return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
             }
             if (selector == this.executeAfterUpgrade.selector) {
@@ -371,7 +370,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
             }
         }
 
-        if (_isValidSignature(transactionHash, signature)) {
+        if (_isValidSignature(_transactionHash, signature)) {
             return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
         }
         return bytes4(0);
