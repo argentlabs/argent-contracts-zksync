@@ -5,7 +5,7 @@ import { checkDeployer } from "../src/deployer.service";
 import { getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
 import { waitForL1BatchBlock, waitForTimestamp } from "../src/provider.service";
-import { getEscapeSignature } from "../src/recovery.service";
+import { triggerEscapeGuardian, triggerEscapeOwner } from "../src/recovery.service";
 import { ArgentAccount } from "../typechain-types";
 import {
   AddressZero,
@@ -148,9 +148,7 @@ describe("Recovery", () => {
       const [escapeBefore] = await account.getEscape();
       expectEqualEscapes(escapeBefore, nullEscape);
 
-      const signature = await getEscapeSignature(newGuardian, account, "triggerEscapeGuardian");
-
-      const response = await account.triggerEscapeGuardian(newGuardian.address, signature);
+      const response = await triggerEscapeGuardian(newGuardian, account);
       const { timestamp } = await waitForL1BatchBlock(response, provider);
       const activeAt = timestamp + escapeSecurityPeriod;
       await expect(response).to.emit(account, "EscapeGuardianTriggerred").withArgs(activeAt, newGuardian.address);
@@ -165,9 +163,7 @@ describe("Recovery", () => {
       const [escapeBefore] = await account.getEscape();
       expectEqualEscapes(escapeBefore, nullEscape);
 
-      const signature = await getEscapeSignature(newOwner, account, "triggerEscapeOwner");
-
-      const response = await account.triggerEscapeOwner(newOwner.address, signature);
+      const response = await triggerEscapeOwner(newOwner, account);
       const { timestamp } = await waitForL1BatchBlock(response, provider);
       const activeAt = timestamp + escapeSecurityPeriod;
       await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAt, newOwner.address);
@@ -184,9 +180,7 @@ describe("Recovery", () => {
       const [escapeBefore] = await account.getEscape();
       expectEqualEscapes(escapeBefore, nullEscape);
 
-      const signature = await getEscapeSignature(newOwner, account, "triggerEscapeOwner");
-
-      const response = await connect(account, [newGuardianBackup]).triggerEscapeOwner(newOwner.address, signature);
+      const response = await triggerEscapeOwner(newOwner, connect(account, [newGuardianBackup]));
       const { timestamp } = await waitForL1BatchBlock(response, provider);
       const activeAt = timestamp + escapeSecurityPeriod;
       await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAt, newOwner.address);
@@ -195,24 +189,24 @@ describe("Recovery", () => {
       expectEqualEscapes(escape, { activeAt, escapeType: ownerEscapeType, newSigner: newOwner.address });
     });
 
-    it.skip("Should run trigger methods twice", async () => {
+    it("Should run trigger methods twice", async () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress });
 
-      let promise = connect(account, [guardian]).triggerEscapeOwner();
+      let promise = triggerEscapeOwner(zksync.Wallet.createRandom(), connect(account, [guardian]));
       await expect(promise).to.emit(account, "EscapeOwnerTriggerred");
 
-      promise = connect(account, [guardian]).triggerEscapeOwner();
+      promise = triggerEscapeOwner(zksync.Wallet.createRandom(), connect(account, [guardian]));
       await expect(promise).to.emit(account, "EscapeOwnerTriggerred");
 
-      promise = connect(account, [owner]).triggerEscapeGuardian();
+      promise = triggerEscapeGuardian(zksync.Wallet.createRandom(), connect(account, [owner]));
       await expect(promise).to.emit(account, "EscapeGuardianTriggerred");
 
-      promise = connect(account, [owner]).triggerEscapeGuardian();
+      promise = triggerEscapeGuardian(zksync.Wallet.createRandom(), connect(account, [owner]));
       await expect(promise).to.emit(account, "EscapeGuardianTriggerred");
     });
   });
 
-  describe.only("Escaping", () => {
+  describe("Escaping", () => {
     if (escapeSecurityPeriod > 60) {
       throw new Error("These tests require an escape security period of less than 60 seconds");
     }
@@ -227,8 +221,7 @@ describe("Recovery", () => {
       });
 
       // trigger escape
-      const signature = await getEscapeSignature(newGuardian, account, "triggerEscapeGuardian");
-      const response = await account.triggerEscapeGuardian(newGuardian.address, signature);
+      const response = await triggerEscapeGuardian(newGuardian, account);
       await response.wait();
 
       // should fail to escape before the end of the period
@@ -261,8 +254,7 @@ describe("Recovery", () => {
       });
 
       // trigger escape
-      const signature = await getEscapeSignature(newOwner, account, "triggerEscapeOwner");
-      const response = await account.triggerEscapeOwner(newOwner.address, signature);
+      const response = await triggerEscapeOwner(newOwner, account);
       await response.wait();
 
       // should fail to escape before the end of the period
@@ -291,7 +283,7 @@ describe("Recovery", () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress });
 
       // guardian triggers a owner escape
-      const guardianResponse = await connect(account, [guardian]).triggerEscapeOwner();
+      const guardianResponse = await triggerEscapeOwner(newOwner, connect(account, [guardian]));
       await guardianResponse.wait();
 
       const [firstEscape] = await account.getEscape();
@@ -301,7 +293,7 @@ describe("Recovery", () => {
       // TODO: do evm_increaseTime + evm_mine here when testing locally
 
       // owner overrides the guardian's escape
-      const ownerResponse = await connect(account, [owner]).triggerEscapeGuardian();
+      const ownerResponse = await triggerEscapeGuardian(newGuardian, connect(account, [owner]));
       await ownerResponse.wait();
 
       const [secondEscape] = await account.getEscape();
@@ -313,7 +305,7 @@ describe("Recovery", () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress });
 
       // owner triggers a guardian escape
-      const response = await connect(account, [owner]).triggerEscapeGuardian();
+      const response = await triggerEscapeGuardian(newGuardian, connect(account, [owner]));
       await response.wait();
 
       const [escape] = await account.getEscape();
@@ -323,12 +315,15 @@ describe("Recovery", () => {
       // TODO: do evm_increaseTime + evm_mine here when testing locally
 
       // guardian cannot override
-      const promise = connect(account, [guardian]).triggerEscapeOwner();
-      await expect(promise).to.be.rejectedWith("argent/cannot-override-owner-escape");
+      const promise = triggerEscapeOwner(newOwner, connect(account, [guardian]));
+      await expect(promise).to.be.rejectedWith("argent/cannot-override-escape");
 
       const [secondEscape] = await account.getEscape();
-      expect(secondEscape.activeAt).to.equal(escape.activeAt);
-      expect(secondEscape.escapeType).to.equal(guardianEscapeType);
+      expectEqualEscapes(secondEscape, {
+        activeAt: escape.activeAt,
+        escapeType: guardianEscapeType,
+        newSigner: newGuardian.address,
+      });
     });
   });
 
@@ -337,7 +332,7 @@ describe("Recovery", () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress });
 
       // guardian triggers a owner escape
-      const response = await connect(account, [guardian]).triggerEscapeOwner();
+      const response = await triggerEscapeOwner(newOwner, connect(account, [guardian]));
       await response.wait();
 
       const [escape] = await account.getEscape();
@@ -349,11 +344,10 @@ describe("Recovery", () => {
       await expect(rejectingPromise).to.be.rejectedWith("Account validation returned invalid magic value");
 
       const resolvingPromise = connect(account, [owner, guardian]).cancelEscape();
-      await expect(resolvingPromise).to.emit(account, "EscapeCancelled");
+      await expect(resolvingPromise).to.emit(account, "EscapeCanceled");
 
       const [secondEscape] = await account.getEscape();
-      expect(secondEscape.activeAt).to.equal(0n);
-      expect(secondEscape.escapeType).to.equal(noEscape);
+      expectEqualEscapes(secondEscape, nullEscape);
     });
   });
 });

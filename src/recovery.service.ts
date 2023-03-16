@@ -18,3 +18,13 @@ export const getEscapeSignature = async (
   const messageHash = ethers.utils.arrayify(ethers.utils.keccak256(message));
   return newSigner.signMessage(messageHash);
 };
+
+export const triggerEscapeGuardian = async (newGuardian: zksync.Wallet, account: ArgentAccount) => {
+  const signature = await getEscapeSignature(newGuardian, account, "triggerEscapeGuardian");
+  return account.triggerEscapeGuardian(newGuardian.address, signature);
+};
+
+export const triggerEscapeOwner = async (newOwner: zksync.Wallet, account: ArgentAccount) => {
+  const signature = await getEscapeSignature(newOwner, account, "triggerEscapeOwner");
+  return account.triggerEscapeOwner(newOwner.address, signature);
+};

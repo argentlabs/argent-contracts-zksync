@@ -96,7 +96,7 @@ describe("Argent account", () => {
 
     it("Should revert when one of the calls is to the account", async () => {
       const dappCall = makeCall(await testDapp.populateTransaction.setNumber(42));
-      const recoveryCall = makeCall(await account.populateTransaction.triggerEscapeGuardian());
+      const recoveryCall = makeCall(await account.populateTransaction.cancelEscape());
 
       let promise = account.multicall([dappCall, recoveryCall]);
       await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
@@ -294,7 +294,7 @@ describe("Argent account", () => {
 
       it("Should revert calls that require the guardian to be set", async () => {
         account = connect(account, [newOwner]);
-        await expect(account.triggerEscapeGuardian()).to.be.rejectedWith("argent/guardian-required");
+        await expect(account.cancelEscape()).to.be.rejectedWith("argent/guardian-required");
       });
 
       it("Should add a guardian", async () => {
