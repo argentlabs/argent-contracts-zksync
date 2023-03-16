@@ -272,7 +272,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         Transaction calldata _transaction
     ) external payable override returns (bytes4) {
         requireOnlyBootloader();
-        return _validateTransaction(_suggestedSignedHash, _transaction, false);
+        bytes32 transactionHash = _suggestedSignedHash != bytes32(0) ? _suggestedSignedHash : _transaction.encodeHash();
+        return _validateTransaction(transactionHash, _transaction, false);
     }
 
     // IERC1271
@@ -306,8 +307,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     // IAccount
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
-        bytes32 transactionHash = _transaction.encodeHash(); // The account recalculates the hash on its own
-        bytes4 result = _validateTransaction(transactionHash, _transaction, true);
+        bytes4 result = _validateTransaction(_transaction.encodeHash(), _transaction, true);
         if (result != ACCOUNT_VALIDATION_SUCCESS_MAGIC) {
             revert("argent/invalid-transaction");
         }
@@ -350,14 +350,12 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     ) internal returns (bytes4) {
         require(owner != address(0), "argent/uninitialized");
 
-        if (!_isFromOutside) {
-            SystemContractsCaller.systemCallWithPropagatedRevert(
-                uint32(gasleft()),
-                address(NONCE_HOLDER_SYSTEM_CONTRACT),
-                0,
-                abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
-            );
-        }
+        SystemContractsCaller.systemCallWithPropagatedRevert(
+            uint32(gasleft()),
+            address(NONCE_HOLDER_SYSTEM_CONTRACT),
+            0,
+            abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
+        );
 
         address to = address(uint160(_transaction.to));
         bytes4 selector = bytes4(_transaction.data);
