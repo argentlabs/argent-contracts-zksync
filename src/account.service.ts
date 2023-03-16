@@ -1,7 +1,8 @@
-import { BigNumber, BytesLike } from "ethers";
+import { BigNumber, BytesLike, PopulatedTransaction } from "ethers";
 import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
-import { ArgentAccount } from "../typechain-types";
+import { AddressZero } from "../test/fixtures";
+import { ArgentAccount, IMulticall } from "../typechain-types";
 import { verifyContract } from "./deployer.service";
 import { AccountDeploymentParams, ArgentInfrastructure } from "./model";
 import { ArgentSigner, Signatory } from "./signer.service";
@@ -65,6 +66,16 @@ export const computeCreate2AddressFromSdk = (
   const proxyBytecodeHash = zksync.utils.hashBytecode(artifacts.proxy.bytecode);
   return zksync.utils.create2Address(factory.address, proxyBytecodeHash, salt, constructorData);
 };
+
+export const makeCall = ({
+  to = AddressZero,
+  value = BigNumber.from(0),
+  data = "0x",
+}: PopulatedTransaction): IMulticall.CallStruct => ({
+  to,
+  value,
+  data,
+});
 
 export const logBalance = async (address: string, balanceOrProvider: zksync.Provider | BigNumber, name?: string) => {
   const balance = "getBalance" in balanceOrProvider ? await balanceOrProvider.getBalance(address) : balanceOrProvider;
