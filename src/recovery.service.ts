@@ -2,6 +2,13 @@ import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount } from "../typechain-types";
 
+export enum EscapeStatus {
+  None,
+  TooEarly,
+  Active,
+  Expired,
+}
+
 export const getEscapeSignature = async (
   newSigner: zksync.Wallet,
   account: ArgentAccount,

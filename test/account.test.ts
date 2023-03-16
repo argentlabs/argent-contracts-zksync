@@ -6,6 +6,7 @@ import { computeCreate2AddressFromSdk, connect, deployAccount } from "../src/acc
 import { checkDeployer, CustomDeployer } from "../src/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
+import { triggerEscapeGuardian } from "../src/recovery.service";
 import { ArgentSigner, TransactionRequest } from "../src/signer.service";
 import { ArgentAccount, IMulticall, TestDapp, UpgradedArgentAccount } from "../typechain-types";
 import { TransactionStruct } from "../typechain-types/contracts/ArgentAccount";
@@ -294,7 +295,8 @@ describe("Argent account", () => {
 
       it("Should revert calls that require the guardian to be set", async () => {
         account = connect(account, [newOwner]);
-        await expect(account.cancelEscape()).to.be.rejectedWith("argent/guardian-required");
+        const newGuardian = zksync.Wallet.createRandom();
+        await expect(triggerEscapeGuardian(newGuardian, account)).to.be.rejectedWith("argent/guardian-required");
       });
 
       it("Should add a guardian", async () => {
