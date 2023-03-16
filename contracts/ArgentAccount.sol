@@ -170,7 +170,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Recovery ****************************************************/
 
-    function escapeWithStatus() external view returns (Escape memory, EscapeStatus) {
+    function getEscape() external view returns (Escape memory, EscapeStatus) {
         return (escape, escapeStatus(escape));
     }
 

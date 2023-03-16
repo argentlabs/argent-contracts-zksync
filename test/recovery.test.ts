@@ -145,7 +145,7 @@ describe("Recovery", () => {
     it("Should run triggerEscapeGuardian() by owner", async () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner] });
 
-      const [escapeBefore] = await account.escapeWithStatus();
+      const [escapeBefore] = await account.getEscape();
       expectEqualEscapes(escapeBefore, nullEscape);
 
       const signature = await getEscapeSignature(newGuardian, account, "triggerEscapeGuardian");
@@ -155,14 +155,14 @@ describe("Recovery", () => {
       const activeAt = timestamp + escapeSecurityPeriod;
       await expect(response).to.emit(account, "EscapeGuardianTriggerred").withArgs(activeAt, newGuardian.address);
 
-      const [escape] = await account.escapeWithStatus();
+      const [escape] = await account.getEscape();
       expectEqualEscapes(escape, { activeAt, escapeType: guardianEscapeType, newSigner: newGuardian.address });
     });
 
     it("Should run triggerEscapeOwner() by guardian", async () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [guardian] });
 
-      const [escapeBefore] = await account.escapeWithStatus();
+      const [escapeBefore] = await account.getEscape();
       expectEqualEscapes(escapeBefore, nullEscape);
 
       const signature = await getEscapeSignature(newOwner, account, "triggerEscapeOwner");
@@ -172,7 +172,7 @@ describe("Recovery", () => {
       const activeAt = timestamp + escapeSecurityPeriod;
       await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAt, newOwner.address);
 
-      const [escape] = await account.escapeWithStatus();
+      const [escape] = await account.getEscape();
       expectEqualEscapes(escape, { activeAt, escapeType: ownerEscapeType, newSigner: newOwner.address });
     });
 
@@ -181,7 +181,7 @@ describe("Recovery", () => {
       const backupResponse = await connect(account, [owner, guardian]).changeGuardianBackup(newGuardianBackup.address);
       await backupResponse.wait();
 
-      const [escapeBefore] = await account.escapeWithStatus();
+      const [escapeBefore] = await account.getEscape();
       expectEqualEscapes(escapeBefore, nullEscape);
 
       const signature = await getEscapeSignature(newOwner, account, "triggerEscapeOwner");
@@ -191,7 +191,7 @@ describe("Recovery", () => {
       const activeAt = timestamp + escapeSecurityPeriod;
       await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAt, newOwner.address);
 
-      const [escape] = await account.escapeWithStatus();
+      const [escape] = await account.getEscape();
       expectEqualEscapes(escape, { activeAt, escapeType: ownerEscapeType, newSigner: newOwner.address });
     });
 
@@ -235,7 +235,7 @@ describe("Recovery", () => {
       await expect(account.escapeGuardian(newGuardian.address)).to.be.rejectedWith("argent/inactive-escape");
 
       // wait security period
-      const [{ activeAt }] = await account.escapeWithStatus();
+      const [{ activeAt }] = await account.getEscape();
       await waitForTimestamp(activeAt, provider);
 
       await expect(account.guardian()).to.eventually.equal(guardian.address);
@@ -247,7 +247,7 @@ describe("Recovery", () => {
       await expect(account.guardian()).to.eventually.equal(newGuardian.address);
 
       // escape should be cleared
-      const [postEscape] = await account.escapeWithStatus();
+      const [postEscape] = await account.getEscape();
       expectEqualEscapes(postEscape, nullEscape);
     });
 
@@ -269,7 +269,7 @@ describe("Recovery", () => {
       await expect(account.escapeOwner(newOwner.address)).to.be.rejectedWith("argent/inactive-escape");
 
       // wait security period
-      const [{ activeAt }] = await account.escapeWithStatus();
+      const [{ activeAt }] = await account.getEscape();
       await waitForTimestamp(activeAt, provider);
 
       await expect(account.owner()).to.eventually.equal(owner.address);
@@ -281,7 +281,7 @@ describe("Recovery", () => {
       await expect(account.owner()).to.eventually.equal(newOwner.address);
 
       // escape should be cleared
-      const [postEscape] = await account.escapeWithStatus();
+      const [postEscape] = await account.getEscape();
       expectEqualEscapes(postEscape, nullEscape);
     });
   });
@@ -294,7 +294,7 @@ describe("Recovery", () => {
       const guardianResponse = await connect(account, [guardian]).triggerEscapeOwner();
       await guardianResponse.wait();
 
-      const [firstEscape] = await account.escapeWithStatus();
+      const [firstEscape] = await account.getEscape();
       expect(firstEscape.activeAt).to.be.greaterThan(0n);
       expect(firstEscape.escapeType).to.equal(ownerEscapeType);
 
@@ -304,7 +304,7 @@ describe("Recovery", () => {
       const ownerResponse = await connect(account, [owner]).triggerEscapeGuardian();
       await ownerResponse.wait();
 
-      const [secondEscape] = await account.escapeWithStatus();
+      const [secondEscape] = await account.getEscape();
       expect(secondEscape.activeAt).to.be.greaterThanOrEqual(firstEscape.activeAt); // TODO: greaterThan after evm_mine
       expect(secondEscape.escapeType).to.equal(guardianEscapeType);
     });
@@ -316,7 +316,7 @@ describe("Recovery", () => {
       const response = await connect(account, [owner]).triggerEscapeGuardian();
       await response.wait();
 
-      const [escape] = await account.escapeWithStatus();
+      const [escape] = await account.getEscape();
       expect(escape.activeAt).to.be.greaterThan(0n);
       expect(escape.escapeType).to.equal(guardianEscapeType);
 
@@ -326,7 +326,7 @@ describe("Recovery", () => {
       const promise = connect(account, [guardian]).triggerEscapeOwner();
       await expect(promise).to.be.rejectedWith("argent/cannot-override-owner-escape");
 
-      const [secondEscape] = await account.escapeWithStatus();
+      const [secondEscape] = await account.getEscape();
       expect(secondEscape.activeAt).to.equal(escape.activeAt);
       expect(secondEscape.escapeType).to.equal(guardianEscapeType);
     });
@@ -340,7 +340,7 @@ describe("Recovery", () => {
       const response = await connect(account, [guardian]).triggerEscapeOwner();
       await response.wait();
 
-      const [escape] = await account.escapeWithStatus();
+      const [escape] = await account.getEscape();
       expect(escape.activeAt).to.be.greaterThan(0n);
       expect(escape.escapeType).to.equal(ownerEscapeType);
 
@@ -351,7 +351,7 @@ describe("Recovery", () => {
       const resolvingPromise = connect(account, [owner, guardian]).cancelEscape();
       await expect(resolvingPromise).to.emit(account, "EscapeCancelled");
 
-      const [secondEscape] = await account.escapeWithStatus();
+      const [secondEscape] = await account.getEscape();
       expect(secondEscape.activeAt).to.equal(0n);
       expect(secondEscape.escapeType).to.equal(noEscape);
     });
