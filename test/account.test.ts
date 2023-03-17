@@ -38,7 +38,7 @@ describe("Argent account", () => {
     });
 
     it("Should predict the account address from the JS SDK", async () => {
-      const address = computeCreate2AddressFromSdk(argent, salt, ownerAddress, guardianAddress);
+      const address = computeCreate2AddressFromSdk(argent, salt, ownerAddress, guardianAddress, AddressZero);
       expect(account.address).to.equal(address);
     });
 
@@ -48,6 +48,7 @@ describe("Argent account", () => {
         argent.implementation.address,
         ownerAddress,
         guardianAddress,
+        AddressZero,
       );
       expect(account.address).to.equal(address);
     });
@@ -63,7 +64,7 @@ describe("Argent account", () => {
     it("Should refuse to be initialized twice", async () => {
       const { abi } = argent.artifacts.implementation;
       const accountFromEoa = new zksync.Contract(account.address, abi, deployer.zkWallet);
-      const promise = accountFromEoa.initialize(owner.address, guardian.address);
+      const promise = accountFromEoa.initialize(owner.address, guardian.address, AddressZero);
       await expect(promise).to.be.rejectedWith("argent/already-init");
     });
   });

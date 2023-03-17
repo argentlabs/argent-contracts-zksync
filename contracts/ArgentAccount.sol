@@ -53,7 +53,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     //                                                     Events                                                     //
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    event AccountCreated(address account, address owner, address guardian);
+    event AccountCreated(address account, address indexed owner, address guardian, address guardianBackup);
     event AccountUpgraded(address newImplementation);
     event TransactionExecuted(bytes32 hashed, bytes response);
 
@@ -100,12 +100,13 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Lifecycle ***************************************************/
 
-    function initialize(address _owner, address _guardian) external {
+    function initialize(address _owner, address _guardian, address _guardianBackup) external {
         require(_owner != address(0), "argent/null-owner");
         require(owner == address(0), "argent/already-initialized");
         owner = _owner;
         guardian = _guardian;
-        emit AccountCreated(address(this), _owner, _guardian);
+        guardianBackup = _guardianBackup;
+        emit AccountCreated(address(this), _owner, _guardian, _guardianBackup);
     }
 
     function upgrade(address _newImplementation, bytes calldata _data) external {

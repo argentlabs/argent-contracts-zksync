@@ -36,6 +36,7 @@ export interface AccountDeploymentParams {
   argent: ArgentInfrastructure;
   ownerAddress: string;
   guardianAddress: string;
+  guardianBackupAddress?: string;
   connect?: Signatory[];
   funds?: false | string;
   salt?: BytesLike;
