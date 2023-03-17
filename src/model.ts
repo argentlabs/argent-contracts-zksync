@@ -5,6 +5,19 @@ import * as zksync from "zksync-web3";
 import { AccountFactory } from "../typechain-types";
 import { Signatory } from "./signer.service";
 
+export enum EscapeType {
+  None,
+  Guardian,
+  Owner,
+}
+
+export enum EscapeStatus {
+  None,
+  Triggered,
+  Active,
+  Expired,
+}
+
 export interface IConfig {
   escapeSecurityPeriodInSeconds: number;
   implementation: string;

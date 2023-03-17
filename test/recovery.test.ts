@@ -3,9 +3,8 @@ import * as zksync from "zksync-web3";
 import { connect, deployAccount } from "../src/account.service";
 import { checkDeployer } from "../src/deployer.service";
 import { getTestInfrastructure } from "../src/infrastructure.service";
-import { ArgentInfrastructure } from "../src/model";
+import { ArgentInfrastructure, EscapeStatus, EscapeType } from "../src/model";
 import { waitForL1BatchBlock, waitForTimestamp } from "../src/provider.service";
-import { EscapeStatus, EscapeType } from "../src/recovery.service";
 import { ArgentAccount } from "../typechain-types";
 import {
   AddressZero,

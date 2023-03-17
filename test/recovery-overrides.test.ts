@@ -2,9 +2,8 @@ import { expect } from "chai";
 import { connect, deployAccount } from "../src/account.service";
 import { checkDeployer } from "../src/deployer.service";
 import { getTestInfrastructure } from "../src/infrastructure.service";
-import { ArgentInfrastructure } from "../src/model";
+import { ArgentInfrastructure, EscapeStatus, EscapeType } from "../src/model";
 import { waitForTimestamp } from "../src/provider.service";
-import { EscapeStatus, EscapeType } from "../src/recovery.service";
 import { ArgentAccount } from "../typechain-types";
 import {
   deployer,
@@ -18,7 +17,7 @@ import {
   provider,
 } from "./fixtures";
 
-describe("Recovery statuses", () => {
+describe("Recovery overrides", () => {
   let argent: ArgentInfrastructure;
   let escapeExpiryPeriod: number; // in seconds
 
