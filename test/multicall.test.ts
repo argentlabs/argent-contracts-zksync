@@ -31,7 +31,7 @@ describe("Account multicall", () => {
 
   it("Should revert when one of the calls is to the account", async () => {
     const dappCall = makeCall(await testDapp.populateTransaction.setNumber(42));
-    const recoveryCall = makeCall(await account.populateTransaction.triggerEscapeGuardian());
+    const recoveryCall = makeCall(await account.populateTransaction.cancelEscape());
 
     let promise = account.multicall([dappCall, recoveryCall]);
     await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");

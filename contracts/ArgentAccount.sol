@@ -31,6 +31,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     struct Escape {
         uint32 activeAt;    // bits [0...32[    timestamp for activation of escape mode, 0 otherwise
         uint8 escapeType;   // bits [32...40[   packed EscapeType enum
+        address newSigner;  // bits [40...200[  new owner or new guardian
     }
 
     bytes32 public constant NAME = "ArgentAccount";
@@ -60,8 +61,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     event GuardianChanged(address newGuardian);
     event GuardianBackupChanged(address newGuardianBackup);
 
-    event EscapeOwnerTriggerred(uint32 activeAt);
-    event EscapeGuardianTriggerred(uint32 activeAt);
+    event EscapeOwnerTriggerred(uint32 activeAt, address newOwner);
+    event EscapeGuardianTriggerred(uint32 activeAt, address newGuardian);
     event OwnerEscaped(address newOwner);
     event GuardianEscaped(address newGuardian);
     event EscapeCancelled();
@@ -178,7 +179,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         emit GuardianBackupChanged(_newGuardianBackup);
     }
 
-    function triggerEscapeOwner() external {
+    function triggerEscapeOwner(address _newOwner) external {
         requireOnlySelf();
         requireGuardian();
         // no escape if there is an guardian escape triggered by the owner in progress
@@ -187,16 +188,16 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         }
 
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
-        escape = Escape(activeAt, uint8(EscapeType.Owner));
-        emit EscapeOwnerTriggerred(activeAt);
+        escape = Escape(activeAt, uint8(EscapeType.Owner), _newOwner);
+        emit EscapeOwnerTriggerred(activeAt, _newOwner);
     }
 
-    function triggerEscapeGuardian() external {
+    function triggerEscapeGuardian(address _newGuardian) external {
         requireOnlySelf();
         requireGuardian();
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
-        escape = Escape(activeAt, uint8(EscapeType.Guardian));
-        emit EscapeGuardianTriggerred(activeAt);
+        escape = Escape(activeAt, uint8(EscapeType.Guardian), _newGuardian);
+        emit EscapeGuardianTriggerred(activeAt, _newGuardian);
     }
 
     function cancelEscape() external {
@@ -214,6 +215,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
         require(escape.escapeType == uint8(EscapeType.Owner), "argent/invalid-escape-type");
+        require(escape.newSigner == _newOwner, "argent/invalid-escape-signer");
 
         delete escape;
         owner = _newOwner;
@@ -227,6 +229,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
         require(escape.escapeType == uint8(EscapeType.Guardian), "argent/invalid-escape-type");
+        require(escape.newSigner == _newGuardian, "argent/invalid-escape-signer");
 
         delete escape;
         guardian = _newGuardian;
@@ -381,13 +384,13 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     function isValidOwnerSignature(bytes32 _hash, bytes memory _ownerSignature) internal view returns (bool) {
-        address recovered = Signatures.recoverSigner(_hash, _ownerSignature);
-        return recovered != address(0) && recovered == owner;
+        address signer = Signatures.recoverSigner(_hash, _ownerSignature);
+        return signer != address(0) && signer == owner;
     }
 
     function isValidGuardianSignature(bytes32 _hash, bytes memory _guardianSignature) internal view returns (bool) {
-        address recovered = Signatures.recoverSigner(_hash, _guardianSignature);
-        return recovered != address(0) && (recovered == guardian || recovered == guardianBackup);
+        address signer = Signatures.recoverSigner(_hash, _guardianSignature);
+        return signer != address(0) && (signer == guardian || signer == guardianBackup);
     }
 
     function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {
