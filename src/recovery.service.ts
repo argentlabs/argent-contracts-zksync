@@ -2,9 +2,15 @@ import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount } from "../typechain-types";
 
+export enum EscapeType {
+  None,
+  Guardian,
+  Owner,
+}
+
 export enum EscapeStatus {
   None,
-  TooEarly,
+  Triggered,
   Active,
   Expired,
 }

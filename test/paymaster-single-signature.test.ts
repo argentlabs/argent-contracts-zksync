@@ -6,7 +6,6 @@ import { deployAccount } from "../src/account.service";
 import { checkDeployer } from "../src/deployer.service";
 import { getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
-import { getEscapeSignature } from "../src/recovery.service";
 import { ArgentAccount } from "../typechain-types";
 import { deployer, guardian, owner, provider } from "./fixtures";
 
@@ -54,9 +53,8 @@ describe("Paymaster tests", () => {
       });
 
       const newOwner = zksync.Wallet.createRandom();
-      const signature = await getEscapeSignature(newOwner, account, "triggerEscapeOwner");
       const overrides = { customData: { genericPaymasterParams } };
-      const estimation = await account.estimateGas.triggerEscapeOwner(newOwner.address, signature, overrides);
+      const estimation = await account.estimateGas.triggerEscapeOwner(newOwner.address, overrides);
       const gasLimit = estimation.mul(8); // Extra for the transfer to the paymaster
 
       const paymasterParams = zksync.utils.getPaymasterParams(paymaster.address, {
@@ -74,7 +72,7 @@ describe("Paymaster tests", () => {
         gasLimit,
         customData: { paymasterParams },
       };
-      const promise = account.triggerEscapeOwner(newOwner.address, signature, finalOverrides);
+      const promise = account.triggerEscapeOwner(newOwner.address, finalOverrides);
 
       await expect(promise).to.be.rejectedWith("argent/no-paymaster-with-single-signature");
     });

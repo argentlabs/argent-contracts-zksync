@@ -31,7 +31,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     enum EscapeStatus {
         None,
-        TooEarly,
+        Triggered,
         Active,
         Expired
     }
@@ -43,10 +43,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         address newSigner;  // bits [40...200[  new owner or new guardian
     }
 
-    bytes32 public constant VERSION = "0.0.1-alpha.2";
-
-    uint8 public constant GUARDIAN_ESCAPE_TYPE = uint8(EscapeType.Guardian);
-    uint8 public constant OWNER_ESCAPE_TYPE = uint8(EscapeType.Owner);
+    bytes32 public constant VERSION = "0.1.0-alpha.1";
 
     uint32 public immutable escapeSecurityPeriod;
     uint32 public immutable escapeExpiryPeriod;
@@ -204,12 +201,12 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
         // no escape if there is an guardian escape triggered by the owner in progress
         EscapeStatus status = escapeStatus(escape);
-        if (status == EscapeStatus.TooEarly || status == EscapeStatus.Active) {
-            require(escape.escapeType == OWNER_ESCAPE_TYPE, "argent/cannot-override-escape");
+        if (status == EscapeStatus.Triggered || status == EscapeStatus.Active) {
+            require(escape.escapeType == uint8(EscapeType.Owner), "argent/cannot-override-escape");
         }
 
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
-        escape = Escape(activeAt, OWNER_ESCAPE_TYPE, _newOwner);
+        escape = Escape(activeAt, uint8(EscapeType.Owner), _newOwner);
         emit EscapeOwnerTriggerred(activeAt, _newOwner);
     }
 
@@ -219,7 +216,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         clearExpiredEscape();
 
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
-        escape = Escape(activeAt, GUARDIAN_ESCAPE_TYPE, _newGuardian);
+        escape = Escape(activeAt, uint8(EscapeType.Guardian), _newGuardian);
         emit EscapeGuardianTriggerred(activeAt, _newGuardian);
     }
 
@@ -238,7 +235,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
         require(_newOwner != address(0), "argent/null-owner");
         require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
-        require(escape.escapeType == OWNER_ESCAPE_TYPE, "argent/invalid-escape-type");
+        require(escape.escapeType == uint8(EscapeType.Owner), "argent/invalid-escape-type");
         require(escape.newSigner == _newOwner, "argent/invalid-escape-signer");
 
         delete escape;
@@ -252,7 +249,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
         require(_newGuardian != address(0), "argent/null-guardian");
         require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
-        require(escape.escapeType == GUARDIAN_ESCAPE_TYPE, "argent/invalid-escape-type");
+        require(escape.escapeType == uint8(EscapeType.Guardian), "argent/invalid-escape-type");
         require(escape.newSigner == _newGuardian, "argent/invalid-escape-signer");
 
         delete escape;
@@ -464,7 +461,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             return EscapeStatus.None;
         }
         if (block.timestamp < _escape.activeAt) {
-            return EscapeStatus.TooEarly;
+            return EscapeStatus.Triggered;
         }
         if (_escape.activeAt + escapeExpiryPeriod < block.timestamp) {
             return EscapeStatus.Expired;
