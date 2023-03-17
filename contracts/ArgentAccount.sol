@@ -453,6 +453,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function clearExpiredEscape() internal {
         if (escapeStatus(escape) == EscapeStatus.Expired) {
             delete escape;
+            emit EscapeCanceled();
         }
     }
 

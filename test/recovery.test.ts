@@ -13,16 +13,15 @@ import {
   EscapeStruct,
   guardian,
   guardianAddress,
+  newGuardian,
+  newGuardianBackup,
+  newOwner,
   owner,
   ownerAddress,
   provider,
   wrongGuardian,
   wrongOwner,
 } from "./fixtures";
-
-const newOwner = zksync.Wallet.createRandom();
-const newGuardian = zksync.Wallet.createRandom();
-const newGuardianBackup = zksync.Wallet.createRandom();
 
 describe("Recovery", () => {
   let argent: ArgentInfrastructure;
@@ -218,15 +217,9 @@ describe("Recovery", () => {
         funds: "0.0004",
       });
 
-      const [, statusBefore] = await account.getEscape();
-      expect(statusBefore).to.equal(EscapeStatus.None);
-
       // trigger escape
       const response = await triggerEscapeGuardian(newGuardian, account);
       await response.wait();
-
-      const [, statusAfterTrigger] = await account.getEscape();
-      expect(statusAfterTrigger).to.equal(EscapeStatus.Triggered);
 
       // should fail to escape before the end of the period
       await expect(account.escapeGuardian(newGuardian.address)).to.be.rejectedWith("argent/inactive-escape");
@@ -235,15 +228,13 @@ describe("Recovery", () => {
       const [{ activeAt }] = await account.getEscape();
       await waitForTimestamp(activeAt, provider);
 
-      const [, statusAfterSecurityPeriod] = await account.getEscape();
-      expect(statusAfterSecurityPeriod).to.equal(EscapeStatus.Active);
-
-      await expect(account.guardian()).to.eventually.equal(guardian.address);
+      // should fail to escape to wrong address
+      await expect(account.escapeGuardian(wrongGuardian.address)).to.be.rejectedWith("argent/invalid-escape-signer");
 
       // should escape after the security period
+      await expect(account.guardian()).to.eventually.equal(guardian.address);
       const promise = account.escapeGuardian(newGuardian.address);
       await expect(promise).to.emit(account, "GuardianEscaped").withArgs(newGuardian.address);
-
       await expect(account.guardian()).to.eventually.equal(newGuardian.address);
 
       // escape should be cleared
@@ -261,15 +252,9 @@ describe("Recovery", () => {
         funds: "0.0005",
       });
 
-      const [, statusBefore] = await account.getEscape();
-      expect(statusBefore).to.equal(EscapeStatus.None);
-
       // trigger escape
       const response = await triggerEscapeOwner(newOwner, account);
       await response.wait();
-
-      const [, statusAfterTrigger] = await account.getEscape();
-      expect(statusAfterTrigger).to.equal(EscapeStatus.Triggered);
 
       // should fail to escape before the end of the period
       await expect(account.escapeOwner(newOwner.address)).to.be.rejectedWith("argent/inactive-escape");
@@ -278,15 +263,13 @@ describe("Recovery", () => {
       const [{ activeAt }] = await account.getEscape();
       await waitForTimestamp(activeAt, provider);
 
-      const [, statusAfterSecurityPeriod] = await account.getEscape();
-      expect(statusAfterSecurityPeriod).to.equal(EscapeStatus.Active);
-
-      await expect(account.owner()).to.eventually.equal(owner.address);
+      // should fail to escape to wrong address
+      await expect(account.escapeOwner(wrongOwner.address)).to.be.rejectedWith("argent/invalid-escape-signer");
 
       // should escape after the security period
+      await expect(account.owner()).to.eventually.equal(owner.address);
       const promise = account.escapeOwner(newOwner.address);
       await expect(promise).to.emit(account, "OwnerEscaped").withArgs(newOwner.address);
-
       await expect(account.owner()).to.eventually.equal(newOwner.address);
 
       // escape should be cleared
