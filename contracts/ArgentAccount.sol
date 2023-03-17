@@ -4,7 +4,6 @@ pragma solidity 0.8.18;
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccount.sol";
@@ -21,7 +20,6 @@ import {Signatures} from "./Signatures.sol";
 contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
-    using ECDSA for bytes32;
 
     enum EscapeType {
         None,
@@ -43,6 +41,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         address newSigner;  // bits [40...200[  new owner or new guardian
     }
 
+    bytes32 public constant NAME = "ArgentAccount";
     bytes32 public constant VERSION = "0.1.0-alpha.1";
 
     uint32 public immutable escapeSecurityPeriod;
@@ -197,7 +196,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function triggerEscapeOwner(address _newOwner) external {
         requireOnlySelf();
         requireGuardian();
-        clearExpiredEscape();
+
+        cancelExpiredEscape();
 
         // no escape if there is an guardian escape triggered by the owner in progress
         EscapeStatus status = escapeStatus(escape);
@@ -213,7 +213,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function triggerEscapeGuardian(address _newGuardian) external {
         requireOnlySelf();
         requireGuardian();
-        clearExpiredEscape();
+
+        cancelExpiredEscape();
 
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(activeAt, uint8(EscapeType.Guardian), _newGuardian);
@@ -222,8 +223,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     function cancelEscape() external {
         requireOnlySelf();
-        // TODO: test cancel expired escape
-        require(escape.activeAt != 0, "argent/not-escaping");
+        require(escapeStatus(escape) != EscapeStatus.None, "argent/not-escaping");
 
         delete escape;
         emit EscapeCanceled();
@@ -450,7 +450,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Recovery ****************************************************/
 
-    function clearExpiredEscape() internal {
+    function cancelExpiredEscape() internal {
         if (escapeStatus(escape) == EscapeStatus.Expired) {
             delete escape;
             emit EscapeCanceled();

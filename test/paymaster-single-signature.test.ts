@@ -7,7 +7,7 @@ import { checkDeployer } from "../src/deployer.service";
 import { getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
 import { ArgentAccount } from "../typechain-types";
-import { deployer, guardian, owner, provider } from "./fixtures";
+import { deployer, guardian, newOwner, owner, provider } from "./fixtures";
 
 describe("Paymaster tests", () => {
   let argent: ArgentInfrastructure;
@@ -52,7 +52,6 @@ describe("Paymaster tests", () => {
         innerInput: "0x",
       });
 
-      const newOwner = zksync.Wallet.createRandom();
       const overrides = { customData: { genericPaymasterParams } };
       const estimation = await account.estimateGas.triggerEscapeOwner(newOwner.address, overrides);
       const gasLimit = estimation.mul(8); // Extra for the transfer to the paymaster

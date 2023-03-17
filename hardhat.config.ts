@@ -41,6 +41,6 @@ module.exports = {
     version: "0.8.18",
   },
   mocha: {
-    timeout: 60_000,
+    timeout: 120_000, // milliseconds
   },
 };

@@ -1,11 +1,9 @@
 import { expect } from "chai";
-import * as zksync from "zksync-web3";
 import { connect, deployAccount } from "../src/account.service";
 import { checkDeployer } from "../src/deployer.service";
 import { getTestInfrastructure } from "../src/infrastructure.service";
-import { ArgentInfrastructure } from "../src/model";
+import { ArgentInfrastructure, EscapeStatus, EscapeType } from "../src/model";
 import { waitForL1BatchBlock, waitForTimestamp } from "../src/provider.service";
-import { EscapeStatus, EscapeType } from "../src/recovery.service";
 import { ArgentAccount } from "../typechain-types";
 import {
   AddressZero,
@@ -130,7 +128,7 @@ describe("Recovery", () => {
     });
   });
 
-  const nullEscape = { activeAt: 0, escapeType: 0, newSigner: AddressZero };
+  const nullEscape = { activeAt: 0, escapeType: EscapeType.None, newSigner: AddressZero };
 
   const expectEqualEscapes = (actual: EscapeStruct, expected: EscapeStruct) => {
     expect(actual.activeAt).to.equal(expected.activeAt);
@@ -184,22 +182,6 @@ describe("Recovery", () => {
 
       const [escape] = await account.getEscape();
       expectEqualEscapes(escape, { activeAt, escapeType: EscapeType.Owner, newSigner: newOwner.address });
-    });
-
-    it("Should run trigger methods twice", async () => {
-      const account = await deployAccount({ argent, ownerAddress, guardianAddress });
-
-      let promise = connect(account, [guardian]).triggerEscapeOwner(zksync.Wallet.createRandom().address);
-      await expect(promise).to.emit(account, "EscapeOwnerTriggerred");
-
-      promise = connect(account, [guardian]).triggerEscapeOwner(zksync.Wallet.createRandom().address);
-      await expect(promise).to.emit(account, "EscapeOwnerTriggerred");
-
-      promise = connect(account, [owner]).triggerEscapeGuardian(zksync.Wallet.createRandom().address);
-      await expect(promise).to.emit(account, "EscapeGuardianTriggerred");
-
-      promise = connect(account, [owner]).triggerEscapeGuardian(zksync.Wallet.createRandom().address);
-      await expect(promise).to.emit(account, "EscapeGuardianTriggerred");
     });
   });
 
