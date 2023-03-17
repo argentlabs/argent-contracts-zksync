@@ -27,11 +27,11 @@ export const getEscapeSignature = async (
 };
 
 export const triggerEscapeGuardian = async (newGuardian: zksync.Wallet, account: ArgentAccount) => {
-  const signature = await getEscapeSignature(newGuardian, account, "triggerEscapeGuardian");
-  return account.triggerEscapeGuardian(newGuardian.address, signature);
+  // const signature = await getEscapeSignature(newGuardian, account, "triggerEscapeGuardian");
+  return account.triggerEscapeGuardian(newGuardian.address);
 };
 
 export const triggerEscapeOwner = async (newOwner: zksync.Wallet, account: ArgentAccount) => {
-  const signature = await getEscapeSignature(newOwner, account, "triggerEscapeOwner");
-  return account.triggerEscapeOwner(newOwner.address, signature);
+  // const signature = await getEscapeSignature(newOwner, account, "triggerEscapeOwner");
+  return account.triggerEscapeOwner(newOwner.address);
 };

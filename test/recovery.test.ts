@@ -31,6 +31,7 @@ describe("Recovery", () => {
   let ownerEscapeType: number;
   let guardianEscapeType: number;
   let escapeSecurityPeriod: number; // in seconds
+  let escapeExpiryPeriod: number; // in seconds
 
   before(async () => {
     await checkDeployer(deployer);
@@ -40,6 +41,7 @@ describe("Recovery", () => {
     ownerEscapeType = await account.OWNER_ESCAPE_TYPE();
     guardianEscapeType = await account.GUARDIAN_ESCAPE_TYPE();
     escapeSecurityPeriod = await account.escapeSecurityPeriod();
+    escapeExpiryPeriod = await account.escapeExpiryPeriod();
   });
 
   describe("Changing owner", () => {
@@ -299,7 +301,7 @@ describe("Recovery", () => {
   });
 
   describe("Escape overriding", () => {
-    it("Should allow owner to override an owner escape", async () => {
+    it("Should allow owner to override an owner escape immediately", async () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress });
 
       // guardian triggers a owner escape
@@ -328,22 +330,31 @@ describe("Recovery", () => {
       const response = await triggerEscapeGuardian(newGuardian, connect(account, [owner]));
       await response.wait();
 
-      const [escape] = await account.getEscape();
+      const [escape, status] = await account.getEscape();
       expect(escape.activeAt).to.be.greaterThan(0n);
       expect(escape.escapeType).to.equal(guardianEscapeType);
 
       // TODO: do evm_increaseTime + evm_mine here when testing locally
 
-      // guardian cannot override
-      const promise = triggerEscapeOwner(newOwner, connect(account, [guardian]));
+      // guardian cannot override in TooEarly state
+      let promise = triggerEscapeOwner(newOwner, connect(account, [guardian]));
       await expect(promise).to.be.rejectedWith("argent/cannot-override-escape");
 
-      const [secondEscape] = await account.getEscape();
-      expectEqualEscapes(secondEscape, {
-        activeAt: escape.activeAt,
-        escapeType: guardianEscapeType,
-        newSigner: newGuardian.address,
-      });
+      const [secondEscape, secondStatus] = await account.getEscape();
+      expectEqualEscapes(secondEscape, escape);
+      expect(secondStatus).to.equal(status);
+
+      await waitForTimestamp(escape.activeAt, provider);
+
+      // guardian cannot override in Active state
+      promise = triggerEscapeOwner(newOwner, connect(account, [guardian]));
+      await expect(promise).to.be.rejectedWith("argent/cannot-override-escape");
+
+      await waitForTimestamp(escape.activeAt + escapeExpiryPeriod, provider);
+
+      // guardian cannot override in Active state
+      promise = triggerEscapeOwner(newOwner, connect(account, [guardian]));
+      await expect(promise).to.emit(account, "EscapeOwnerTriggerred");
     });
   });
 
@@ -366,8 +377,53 @@ describe("Recovery", () => {
       const resolvingPromise = connect(account, [owner, guardian]).cancelEscape();
       await expect(resolvingPromise).to.emit(account, "EscapeCanceled");
 
-      const [secondEscape] = await account.getEscape();
+      const [secondEscape, secondStatus] = await account.getEscape();
       expectEqualEscapes(secondEscape, nullEscape);
+      expect(secondStatus).to.equal(EscapeStatus.None);
+    });
+  });
+
+  describe("Expired escapes", () => {
+    const deployAccountInStatus = async (escapeType: "owner" | "guardian", escapeStatus: EscapeStatus) => {
+      const connect = escapeType === "owner" ? [guardian] : [owner];
+      const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect, funds: "0.0005" });
+      if (escapeStatus === EscapeStatus.None) {
+        return account;
+      }
+
+      const newSigner = escapeType === "owner" ? newOwner : newGuardian;
+      const triggerEscape = escapeType === "owner" ? triggerEscapeOwner : triggerEscapeGuardian;
+
+      const response = await triggerEscape(newSigner, account);
+      await response.wait();
+      if (escapeStatus === EscapeStatus.TooEarly) {
+        return account;
+      }
+
+      const [{ activeAt }] = await account.getEscape();
+      if (escapeStatus === EscapeStatus.Active) {
+        await waitForTimestamp(activeAt, provider);
+      } else if (escapeStatus === EscapeStatus.Expired) {
+        await waitForTimestamp(activeAt + escapeExpiryPeriod, provider);
+      } else {
+        throw new Error("EscapeStatus enumeration exhausted");
+      }
+
+      const [, status] = await account.getEscape();
+      expect(status).to.equal(escapeStatus);
+      return account;
+    };
+
+    it("Should be in the right state", async () => {
+      await deployAccountInStatus("owner", EscapeStatus.None);
+      await deployAccountInStatus("owner", EscapeStatus.TooEarly);
+      await deployAccountInStatus("owner", EscapeStatus.Active);
+      await deployAccountInStatus("owner", EscapeStatus.Expired);
+    });
+
+    it("Shouldn't escape if expired", async () => {
+      const account = await deployAccountInStatus("owner", EscapeStatus.Expired);
+      await expect(account.escapeOwner(newOwner.address)).to.be.rejectedWith("argent/inactive-escape");
     });
   });
 });

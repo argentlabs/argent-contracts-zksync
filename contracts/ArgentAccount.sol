@@ -49,6 +49,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     uint8 public constant OWNER_ESCAPE_TYPE = uint8(EscapeType.Owner);
 
     uint32 public immutable escapeSecurityPeriod;
+    uint32 public immutable escapeExpiryPeriod;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //                                                     Storage                                                    //
@@ -104,6 +105,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     constructor(uint32 _escapeSecurityPeriod) {
         require(_escapeSecurityPeriod != 0, "argent/null-escape-security-period");
         escapeSecurityPeriod = _escapeSecurityPeriod;
+        escapeExpiryPeriod = _escapeSecurityPeriod;
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -195,14 +197,14 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         emit GuardianBackupChanged(_newGuardianBackup);
     }
 
-    function triggerEscapeOwner(address _newOwner, bytes memory _newOwnerSignature) external {
+    function triggerEscapeOwner(address _newOwner) external {
         requireOnlySelf();
         requireGuardian();
-        requireValidEscapeSignature(_newOwner, _newOwnerSignature, this.triggerEscapeOwner.selector);
         clearExpiredEscape();
 
         // no escape if there is an guardian escape triggered by the owner in progress
-        if (escape.activeAt != 0) {
+        EscapeStatus status = escapeStatus(escape);
+        if (status == EscapeStatus.TooEarly || status == EscapeStatus.Active) {
             require(escape.escapeType == OWNER_ESCAPE_TYPE, "argent/cannot-override-escape");
         }
 
@@ -211,10 +213,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         emit EscapeOwnerTriggerred(activeAt, _newOwner);
     }
 
-    function triggerEscapeGuardian(address _newGuardian, bytes memory _newGuardianSignature) external {
+    function triggerEscapeGuardian(address _newGuardian) external {
         requireOnlySelf();
         requireGuardian();
-        requireValidEscapeSignature(_newGuardian, _newGuardianSignature, this.triggerEscapeGuardian.selector);
         clearExpiredEscape();
 
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
@@ -235,8 +236,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         requireOnlySelf();
         requireGuardian();
 
-        clearExpiredEscape();
-
         require(_newOwner != address(0), "argent/null-owner");
         require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
         require(escape.escapeType == OWNER_ESCAPE_TYPE, "argent/invalid-escape-type");
@@ -250,8 +249,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function escapeGuardian(address _newGuardian) external {
         requireOnlySelf();
         requireGuardian();
-
-        clearExpiredEscape();
 
         require(_newGuardian != address(0), "argent/null-guardian");
         require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
@@ -469,23 +466,10 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         if (block.timestamp < _escape.activeAt) {
             return EscapeStatus.TooEarly;
         }
-        if (_escape.activeAt + escapeExpiryPeriod() < block.timestamp) {
+        if (_escape.activeAt + escapeExpiryPeriod < block.timestamp) {
             return EscapeStatus.Expired;
         }
         return EscapeStatus.Active;
-    }
-
-    function escapeExpiryPeriod() public view returns (uint32) {
-        return 2 * escapeSecurityPeriod;
-    }
-
-    function requireValidEscapeSignature(address _newSigner, bytes memory _signature, bytes4 _selector) internal view {
-        // uint256 nonce = INonceHolder(NONCE_HOLDER_SYSTEM_CONTRACT).getMinNonce(address(this));
-        uint256 nonce = 0;
-        bytes memory message = abi.encodePacked(_selector, block.chainid, address(this), nonce, _newSigner);
-        bytes32 messageHash = keccak256(message).toEthSignedMessageHash();
-        address signer = Signatures.recoverSigner(messageHash, _signature);
-        require(signer != address(0) && signer == _newSigner, "argent/invalid-escape-signature");
     }
 
     function isOwnerEscapeCall(bytes4 _selector) internal pure returns (bool) {
