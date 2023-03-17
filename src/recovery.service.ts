@@ -1,7 +1,3 @@
-import { ethers } from "hardhat";
-import * as zksync from "zksync-web3";
-import { ArgentAccount } from "../typechain-types";
-
 export enum EscapeType {
   None,
   Guardian,
@@ -15,6 +11,7 @@ export enum EscapeStatus {
   Expired,
 }
 
+/*
 export const getEscapeSignature = async (
   newSigner: zksync.Wallet,
   account: ArgentAccount,
@@ -33,11 +30,13 @@ export const getEscapeSignature = async (
 };
 
 export const triggerEscapeGuardian = async (newGuardian: zksync.Wallet, account: ArgentAccount) => {
-  // const signature = await getEscapeSignature(newGuardian, account, "triggerEscapeGuardian");
+  const signature = await getEscapeSignature(newGuardian, account, "triggerEscapeGuardian");
   return account.triggerEscapeGuardian(newGuardian.address);
 };
 
 export const triggerEscapeOwner = async (newOwner: zksync.Wallet, account: ArgentAccount) => {
-  // const signature = await getEscapeSignature(newOwner, account, "triggerEscapeOwner");
+  const signature = await getEscapeSignature(newOwner, account, "triggerEscapeOwner");
   return account.triggerEscapeOwner(newOwner.address);
 };
+
+*/

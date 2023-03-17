@@ -4,7 +4,7 @@ import { checkDeployer } from "../src/deployer.service";
 import { getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
 import { waitForTimestamp } from "../src/provider.service";
-import { EscapeStatus, EscapeType, triggerEscapeGuardian, triggerEscapeOwner } from "../src/recovery.service";
+import { EscapeStatus, EscapeType } from "../src/recovery.service";
 import { ArgentAccount } from "../typechain-types";
 import {
   deployer,
@@ -44,8 +44,8 @@ describe("Recovery statuses", () => {
     }
 
     const newSigner = escapeType === EscapeType.Owner ? newOwner : newGuardian;
-    const triggerEscape = escapeType === EscapeType.Owner ? triggerEscapeOwner : triggerEscapeGuardian;
-    const response = await triggerEscape(newSigner, account);
+    const triggerEscape = escapeType === EscapeType.Owner ? account.triggerEscapeOwner : account.triggerEscapeGuardian;
+    const response = await triggerEscape(newSigner.address);
     await response.wait();
     await tests[EscapeStatus.Triggered]?.(account);
     if (!hasTests(EscapeStatus.Active, EscapeStatus.Expired)) {

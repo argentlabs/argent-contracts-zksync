@@ -5,7 +5,6 @@ import { computeCreate2AddressFromSdk, connect, deployAccount } from "../src/acc
 import { checkDeployer, CustomDeployer } from "../src/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
-import { triggerEscapeGuardian } from "../src/recovery.service";
 import { ArgentSigner } from "../src/signer.service";
 import { ArgentAccount, TestDapp } from "../typechain-types";
 import {
@@ -14,6 +13,8 @@ import {
   deployerAddress,
   guardian,
   guardianAddress,
+  newGuardian,
+  newOwner,
   owner,
   ownerAddress,
   provider,
@@ -200,8 +201,6 @@ describe("Argent account", () => {
     });
 
     describe("Calling the dapp without using a guardian", () => {
-      const newOwner = zksync.Wallet.createRandom();
-
       before(async () => {
         account = await deployAccount({
           argent,
@@ -232,8 +231,7 @@ describe("Argent account", () => {
 
       it("Should revert calls that require the guardian to be set", async () => {
         account = connect(account, [newOwner]);
-        const newGuardian = zksync.Wallet.createRandom();
-        await expect(triggerEscapeGuardian(newGuardian, account)).to.be.rejectedWith("argent/guardian-required");
+        await expect(account.triggerEscapeGuardian(newGuardian.address)).to.be.rejectedWith("argent/guardian-required");
       });
 
       it("Should add a guardian", async () => {
