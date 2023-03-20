@@ -14,9 +14,10 @@ import {Transaction, TransactionHelper, IPaymasterFlow} from "@matterlabs/zksync
 import {Utils} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/Utils.sol";
 
 import {IMulticall} from "./IMulticall.sol";
+import {IProxy} from "./Proxy.sol";
 import {Signatures} from "./Signatures.sol";
 
-contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
+contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
 
@@ -28,16 +29,12 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
 
     // prettier-ignore
     struct Escape {
-        uint32 activeAt;       // bits [0...32]   timestamp for activation of escape mode, 0 otherwise
-        uint8 escapeType;      // bits [31...40]  packed EscapeType enum
-        // address newSigner;  // bits [41...200] new owner or new guardian
+        uint32 activeAt;    // bits [0...32[    timestamp for activation of escape mode, 0 otherwise
+        uint8 escapeType;   // bits [32...40[   packed EscapeType enum
     }
 
-    bytes32 public constant VERSION = "0.0.1-alpha.2";
-
-    uint8 public constant NO_ESCAPE = uint8(EscapeType.None);
-    uint8 public constant GUARDIAN_ESCAPE = uint8(EscapeType.Guardian);
-    uint8 public constant OWNER_ESCAPE = uint8(EscapeType.Owner);
+    bytes32 public constant NAME = "ArgentAccount";
+    bytes32 public constant VERSION = "0.1.0-alpha.1";
 
     uint32 public immutable escapeSecurityPeriod;
 
@@ -186,11 +183,11 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         requireGuardian();
         // no escape if there is an guardian escape triggered by the owner in progress
         if (escape.activeAt != 0) {
-            require(escape.escapeType == OWNER_ESCAPE, "argent/cannot-override-owner-escape");
+            require(escape.escapeType == uint8(EscapeType.Owner), "argent/cannot-override-escape");
         }
 
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
-        escape = Escape(activeAt, OWNER_ESCAPE);
+        escape = Escape(activeAt, uint8(EscapeType.Owner));
         emit EscapeOwnerTriggerred(activeAt);
     }
 
@@ -198,13 +195,13 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         requireOnlySelf();
         requireGuardian();
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
-        escape = Escape(activeAt, GUARDIAN_ESCAPE);
+        escape = Escape(activeAt, uint8(EscapeType.Guardian));
         emit EscapeGuardianTriggerred(activeAt);
     }
 
     function cancelEscape() external {
         requireOnlySelf();
-        require(escape.activeAt != 0 && escape.escapeType != NO_ESCAPE, "argent/not-escaping");
+        require(escape.activeAt != 0 && escape.escapeType != uint8(EscapeType.None), "argent/not-escaping");
 
         delete escape;
         emit EscapeCancelled();
@@ -216,7 +213,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         require(_newOwner != address(0), "argent/null-owner");
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
-        require(escape.escapeType == OWNER_ESCAPE, "argent/invalid-escape-type");
+        require(escape.escapeType == uint8(EscapeType.Owner), "argent/invalid-escape-type");
 
         delete escape;
         owner = _newOwner;
@@ -229,7 +226,7 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         require(_newGuardian != address(0), "argent/null-guardian");
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
-        require(escape.escapeType == GUARDIAN_ESCAPE, "argent/invalid-escape-type");
+        require(escape.escapeType == uint8(EscapeType.Guardian), "argent/invalid-escape-type");
 
         delete escape;
         guardian = _newGuardian;

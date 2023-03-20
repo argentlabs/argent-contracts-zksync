@@ -13,6 +13,7 @@ import {
   deployerAddress,
   guardian,
   guardianAddress,
+  newOwner,
   owner,
   ownerAddress,
   provider,
@@ -52,7 +53,7 @@ describe("Argent account", () => {
 
     it("Should be initialized properly", async () => {
       const version = new Uint8Array(32);
-      version.set(ethers.utils.toUtf8Bytes("0.0.1-alpha.2"));
+      version.set(ethers.utils.toUtf8Bytes("0.1.0-alpha.1"));
       await expect(account.VERSION()).to.eventually.equal(ethers.utils.hexlify(version));
       await expect(account.owner()).to.eventually.equal(owner.address);
       await expect(account.guardian()).to.eventually.equal(guardian.address);
@@ -199,8 +200,6 @@ describe("Argent account", () => {
     });
 
     describe("Calling the dapp without using a guardian", () => {
-      const newOwner = zksync.Wallet.createRandom();
-
       before(async () => {
         account = await deployAccount({
           argent,
