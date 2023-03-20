@@ -13,6 +13,7 @@ import {
   deployerAddress,
   guardian,
   guardianAddress,
+  newGuardian,
   newOwner,
   owner,
   ownerAddress,
@@ -230,7 +231,7 @@ describe("Argent account", () => {
 
       it("Should revert calls that require the guardian to be set", async () => {
         account = connect(account, [newOwner]);
-        await expect(account.triggerEscapeGuardian()).to.be.rejectedWith("argent/guardian-required");
+        await expect(account.triggerEscapeGuardian(newGuardian.address)).to.be.rejectedWith("argent/guardian-required");
       });
 
       it("Should add a guardian", async () => {
