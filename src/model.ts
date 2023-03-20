@@ -11,6 +11,13 @@ export enum EscapeType {
   Owner,
 }
 
+export enum EscapeStatus {
+  None,
+  Triggered,
+  Active,
+  Expired,
+}
+
 export interface IConfig {
   escapeSecurityPeriodInSeconds: number;
   implementation: string;

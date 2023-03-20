@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { connect, deployAccount } from "../src/account.service";
 import { checkDeployer } from "../src/deployer.service";
 import { getTestInfrastructure } from "../src/infrastructure.service";
-import { ArgentInfrastructure, EscapeType } from "../src/model";
+import { ArgentInfrastructure, EscapeStatus, EscapeType } from "../src/model";
 import { waitForL1BatchBlock, waitForTimestamp } from "../src/provider.service";
 import { ArgentAccount } from "../typechain-types";
 import {
@@ -26,6 +26,7 @@ describe("Recovery", () => {
   let account: ArgentAccount;
 
   let escapeSecurityPeriod: number; // in seconds
+  let escapeExpiryPeriod: number; // in seconds
 
   before(async () => {
     await checkDeployer(deployer);
@@ -33,6 +34,7 @@ describe("Recovery", () => {
 
     const account = argent.implementation;
     escapeSecurityPeriod = await account.escapeSecurityPeriod();
+    escapeExpiryPeriod = await account.escapeExpiryPeriod();
   });
 
   describe("Changing owner", () => {
@@ -138,7 +140,7 @@ describe("Recovery", () => {
     it("Should run triggerEscapeGuardian() by owner", async () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner] });
 
-      const escapeBefore = await account.escape();
+      const [escapeBefore] = await account.getEscape();
       expectEqualEscapes(escapeBefore, nullEscape);
 
       const response = await account.triggerEscapeGuardian(newGuardian.address);
@@ -146,14 +148,14 @@ describe("Recovery", () => {
       const activeAt = timestamp + escapeSecurityPeriod;
       await expect(response).to.emit(account, "EscapeGuardianTriggerred").withArgs(activeAt, newGuardian.address);
 
-      const escape = await account.escape();
+      const [escape] = await account.getEscape();
       expectEqualEscapes(escape, { activeAt, escapeType: EscapeType.Guardian, newSigner: newGuardian.address });
     });
 
     it("Should run triggerEscapeOwner() by guardian", async () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [guardian] });
 
-      const escapeBefore = await account.escape();
+      const [escapeBefore] = await account.getEscape();
       expectEqualEscapes(escapeBefore, nullEscape);
 
       const response = await account.triggerEscapeOwner(newOwner.address);
@@ -161,7 +163,7 @@ describe("Recovery", () => {
       const activeAt = timestamp + escapeSecurityPeriod;
       await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAt, newOwner.address);
 
-      const escape = await account.escape();
+      const [escape] = await account.getEscape();
       expectEqualEscapes(escape, { activeAt, escapeType: EscapeType.Owner, newSigner: newOwner.address });
     });
 
@@ -170,7 +172,7 @@ describe("Recovery", () => {
       const backupResponse = await connect(account, [owner, guardian]).changeGuardianBackup(newGuardianBackup.address);
       await backupResponse.wait();
 
-      const escapeBefore = await account.escape();
+      const [escapeBefore] = await account.getEscape();
       expectEqualEscapes(escapeBefore, nullEscape);
 
       const response = await connect(account, [newGuardianBackup]).triggerEscapeOwner(newOwner.address);
@@ -178,7 +180,7 @@ describe("Recovery", () => {
       const activeAt = timestamp + escapeSecurityPeriod;
       await expect(response).to.emit(account, "EscapeOwnerTriggerred").withArgs(activeAt, newOwner.address);
 
-      const escape = await account.escape();
+      const [escape] = await account.getEscape();
       expectEqualEscapes(escape, { activeAt, escapeType: EscapeType.Owner, newSigner: newOwner.address });
     });
   });
@@ -205,7 +207,7 @@ describe("Recovery", () => {
       await expect(account.escapeGuardian(newGuardian.address)).to.be.rejectedWith("argent/inactive-escape");
 
       // wait security period
-      const { activeAt } = await account.escape();
+      const [{ activeAt }] = await account.getEscape();
       await waitForTimestamp(activeAt, provider);
 
       // should fail to escape to wrong address
@@ -218,8 +220,9 @@ describe("Recovery", () => {
       await expect(account.guardian()).to.eventually.equal(newGuardian.address);
 
       // escape should be cleared
-      const escape = await account.escape();
+      const [escape, statusAfterEscape] = await account.getEscape();
       expectEqualEscapes(escape, nullEscape);
+      expect(statusAfterEscape).to.equal(EscapeStatus.None);
     });
 
     it("Should escape owner", async () => {
@@ -239,7 +242,7 @@ describe("Recovery", () => {
       await expect(account.escapeOwner(newOwner.address)).to.be.rejectedWith("argent/inactive-escape");
 
       // wait security period
-      const { activeAt } = await account.escape();
+      const [{ activeAt }] = await account.getEscape();
       await waitForTimestamp(activeAt, provider);
 
       // should fail to escape to wrong address
@@ -252,8 +255,9 @@ describe("Recovery", () => {
       await expect(account.owner()).to.eventually.equal(newOwner.address);
 
       // escape should be cleared
-      const escape = await account.escape();
+      const [escape, statusAfterEscape] = await account.getEscape();
       expectEqualEscapes(escape, nullEscape);
+      expect(statusAfterEscape).to.equal(EscapeStatus.None);
     });
   });
 
@@ -265,7 +269,7 @@ describe("Recovery", () => {
       const guardianResponse = await connect(account, [guardian]).triggerEscapeOwner(newOwner.address);
       await guardianResponse.wait();
 
-      const firstEscape = await account.escape();
+      const [firstEscape] = await account.getEscape();
       expect(firstEscape.activeAt).to.be.greaterThan(0n);
       expect(firstEscape.escapeType).to.equal(EscapeType.Owner);
 
@@ -275,7 +279,7 @@ describe("Recovery", () => {
       const ownerResponse = await connect(account, [owner]).triggerEscapeGuardian(newGuardian.address);
       await ownerResponse.wait();
 
-      const secondEscape = await account.escape();
+      const [secondEscape] = await account.getEscape();
       expect(secondEscape.activeAt).to.be.greaterThanOrEqual(firstEscape.activeAt); // TODO: greaterThan after evm_mine
       expect(secondEscape.escapeType).to.equal(EscapeType.Guardian);
     });
@@ -287,7 +291,7 @@ describe("Recovery", () => {
       const response = await connect(account, [owner]).triggerEscapeGuardian(newGuardian.address);
       await response.wait();
 
-      const escape = await account.escape();
+      const [escape, status] = await account.getEscape();
       expect(escape.activeAt).to.be.greaterThan(0n);
       expect(escape.escapeType).to.equal(EscapeType.Guardian);
 
@@ -297,14 +301,21 @@ describe("Recovery", () => {
       let promise = connect(account, [guardian]).triggerEscapeOwner(newOwner.address);
       await expect(promise).to.be.rejectedWith("argent/cannot-override-escape");
 
-      const secondEscape = await account.escape();
+      const [secondEscape, secondStatus] = await account.getEscape();
       expectEqualEscapes(secondEscape, escape);
+      expect(secondStatus).to.equal(status);
 
       await waitForTimestamp(escape.activeAt, provider);
 
       // guardian cannot override in Active state
       promise = connect(account, [guardian]).triggerEscapeOwner(newOwner.address);
       await expect(promise).to.be.rejectedWith("argent/cannot-override-escape");
+
+      await waitForTimestamp(escape.activeAt + escapeExpiryPeriod, provider);
+
+      // guardian can override in Expired state
+      promise = connect(account, [guardian]).triggerEscapeOwner(newOwner.address);
+      await expect(promise).to.emit(account, "EscapeOwnerTriggerred");
     });
   });
 
@@ -316,7 +327,7 @@ describe("Recovery", () => {
       const response = await connect(account, [guardian]).triggerEscapeOwner(newOwner.address);
       await response.wait();
 
-      const escape = await account.escape();
+      const [escape] = await account.getEscape();
       expect(escape.activeAt).to.be.greaterThan(0n);
       expect(escape.escapeType).to.equal(EscapeType.Owner);
 
@@ -325,10 +336,11 @@ describe("Recovery", () => {
       await expect(rejectingPromise).to.be.rejectedWith("Account validation returned invalid magic value");
 
       const resolvingPromise = connect(account, [owner, guardian]).cancelEscape();
-      await expect(resolvingPromise).to.emit(account, "EscapeCancelled");
+      await expect(resolvingPromise).to.emit(account, "EscapeCanceled");
 
-      const secondEscape = await account.escape();
+      const [secondEscape, secondStatus] = await account.getEscape();
       expectEqualEscapes(secondEscape, nullEscape);
+      expect(secondStatus).to.equal(EscapeStatus.None);
     });
   });
 });
