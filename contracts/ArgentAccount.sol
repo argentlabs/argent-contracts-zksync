@@ -20,6 +20,12 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
 
+    struct Version {
+        uint8 major;
+        uint8 minor;
+        uint8 patch;
+    }
+
     enum EscapeType {
         None,
         Guardian,
@@ -32,8 +38,6 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         uint8 escapeType;      // bits [31...40]  packed EscapeType enum
         // address newSigner;  // bits [41...200] new owner or new guardian
     }
-
-    bytes32 public constant VERSION = "0.0.1-alpha.2";
 
     uint8 public constant NO_ESCAPE = uint8(EscapeType.None);
     uint8 public constant GUARDIAN_ESCAPE = uint8(EscapeType.Guardian);
@@ -102,6 +106,10 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Lifecycle ***************************************************/
 
+    function version() public pure returns (Version memory) {
+        return Version(0, 1, 0);
+    }
+
     function initialize(address _owner, address _guardian) external {
         require(_owner != address(0), "argent/null-owner");
         require(owner == address(0), "argent/already-initialized");
@@ -117,12 +125,14 @@ contract ArgentAccount is IAccount, IMulticall, IERC165, IERC1271 {
         implementation = _newImplementation;
         emit AccountUpgraded(_newImplementation);
         // using delegatecall to run the `executeAfterUpgrade` function of the new implementation
-        (bool success, ) = _newImplementation.delegatecall(abi.encodeCall(this.executeAfterUpgrade, (VERSION, _data)));
+        (bool success, ) = _newImplementation.delegatecall(
+            abi.encodeCall(this.executeAfterUpgrade, (version(), _data))
+        );
         require(success, "argent/upgrade-callback-failed");
     }
 
     // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
-    function executeAfterUpgrade(bytes32 /*_previousVersion*/, bytes calldata /*_data*/) external {
+    function executeAfterUpgrade(Version memory /*_previousVersion*/, bytes calldata /*_data*/) external {
         requireOnlySelf();
         // reserved upgrade callback for future account versions
     }
