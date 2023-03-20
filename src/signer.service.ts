@@ -22,6 +22,7 @@ export class ArgentSigner extends Signer {
   async getAddress(): Promise<string> {
     return this.address;
   }
+
   async getChainId(): Promise<number> {
     if (this._chainId === undefined) {
       const { chainId } = await this.provider.getNetwork();
