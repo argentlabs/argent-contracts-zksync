@@ -9,6 +9,7 @@ export type EscapeStruct = ArgentAccount.EscapeStruct;
 
 export const owner = zksync.Wallet.createRandom();
 export const guardian = zksync.Wallet.createRandom();
+export const guardianBackup = zksync.Wallet.createRandom();
 export const wrongOwner = zksync.Wallet.createRandom();
 export const wrongGuardian = zksync.Wallet.createRandom();
 export const newOwner = zksync.Wallet.createRandom();
