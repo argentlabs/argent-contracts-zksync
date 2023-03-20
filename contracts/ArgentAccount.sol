@@ -176,6 +176,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function changeOwner(address _newOwner) external {
         requireOnlySelf();
         require(_newOwner != address(0), "argent/null-owner");
+
+        cancelCurrentEscape();
         owner = _newOwner;
         emit OwnerChanged(_newOwner);
     }
@@ -183,6 +185,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function changeGuardian(address _newGuardian) external {
         requireOnlySelf();
         require(_newGuardian != address(0) || guardianBackup == address(0), "argent/backup-should-be-null");
+
+        cancelCurrentEscape();
         guardian = _newGuardian;
         emit GuardianChanged(_newGuardian);
     }
@@ -190,6 +194,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function changeGuardianBackup(address _newGuardianBackup) external {
         requireOnlySelf();
         requireGuardian();
+
+        cancelCurrentEscape();
         guardianBackup = _newGuardianBackup;
         emit GuardianBackupChanged(_newGuardianBackup);
     }
@@ -198,14 +204,13 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         requireOnlySelf();
         requireGuardian();
 
-        cancelExpiredEscape();
-
         // no escape if there is an guardian escape triggered by the owner in progress
         EscapeStatus status = escapeStatus(escape);
         if (status == EscapeStatus.Triggered || status == EscapeStatus.Active) {
             require(escape.escapeType == uint8(EscapeType.Owner), "argent/cannot-override-escape");
         }
 
+        cancelCurrentEscape();
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(activeAt, uint8(EscapeType.Owner), _newOwner);
         emit EscapeOwnerTriggerred(activeAt, _newOwner);
@@ -215,8 +220,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         requireOnlySelf();
         requireGuardian();
 
-        cancelExpiredEscape();
-
+        cancelCurrentEscape();
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(activeAt, uint8(EscapeType.Guardian), _newGuardian);
         emit EscapeGuardianTriggerred(activeAt, _newGuardian);
@@ -224,7 +228,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     function cancelEscape() external {
         requireOnlySelf();
-        require(escapeStatus(escape) != EscapeStatus.None, "argent/not-escaping");
+        require(escapeStatus(escape) != EscapeStatus.None, "argent/null-escape");
 
         delete escape;
         emit EscapeCanceled();
@@ -233,7 +237,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function escapeOwner(address _newOwner) external {
         requireOnlySelf();
         requireGuardian();
-
         require(_newOwner != address(0), "argent/null-owner");
         require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
         require(escape.escapeType == uint8(EscapeType.Owner), "argent/invalid-escape-type");
@@ -247,7 +250,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function escapeGuardian(address _newGuardian) external {
         requireOnlySelf();
         requireGuardian();
-
         require(_newGuardian != address(0), "argent/null-guardian");
         require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
         require(escape.escapeType == uint8(EscapeType.Guardian), "argent/invalid-escape-type");
@@ -451,8 +453,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Recovery ****************************************************/
 
-    function cancelExpiredEscape() internal {
-        if (escapeStatus(escape) == EscapeStatus.Expired) {
+    function cancelCurrentEscape() internal {
+        if (escapeStatus(escape) != EscapeStatus.None) {
             delete escape;
             emit EscapeCanceled();
         }

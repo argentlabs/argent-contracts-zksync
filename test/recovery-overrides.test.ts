@@ -33,12 +33,14 @@ describe("Recovery overrides", () => {
     escapeType: EscapeType.Guardian | EscapeType.Owner,
     tests: Partial<Record<EscapeStatus, (account: ArgentAccount) => Promise<void>>>,
   ) => {
-    const hasTests = (...statuses: EscapeStatus[]) => statuses.some((status) => tests[status]);
+    const hasTestsAfter = (currentStatus: EscapeStatus) =>
+      Object.keys(tests).some((status) => Number(status) > currentStatus);
+
     const connect = escapeType === EscapeType.Owner ? [guardian] : [owner];
     const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect, funds: "0.0005" });
 
     await tests[EscapeStatus.None]?.(account);
-    if (!hasTests(EscapeStatus.Triggered, EscapeStatus.Active, EscapeStatus.Expired)) {
+    if (!hasTestsAfter(EscapeStatus.None)) {
       return account;
     }
 
@@ -47,14 +49,14 @@ describe("Recovery overrides", () => {
     const response = await triggerEscape(newSigner.address);
     await response.wait();
     await tests[EscapeStatus.Triggered]?.(account);
-    if (!hasTests(EscapeStatus.Active, EscapeStatus.Expired)) {
+    if (!hasTestsAfter(EscapeStatus.Triggered)) {
       return account;
     }
 
     const [{ activeAt }] = await account.getEscape();
     await waitForTimestamp(activeAt, provider);
     await tests[EscapeStatus.Active]?.(account);
-    if (!hasTests(EscapeStatus.Expired)) {
+    if (!hasTestsAfter(EscapeStatus.Active)) {
       return account;
     }
 
@@ -69,23 +71,15 @@ describe("Recovery overrides", () => {
   ) => testAccountInStatuses(escapeType, { [escapeStatus]: async () => {} });
 
   it("Should be in the right status", async () => {
+    const expectStatus = async (account: ArgentAccount, expectedStatus: EscapeStatus) => {
+      const [, actualStatus] = await account.getEscape();
+      expect(actualStatus).to.equal(expectedStatus);
+    };
     await testAccountInStatuses(EscapeType.Owner, {
-      [EscapeStatus.None]: async (account) => {
-        const [, status] = await account.getEscape();
-        expect(status).to.equal(EscapeStatus.None);
-      },
-      [EscapeStatus.Triggered]: async (account) => {
-        const [, status] = await account.getEscape();
-        expect(status).to.equal(EscapeStatus.Triggered);
-      },
-      [EscapeStatus.Active]: async (account) => {
-        const [, status] = await account.getEscape();
-        expect(status).to.equal(EscapeStatus.Active);
-      },
-      [EscapeStatus.Expired]: async (account) => {
-        const [, status] = await account.getEscape();
-        expect(status).to.equal(EscapeStatus.Expired);
-      },
+      [EscapeStatus.None]: async (account) => expectStatus(account, EscapeStatus.None),
+      [EscapeStatus.Triggered]: async (account) => expectStatus(account, EscapeStatus.Triggered),
+      [EscapeStatus.Active]: async (account) => expectStatus(account, EscapeStatus.Active),
+      [EscapeStatus.Expired]: async (account) => expectStatus(account, EscapeStatus.Expired),
     });
   });
 
@@ -104,7 +98,7 @@ describe("Recovery overrides", () => {
         for (const escapeStatus of [EscapeStatus.Triggered, EscapeStatus.Active, EscapeStatus.Expired]) {
           it(`${changeSigner.name}() should cancel escapeType=${EscapeType[escapeType]} when in escapeStatus=${EscapeStatus[escapeStatus]}`, async () => {
             const account = await deployAccountInStatus(escapeType, escapeStatus);
-            expect(changeSigner(account)).to.emit(account, "EscapeCanceled");
+            await expect(changeSigner(account)).to.emit(account, "EscapeCanceled");
           });
         }
       }
@@ -116,20 +110,33 @@ describe("Recovery overrides", () => {
     for (const escapeStatus of [EscapeStatus.Triggered, EscapeStatus.Active, EscapeStatus.Expired]) {
       it(`triggerEscapeOwner() should override escapeType=Owner when in escapeStatus=${EscapeStatus[escapeStatus]}`, async () => {
         const account = await deployAccountInStatus(EscapeType.Owner, escapeStatus);
-        expect(account.triggerEscapeOwner(other.address)).to.emit(account, "EscapeCanceled");
+        await expect(account.triggerEscapeOwner(other.address)).to.emit(account, "EscapeCanceled");
       });
     }
     // guardian escapes
     for (const escapeStatus of [EscapeStatus.Triggered, EscapeStatus.Active]) {
       it(`triggerEscapeOwner() should FAIL to override escapeType=Guardian when in escapeStatus=${EscapeStatus[escapeStatus]}`, async () => {
         const account = await deployAccountInStatus(EscapeType.Guardian, escapeStatus);
-        expect(account.triggerEscapeOwner(other.address)).to.be.rejectedWith("argent/cannot-override-escape");
+        await expect(account.triggerEscapeOwner(other.address)).to.be.rejectedWith("argent/cannot-override-escape");
       });
     }
     it(`triggerEscapeOwner() should override escapeType=Owner when in escapeStatus=Expired`, async () => {
       const account = await deployAccountInStatus(EscapeType.Guardian, EscapeStatus.Expired);
-      expect(account.triggerEscapeOwner(other.address)).to.emit(account, "EscapeCanceled");
+      const connectedAccount = connect(account, [guardian]);
+      await expect(connectedAccount.triggerEscapeOwner(other.address)).to.emit(account, "EscapeCanceled");
     });
+  });
+
+  describe("Should cancel escape in any non null state", () => {
+    for (const escapeType of [EscapeType.Guardian, EscapeType.Owner] as const) {
+      for (const escapeStatus of [EscapeStatus.Triggered, EscapeStatus.Active, EscapeStatus.Expired]) {
+        it(`cancelEscape() should cancel escapeType=${EscapeType[escapeType]} when in escapeStatus=${EscapeStatus[escapeStatus]}`, async () => {
+          const account = await deployAccountInStatus(escapeType, escapeStatus);
+          const connectedAccount = connect(account, [owner, guardian]);
+          await expect(connectedAccount.cancelEscape()).to.emit(account, "EscapeCanceled");
+        });
+      }
+    }
   });
 
   describe("Should fail to call escape methods in invalid states", () => {

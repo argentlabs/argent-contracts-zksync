@@ -323,6 +323,9 @@ describe("Recovery", () => {
     it("Should cancel an escape", async () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress });
 
+      let promise = connect(account, [owner, guardian]).cancelEscape();
+      await expect(promise).to.be.rejectedWith("null-escape");
+
       // guardian triggers a owner escape
       const response = await connect(account, [guardian]).triggerEscapeOwner(newOwner.address);
       await response.wait();
@@ -332,11 +335,11 @@ describe("Recovery", () => {
       expect(escape.escapeType).to.equal(EscapeType.Owner);
 
       // should fail to cancel with just the owner signature
-      const rejectingPromise = connect(account, [owner]).cancelEscape();
-      await expect(rejectingPromise).to.be.rejectedWith("Account validation returned invalid magic value");
+      promise = connect(account, [owner]).cancelEscape();
+      await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
 
-      const resolvingPromise = connect(account, [owner, guardian]).cancelEscape();
-      await expect(resolvingPromise).to.emit(account, "EscapeCanceled");
+      promise = connect(account, [owner, guardian]).cancelEscape();
+      await expect(promise).to.emit(account, "EscapeCanceled");
 
       const [secondEscape, secondStatus] = await account.getEscape();
       expectEqualEscapes(secondEscape, nullEscape);
