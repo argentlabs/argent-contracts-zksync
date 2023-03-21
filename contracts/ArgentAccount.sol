@@ -146,6 +146,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
     function executeAfterUpgrade(Version memory /*_previousVersion*/, bytes calldata /*_data*/) external {
         requireOnlySelf();
+        owner = owner; // useless code to suppress warning about pure function
         // reserved upgrade callback for future account versions
     }
 
