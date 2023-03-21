@@ -175,9 +175,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     function changeOwner(address _newOwner, bytes memory _signature) external {
         requireOnlySelf();
-        require(_newOwner != address(0), "argent/null-owner");
-        requireValidNewOwnerSignature(_newOwner, _signature);
-
+        validateNewOwner(_newOwner, _signature);
         owner = _newOwner;
         emit OwnerChanged(_newOwner);
     }
@@ -422,6 +420,15 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Execution ***************************************************/
 
+    function validateNewOwner(address _newOwner, bytes memory _signature) private view {
+        require(_newOwner != address(0), "argent/null-owner");
+        bytes4 selector = this.changeOwner.selector;
+        bytes memory message = abi.encodePacked(selector, block.chainid, address(this), owner);
+        bytes32 messageHash = keccak256(message).toEthSignedMessageHash();
+        address signer = Signatures.recoverSigner(messageHash, _signature);
+        require(signer != address(0) && signer == _newOwner, "argent/invalid-owner-sig");
+    }
+
     function _execute(address to, uint256 value, bytes memory data) internal {
         uint128 value128 = Utils.safeCastToU128(value);
         if (to == address(DEPLOYER_SYSTEM_CONTRACT)) {
@@ -441,14 +448,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     /**************************************************** Recovery ****************************************************/
-
-    function requireValidNewOwnerSignature(address _newOwner, bytes memory _signature) internal view {
-        bytes4 selector = this.changeOwner.selector;
-        bytes memory message = abi.encodePacked(selector, block.chainid, address(this), owner);
-        bytes32 messageHash = keccak256(message).toEthSignedMessageHash();
-        address signer = Signatures.recoverSigner(messageHash, _signature);
-        require(signer != address(0) && signer == _newOwner, "argent/invalid-owner-sig");
-    }
 
     function isOwnerEscapeCall(bytes4 _selector) internal pure returns (bool) {
         return _selector == this.escapeOwner.selector || _selector == this.triggerEscapeOwner.selector;
