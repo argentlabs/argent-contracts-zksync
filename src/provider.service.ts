@@ -1,3 +1,4 @@
+import { ContractTransaction } from "ethers";
 import hre from "hardhat";
 import * as zksync from "zksync-web3";
 import { TransactionResponse } from "zksync-web3/build/src/types";
@@ -47,8 +48,8 @@ export const waitForTimestampPublic = async (deadline: seconds, provider: zksync
   });
 };
 
-export const waitForL1BatchBlock = async (response: TransactionResponse, provider: zksync.Provider) => {
-  const receipt = await response.waitFinalize();
+export const waitForL1BatchBlock = async (response: ContractTransaction, provider: zksync.Provider) => {
+  const receipt = await (response as TransactionResponse).waitFinalize();
   const range = await provider.getL1BatchBlockRange(receipt.l1BatchNumber);
   if (!range) {
     throw new Error("Batch not found");

@@ -16,16 +16,24 @@ export const deployAccount = async ({
   argent,
   ownerAddress,
   guardianAddress,
+  guardianBackupAddress = ethers.constants.AddressZero,
   connect: signatories,
   funds = undefined,
   salt = ethers.utils.randomBytes(32),
 }: AccountDeploymentParams): Promise<ArgentAccount> => {
   const { deployer, factory, implementation, artifacts } = argent;
 
-  const response = await factory.deployProxyAccount(salt, implementation.address, ownerAddress, guardianAddress);
+  const response = await factory.deployProxyAccount(
+    salt,
+    implementation.address,
+    ownerAddress,
+    guardianAddress,
+    guardianBackupAddress,
+  );
   const receipt = await response.wait();
   const [{ deployedAddress }] = zksync.utils.getDeployedContracts(receipt);
-  const initData = implementation.interface.encodeFunctionData("initialize", [ownerAddress, guardianAddress]);
+  const args = [ownerAddress, guardianAddress, guardianBackupAddress];
+  const initData = implementation.interface.encodeFunctionData("initialize", args);
   await verifyContract(deployedAddress, artifacts.proxy, [implementation.address, initData]);
 
   const account = argentAccountContract(deployedAddress, argent);
@@ -56,8 +64,10 @@ export const computeCreate2AddressFromSdk = (
   salt: BytesLike,
   ownerAddress: string,
   guardianAddress: string,
+  guardianBackupAddress: string,
 ) => {
-  const initData = implementation.interface.encodeFunctionData("initialize", [ownerAddress, guardianAddress]);
+  const args = [ownerAddress, guardianAddress, guardianBackupAddress];
+  const initData = implementation.interface.encodeFunctionData("initialize", args);
 
   const proxyInterface = new ethers.utils.Interface(artifacts.proxy.abi);
   const constructorData = proxyInterface.encodeDeploy([implementation.address, initData]);

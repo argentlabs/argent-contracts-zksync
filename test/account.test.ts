@@ -13,6 +13,9 @@ import {
   deployerAddress,
   guardian,
   guardianAddress,
+  guardianBackup,
+  newGuardian,
+  newOwner,
   owner,
   ownerAddress,
   provider,
@@ -30,13 +33,21 @@ describe("Argent account", () => {
 
   describe("AccountFactory", () => {
     const salt = ethers.utils.randomBytes(32);
+    const guardianBackupAddress = guardianBackup.address;
 
     before(async () => {
-      account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: false, salt });
+      account = await deployAccount({
+        argent,
+        ownerAddress,
+        guardianAddress,
+        guardianBackupAddress,
+        funds: false,
+        salt,
+      });
     });
 
     it("Should predict the account address from the JS SDK", async () => {
-      const address = computeCreate2AddressFromSdk(argent, salt, ownerAddress, guardianAddress);
+      const address = computeCreate2AddressFromSdk(argent, salt, ownerAddress, guardianAddress, guardianBackupAddress);
       expect(account.address).to.equal(address);
     });
 
@@ -46,6 +57,7 @@ describe("Argent account", () => {
         argent.implementation.address,
         ownerAddress,
         guardianAddress,
+        guardianBackupAddress,
       );
       expect(account.address).to.equal(address);
     });
@@ -53,14 +65,15 @@ describe("Argent account", () => {
     it("Should be initialized properly", async () => {
       const { major, minor, patch } = await account.version();
       expect([major, minor, patch]).to.deep.equal([0, 1, 0]);
-      await expect(account.owner()).to.eventually.equal(owner.address);
-      await expect(account.guardian()).to.eventually.equal(guardian.address);
+      await expect(account.owner()).to.eventually.equal(ownerAddress);
+      await expect(account.guardian()).to.eventually.equal(guardianAddress);
+      await expect(account.guardianBackup()).to.eventually.equal(guardianBackupAddress);
     });
 
     it("Should refuse to be initialized twice", async () => {
       const { abi } = argent.artifacts.implementation;
       const accountFromEoa = new zksync.Contract(account.address, abi, deployer.zkWallet);
-      const promise = accountFromEoa.initialize(owner.address, guardian.address);
+      const promise = accountFromEoa.initialize(ownerAddress, guardianAddress, guardianBackupAddress);
       await expect(promise).to.be.rejectedWith("argent/already-init");
     });
   });
@@ -198,8 +211,6 @@ describe("Argent account", () => {
     });
 
     describe("Calling the dapp without using a guardian", () => {
-      const newOwner = zksync.Wallet.createRandom();
-
       before(async () => {
         account = await deployAccount({
           argent,
@@ -230,7 +241,7 @@ describe("Argent account", () => {
 
       it("Should revert calls that require the guardian to be set", async () => {
         account = connect(account, [newOwner]);
-        await expect(account.triggerEscapeGuardian()).to.be.rejectedWith("argent/guardian-required");
+        await expect(account.triggerEscapeGuardian(newGuardian.address)).to.be.rejectedWith("argent/guardian-required");
       });
 
       it("Should add a guardian", async () => {

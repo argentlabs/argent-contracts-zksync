@@ -5,6 +5,12 @@ import * as zksync from "zksync-web3";
 import { AccountFactory } from "../typechain-types";
 import { Signatory } from "./signer.service";
 
+export enum EscapeType {
+  None,
+  Guardian,
+  Owner,
+}
+
 export interface IConfig {
   escapeSecurityPeriodInSeconds: number;
   implementation: string;
@@ -30,6 +36,7 @@ export interface AccountDeploymentParams {
   argent: ArgentInfrastructure;
   ownerAddress: string;
   guardianAddress: string;
+  guardianBackupAddress?: string;
   connect?: Signatory[];
   funds?: false | string;
   salt?: BytesLike;
