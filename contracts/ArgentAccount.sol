@@ -50,7 +50,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     bytes32 public constant NAME = "ArgentAccount";
-    bytes32 public constant VERSION = "0.1.0-alpha.1";
 
     uint32 public immutable escapeSecurityPeriod;
     uint32 public immutable escapeExpiryPeriod;
