@@ -47,13 +47,10 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         address newSigner;  // bits [40...200[  new owner or new guardian
     }
 
-    uint32 public guardian_escape_attempts;
-    uint32 public owner_escape_attempts;
-
-    uint32 public constant MAX_ESCAPE_ATTEMPTS = 5;
 
     bytes32 public constant NAME = "ArgentAccount";
     bytes32 public constant VERSION = "0.1.0-alpha.1";
+    uint32 public constant MAX_ESCAPE_ATTEMPTS = 5;
 
     uint32 public immutable escapeSecurityPeriod;
     uint32 public immutable escapeExpiryPeriod;
@@ -66,8 +63,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     address public owner;
     address public guardian;
     address public guardianBackup;
-
     Escape private escape;
+    uint32 public guardian_escape_attempts;
+    uint32 public owner_escape_attempts;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //                                                     Events                                                     //
