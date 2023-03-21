@@ -5,6 +5,7 @@ import { computeCreate2AddressFromSdk, connect, deployAccount } from "../src/acc
 import { checkDeployer, CustomDeployer } from "../src/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
+import { changeOwnerWithSignature } from "../src/recovery.service";
 import { ArgentSigner } from "../src/signer.service";
 import { ArgentAccount, TestDapp } from "../typechain-types";
 import {
@@ -233,7 +234,7 @@ describe("Argent account", () => {
       it("Should change the owner", async () => {
         await expect(account.owner()).to.eventually.equal(owner.address);
 
-        const promise = account.changeOwner(newOwner.address);
+        const promise = changeOwnerWithSignature(newOwner, account);
 
         await expect(promise).to.emit(account, "OwnerChanged").withArgs(newOwner.address);
         await expect(account.owner()).to.eventually.equal(newOwner.address);
