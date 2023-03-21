@@ -63,9 +63,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     address public owner;
     address public guardian;
     address public guardianBackup;
-    Escape private escape;
     uint32 public guardianEscapeAttempts;
     uint32 public ownerEscapeAttempts;
+    Escape private escape;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //                                                     Events                                                     //
@@ -223,8 +223,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         requireGuardian();
         
         // no escape if there is an guardian escape triggered by the owner in progress
-        if (escape.escapeType == uint8(EscapeType.Owner)) {
-            require(isExpired(escape), "argent/cannot-override-escape");
+        if (escape.escapeType == uint8(EscapeType.Guardian)) {
+            require(escapeStatus(escape) == EscapeStatus.Expired, "argent/cannot-override-escape");
         }
 
         cancelCurrentEscape();
@@ -256,7 +256,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function escapeOwner() external {
         requireOnlySelf();
         requirePreValidEscapeOwner();
-        require(!isExpired(escape), "argent/inactive-escape");
+        require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
 
         resetEscapeAttempts();
 
@@ -268,7 +268,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function escapeGuardian() external {
         requireOnlySelf();
         requirePreValidEscapeGuardian();
-        require(!isExpired(escape), "argent/inactive-escape");
+        require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
 
         resetEscapeAttempts();
 
@@ -452,7 +452,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             }
 
             if (selector == this.executeAfterUpgrade.selector) {
-                return bytes4(0);
+                revert("argent/invalid-selector");
             }
         }
 
@@ -552,14 +552,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         }
         return EscapeStatus.Active;
     }
-
-    function isExpired(Escape memory _escape) private view returns (bool) {
-        if (_escape.activeAt == 0) {
-            return false;
-        }
-        return block.timestamp > (_escape.activeAt + escapeExpiryPeriod);
-    }
-
+    
     function isOwnerEscapeCall(bytes4 _selector) private pure returns (bool) {
         return _selector == this.escapeOwner.selector || _selector == this.triggerEscapeOwner.selector;
     }
