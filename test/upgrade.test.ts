@@ -36,13 +36,13 @@ describe("Account upgrade", () => {
   });
 
   it("Should revert when calling upgrade callback directly", async () => {
-    const version = await account.VERSION();
+    const version = await account.version();
     const promise = connect(account, [owner, guardian]).executeAfterUpgrade(version, "0x");
     await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
   });
 
   it("Should revert when calling upgrade callback via multicall", async () => {
-    const version = await account.VERSION();
+    const version = await account.version();
     const call = makeCall(await account.populateTransaction.executeAfterUpgrade(version, "0x"));
     const promise = connect(account, [owner, guardian]).multicall([call]);
     await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");

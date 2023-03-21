@@ -63,9 +63,8 @@ describe("Argent account", () => {
     });
 
     it("Should be initialized properly", async () => {
-      const version = new Uint8Array(32);
-      version.set(ethers.utils.toUtf8Bytes("0.1.0-alpha.1"));
-      await expect(account.VERSION()).to.eventually.equal(ethers.utils.hexlify(version));
+      const { major, minor, patch } = await account.version();
+      expect([major, minor, patch]).to.deep.equal([0, 1, 0]);
       await expect(account.owner()).to.eventually.equal(ownerAddress);
       await expect(account.guardian()).to.eventually.equal(guardianAddress);
       await expect(account.guardianBackup()).to.eventually.equal(guardianBackupAddress);
