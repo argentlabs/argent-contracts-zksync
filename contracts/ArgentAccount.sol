@@ -221,32 +221,28 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         emit EscapeCancelled();
     }
 
-    function escapeOwner(address _newOwner) external {
+    function escapeOwner() external {
         requireOnlySelf();
         requireGuardian();
-        require(_newOwner != address(0), "argent/null-owner");
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
         require(escape.escapeType == uint8(EscapeType.Owner), "argent/invalid-escape-type");
-        require(escape.newSigner == _newOwner, "argent/invalid-escape-signer");
 
+        owner = escape.newSigner;
+        emit OwnerEscaped(escape.newSigner);
         delete escape;
-        owner = _newOwner;
-        emit OwnerEscaped(_newOwner);
     }
 
-    function escapeGuardian(address _newGuardian) external {
+    function escapeGuardian() external {
         requireOnlySelf();
         requireGuardian();
-        require(_newGuardian != address(0), "argent/null-guardian");
         require(escape.activeAt != 0, "argent/not-escaping");
         require(escape.activeAt <= block.timestamp, "argent/inactive-escape");
         require(escape.escapeType == uint8(EscapeType.Guardian), "argent/invalid-escape-type");
-        require(escape.newSigner == _newGuardian, "argent/invalid-escape-signer");
 
+        guardian = escape.newSigner;
+        emit GuardianEscaped(escape.newSigner);
         delete escape;
-        guardian = _newGuardian;
-        emit GuardianEscaped(_newGuardian);
     }
 
     /*************************************************** Validation ***************************************************/
