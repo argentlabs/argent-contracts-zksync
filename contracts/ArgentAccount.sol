@@ -41,6 +41,12 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         address newSigner;  // bits [40...200[  new owner or new guardian
     }
 
+    uint32 public guardian_escape_attempts;
+    uint32 public owner_escape_attempts;
+
+    uint32 public constant MAX_GUARDIAN_ESCAPE_ATTEMPTS = 10;
+    uint32 public constant MAX_OWNER_ESCAPE_ATTEMPTS = 10;
+
     bytes32 public constant NAME = "ArgentAccount";
     bytes32 public constant VERSION = "0.1.0-alpha.1";
 
@@ -178,6 +184,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         require(_newOwner != address(0), "argent/null-owner");
 
         cancelCurrentEscape();
+        resetEscapeAttempts();
         owner = _newOwner;
         emit OwnerChanged(_newOwner);
     }
@@ -187,6 +194,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         require(_newGuardian != address(0) || guardianBackup == address(0), "argent/backup-should-be-null");
 
         cancelCurrentEscape();
+        resetEscapeAttempts();
         guardian = _newGuardian;
         emit GuardianChanged(_newGuardian);
     }
@@ -196,18 +204,18 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         requireGuardian();
 
         cancelCurrentEscape();
+        resetEscapeAttempts();
         guardianBackup = _newGuardianBackup;
         emit GuardianBackupChanged(_newGuardianBackup);
     }
 
     function triggerEscapeOwner(address _newOwner) external {
         requireOnlySelf();
-        requireGuardian();
+        triggerEscapeOwnerPreValidation(_newOwner);
 
         // no escape if there is an guardian escape triggered by the owner in progress
-        EscapeStatus status = escapeStatus(escape);
-        if (status == EscapeStatus.Triggered || status == EscapeStatus.Active) {
-            require(escape.escapeType == uint8(EscapeType.Owner), "argent/cannot-override-escape");
+        if (escape.escapeType == uint8(EscapeType.Owner)) {
+            require(isExpired(escape), "argent/cannot-override-escape");
         }
 
         cancelCurrentEscape();
@@ -218,7 +226,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     function triggerEscapeGuardian(address _newGuardian) external {
         requireOnlySelf();
-        requireGuardian();
+        triggerEscapeGuardianPreValidation(_newGuardian);
 
         cancelCurrentEscape();
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
@@ -229,18 +237,16 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function cancelEscape() external {
         requireOnlySelf();
         require(escapeStatus(escape) != EscapeStatus.None, "argent/null-escape");
-
         cancelCurrentEscape();
+        resetEscapeAttempts();
     }
 
     function escapeOwner(address _newOwner) external {
         requireOnlySelf();
-        requireGuardian();
-        require(_newOwner != address(0), "argent/null-owner");
-        require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
-        require(escape.escapeType == uint8(EscapeType.Owner), "argent/invalid-escape-type");
-        require(escape.newSigner == _newOwner, "argent/invalid-escape-signer");
+        escapeOwnerPreValidation(_newOwner);
+        require(!isExpired(escape), "argent/inactive-escape");
 
+        resetEscapeAttempts();
         delete escape;
         owner = _newOwner;
         emit OwnerEscaped(_newOwner);
@@ -248,11 +254,10 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     function escapeGuardian(address _newGuardian) external {
         requireOnlySelf();
-        requireGuardian();
-        require(_newGuardian != address(0), "argent/null-guardian");
-        require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
-        require(escape.escapeType == uint8(EscapeType.Guardian), "argent/invalid-escape-type");
-        require(escape.newSigner == _newGuardian, "argent/invalid-escape-signer");
+        escapeGuardianPreValidation(_newGuardian);
+        require(!isExpired(escape), "argent/inactive-escape");
+
+        resetEscapeAttempts();
 
         delete escape;
         guardian = _newGuardian;
@@ -382,12 +387,55 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         }
 
         if (to == address(this)) {
-            if (isGuardianEscapeCall(selector) && isValidOwnerSignature(_transactionHash, signature)) {
+            if(selector == this.triggerEscapeOwner.selector) {
+                if (!isValidGuardianSignature(_transactionHash, signature)) {
+                    return bytes4(0);
+                }
+                require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
+                address newOwner = abi.decode(_transaction.data[4:], (address));
+                triggerEscapeOwnerPreValidation(newOwner);
+                guardian_escape_attempts++;
+                require(guardian_escape_attempts <= MAX_GUARDIAN_ESCAPE_ATTEMPTS, "argent/max-guardian-escape-attempts");
                 return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
             }
-            if (isOwnerEscapeCall(selector) && isValidGuardianSignature(_transactionHash, signature)) {
+
+            if(selector == this.escapeOwner.selector) {
+                if (!isValidGuardianSignature(_transactionHash, signature)) {
+                    return bytes4(0);
+                }
+                require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
+                address newOwner = abi.decode(_transaction.data[4:], (address));
+
+                escapeOwnerPreValidation(newOwner);
+                guardian_escape_attempts++;
+                require(guardian_escape_attempts <= MAX_GUARDIAN_ESCAPE_ATTEMPTS, "argent/max-guardian-escape-attempts");
                 return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
             }
+
+            if(selector == this.triggerEscapeGuardian.selector) {
+                if (!isValidOwnerSignature(_transactionHash, signature)) {
+                    return bytes4(0);
+                }
+                require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
+                address newGuardian = abi.decode(_transaction.data[4:], (address));
+                triggerEscapeGuardianPreValidation(newGuardian);
+                owner_escape_attempts++;
+                require(owner_escape_attempts <= MAX_OWNER_ESCAPE_ATTEMPTS, "argent/max-owner-escape-attempts");
+                return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+            }
+
+            if(selector == this.escapeGuardian.selector) {
+                if (!isValidOwnerSignature(_transactionHash, signature)) {
+                    return bytes4(0);
+                }
+                require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
+                address newGuardian = abi.decode(_transaction.data[4:], (address));
+                escapeGuardianPreValidation(newGuardian);
+                owner_escape_attempts++;
+                require(owner_escape_attempts <= MAX_OWNER_ESCAPE_ATTEMPTS, "argent/max-owner-escape-attempts");
+                return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+            }
+
             if (selector == this.executeAfterUpgrade.selector) {
                 return bytes4(0);
             }
@@ -452,6 +500,35 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Recovery ****************************************************/
 
+    function triggerEscapeOwnerPreValidation(address _newOwner) private view{
+        requireGuardian();
+    }
+
+    function escapeOwnerPreValidation(address _newOwner) private view {
+        requireGuardian();
+        require(_newOwner != address(0), "argent/null-owner");
+        require(escape.escapeType == uint8(EscapeType.Owner), "argent/invalid-escape-type");
+        require(escape.activeAt != 0, "argent/invalid-escape-type");
+        require(escape.newSigner == _newOwner, "argent/invalid-escape-signer");
+    }
+
+    function triggerEscapeGuardianPreValidation(address _newOwner) private view{
+        requireGuardian();
+    }
+
+    function escapeGuardianPreValidation(address _newGuardian) private view {
+        requireGuardian();
+        require(_newGuardian != address(0), "argent/null-guardian");
+        require(escape.escapeType == uint8(EscapeType.Guardian), "argent/invalid-escape-type");
+        require(escape.activeAt != 0, "argent/invalid-escape-type");
+        require(escape.newSigner == _newGuardian, "argent/invalid-escape-signer");
+    }
+
+    function resetEscapeAttempts() private {
+        owner_escape_attempts = 0;
+        guardian_escape_attempts = 0;
+    }
+
     function cancelCurrentEscape() internal {
         if (escapeStatus(escape) != EscapeStatus.None) {
             delete escape;
@@ -470,6 +547,14 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             return EscapeStatus.Expired;
         }
         return EscapeStatus.Active;
+    }
+
+
+    function isExpired(Escape memory _escape) private view returns (bool) {
+        if (_escape.activeAt == 0) {
+            return false;
+        }
+        return block.timestamp > (_escape.activeAt + escapeExpiryPeriod);
     }
 
     function isOwnerEscapeCall(bytes4 _selector) internal pure returns (bool) {

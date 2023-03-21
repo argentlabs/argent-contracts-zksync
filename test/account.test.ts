@@ -242,7 +242,7 @@ describe("Argent account", () => {
 
       it("Should revert calls that require the guardian to be set", async () => {
         account = connect(account, [newOwner]);
-        await expect(account.triggerEscapeGuardian(newGuardian.address)).to.be.rejectedWith("argent/guardian-required");
+        await expect(account.triggerEscapeGuardian(newGuardian.address)).to.be.rejectedWith("Account validation returned invalid magic value");
       });
 
       it("Should add a guardian", async () => {
