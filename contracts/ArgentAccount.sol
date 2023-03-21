@@ -519,13 +519,13 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function requirePreValidEscapeOwner() private view {
         requireGuardian();
         require(escape.escapeType == uint8(EscapeType.Owner), "argent/invalid-escape-type");
-        require(escape.activeAt != 0, "argent/invalid-escape-type");
+        require(escape.activeAt != 0, "argent/invalid-active-at");
     }
 
     function requirePreValidEscapeGuardian() private view {
         requireGuardian();
         require(escape.escapeType == uint8(EscapeType.Guardian), "argent/invalid-escape-type");
-        require(escape.activeAt != 0, "argent/invalid-escape-type");
+        require(escape.activeAt != 0, "argent/invalid-active-at");
     }
 
     function resetEscapeAttempts() private {
