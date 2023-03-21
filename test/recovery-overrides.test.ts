@@ -122,7 +122,8 @@ describe("Recovery overrides", () => {
     }
     it(`triggerEscapeOwner() should override escapeType=Owner when in escapeStatus=Expired`, async () => {
       const account = await deployAccountInStatus(EscapeType.Guardian, EscapeStatus.Expired);
-      await expect(account.triggerEscapeOwner(other.address)).to.emit(account, "EscapeCanceled");
+      const connectedAccount = connect(account, [guardian]);
+      await expect(connectedAccount.triggerEscapeOwner(other.address)).to.emit(account, "EscapeCanceled");
     });
   });
 
