@@ -19,6 +19,12 @@ contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
 
+    struct Version {
+        uint8 major;
+        uint8 minor;
+        uint8 patch;
+    }
+
     enum EscapeType {
         None,
         Guardian,
@@ -84,6 +90,10 @@ contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
         escapeSecurityPeriod = _escapeSecurityPeriod;
     }
 
+    function version() public pure returns (Version memory) {
+        return Version(0, 1, 1);
+    }
+
     function initialize(address _owner, address _guardian) external {
         require(_owner != address(0), "argent/null-owner");
         require(owner == address(0), "argent/already-initialized");
@@ -99,12 +109,14 @@ contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
         implementation = _newImplementation;
         emit AccountUpgraded(_newImplementation);
         // using delegatecall to run the `executeAfterUpgrade` function of the new implementation
-        (bool success, ) = _newImplementation.delegatecall(abi.encodeCall(this.executeAfterUpgrade, (VERSION, _data)));
+        (bool success, ) = _newImplementation.delegatecall(
+            abi.encodeCall(this.executeAfterUpgrade, (version(), _data))
+        );
         require(success, "argent/upgrade-callback-failed");
     }
 
     // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
-    function executeAfterUpgrade(bytes32 /*_previousVersion*/, bytes calldata _data) external {
+    function executeAfterUpgrade(Version memory /*_previousVersion*/, bytes calldata _data) external {
         requireOnlySelf();
         newStorage = abi.decode(_data, (uint256));
     }

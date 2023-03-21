@@ -21,6 +21,12 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
 
+    struct Version {
+        uint8 major;
+        uint8 minor;
+        uint8 patch;
+    }
+
     enum EscapeType {
         None,
         Guardian,
@@ -88,15 +94,15 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     // inlined modifiers for consistency of requirements, easier auditing and some gas savings
 
-    function requireOnlySelf() internal view {
+    function requireOnlySelf() private view {
         require(msg.sender == address(this), "argent/only-self");
     }
 
-    function requireGuardian() internal view {
+    function requireGuardian() private view {
         require(guardian != address(0), "argent/guardian-required");
     }
 
-    function requireOnlyBootloader() internal view {
+    function requireOnlyBootloader() private view {
         require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "argent/only-bootloader");
     }
 
@@ -116,6 +122,10 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Lifecycle ***************************************************/
 
+    function version() public pure returns (Version memory) {
+        return Version(0, 1, 0);
+    }
+
     function initialize(address _owner, address _guardian, address _guardianBackup) external {
         require(_owner != address(0), "argent/null-owner");
         require(owner == address(0), "argent/already-initialized");
@@ -132,12 +142,14 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         implementation = _newImplementation;
         emit AccountUpgraded(_newImplementation);
         // using delegatecall to run the `executeAfterUpgrade` function of the new implementation
-        (bool success, ) = _newImplementation.delegatecall(abi.encodeCall(this.executeAfterUpgrade, (VERSION, _data)));
+        (bool success, ) = _newImplementation.delegatecall(
+            abi.encodeCall(this.executeAfterUpgrade, (version(), _data))
+        );
         require(success, "argent/upgrade-callback-failed");
     }
 
     // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
-    function executeAfterUpgrade(bytes32 /*_previousVersion*/, bytes calldata /*_data*/) external {
+    function executeAfterUpgrade(Version memory /*_previousVersion*/, bytes calldata /*_data*/) external {
         requireOnlySelf();
         // reserved upgrade callback for future account versions
     }
@@ -244,27 +256,28 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         emit EscapeCanceled();
     }
 
-    function escapeOwner(address _newOwner) external {
+    function escapeOwner() external {
         requireOnlySelf();
         escapeOwnerPreValidation(_newOwner);
         require(!isExpired(escape), "argent/inactive-escape");
 
         resetEscapeAttempts();
+
+        owner = escape.newSigner;
+        emit OwnerEscaped(escape.newSigner);
         delete escape;
-        owner = _newOwner;
-        emit OwnerEscaped(_newOwner);
     }
 
-    function escapeGuardian(address _newGuardian) external {
+    function escapeGuardian() external {
         requireOnlySelf();
         escapeGuardianPreValidation(_newGuardian);
         require(!isExpired(escape), "argent/inactive-escape");
 
         resetEscapeAttempts();
 
+        guardian = escape.newSigner;
+        emit GuardianEscaped(escape.newSigner);
         delete escape;
-        guardian = _newGuardian;
-        emit GuardianEscaped(_newGuardian);
     }
 
     /*************************************************** Validation ***************************************************/
@@ -351,7 +364,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         bytes32 _transactionHash,
         Transaction calldata _transaction,
         bool _isFromOutside
-    ) internal returns (bytes4) {
+    ) private returns (bytes4) {
         require(owner != address(0), "argent/uninitialized");
 
         SystemContractsCaller.systemCallWithPropagatedRevert(
@@ -450,24 +463,24 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         return bytes4(0);
     }
 
-    function requiredSignatureLength(bytes4 _selector) internal view returns (uint256) {
+    function requiredSignatureLength(bytes4 _selector) private view returns (uint256) {
         if (guardian == address(0) || isOwnerEscapeCall(_selector) || isGuardianEscapeCall(_selector)) {
             return Signatures.SINGLE_LENGTH;
         }
         return 2 * Signatures.SINGLE_LENGTH;
     }
 
-    function isValidOwnerSignature(bytes32 _hash, bytes memory _ownerSignature) internal view returns (bool) {
+    function isValidOwnerSignature(bytes32 _hash, bytes memory _ownerSignature) private view returns (bool) {
         address signer = Signatures.recoverSigner(_hash, _ownerSignature);
         return signer != address(0) && signer == owner;
     }
 
-    function isValidGuardianSignature(bytes32 _hash, bytes memory _guardianSignature) internal view returns (bool) {
+    function isValidGuardianSignature(bytes32 _hash, bytes memory _guardianSignature) private view returns (bool) {
         address signer = Signatures.recoverSigner(_hash, _guardianSignature);
         return signer != address(0) && (signer == guardian || signer == guardianBackup);
     }
 
-    function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {
+    function _isValidSignature(bytes32 _hash, bytes memory _signature) private view returns (bool) {
         (bytes memory ownerSignature, bytes memory guardianSignature) = Signatures.splitSignatures(_signature);
         // always doing both ecrecovers to have proper gas estimation of validation step
         bool ownerIsValid = isValidOwnerSignature(_hash, ownerSignature);
@@ -483,7 +496,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Execution ***************************************************/
 
-    function _execute(address to, uint256 value, bytes memory data) internal {
+    function _execute(address to, uint256 value, bytes memory data) private {
         uint128 value128 = Utils.safeCastToU128(value);
         if (to == address(DEPLOYER_SYSTEM_CONTRACT)) {
             uint32 gas = Utils.safeCastToU32(gasleft());
@@ -532,14 +545,14 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         guardian_escape_attempts = 0;
     }
 
-    function cancelCurrentEscape() internal {
+    function cancelCurrentEscape() private {
         if (escapeStatus(escape) != EscapeStatus.None) {
             delete escape;
             emit EscapeCanceled();
         }
     }
 
-    function escapeStatus(Escape memory _escape) internal view returns (EscapeStatus) {
+    function escapeStatus(Escape memory _escape) private view returns (EscapeStatus) {
         if (_escape.activeAt == 0) {
             return EscapeStatus.None;
         }
@@ -552,7 +565,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         return EscapeStatus.Active;
     }
 
-
     function isExpired(Escape memory _escape) private view returns (bool) {
         if (_escape.activeAt == 0) {
             return false;
@@ -560,11 +572,11 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         return block.timestamp > (_escape.activeAt + escapeExpiryPeriod);
     }
 
-    function isOwnerEscapeCall(bytes4 _selector) internal pure returns (bool) {
+    function isOwnerEscapeCall(bytes4 _selector) private pure returns (bool) {
         return _selector == this.escapeOwner.selector || _selector == this.triggerEscapeOwner.selector;
     }
 
-    function isGuardianEscapeCall(bytes4 _selector) internal pure returns (bool) {
+    function isGuardianEscapeCall(bytes4 _selector) private pure returns (bool) {
         return _selector == this.escapeGuardian.selector || _selector == this.triggerEscapeGuardian.selector;
     }
 }
