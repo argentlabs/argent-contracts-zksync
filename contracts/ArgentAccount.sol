@@ -4,6 +4,7 @@ pragma solidity 0.8.18;
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccount.sol";
@@ -20,6 +21,7 @@ import {Signatures} from "./Signatures.sol";
 contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
+    using ECDSA for bytes32;
 
     struct Version {
         uint8 major;
@@ -171,9 +173,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Recovery ****************************************************/
 
-    function changeOwner(address _newOwner) external {
+    function changeOwner(address _newOwner, bytes memory _signature) external {
         requireOnlySelf();
-        require(_newOwner != address(0), "argent/null-owner");
+        validateNewOwner(_newOwner, _signature);
         owner = _newOwner;
         emit OwnerChanged(_newOwner);
     }
@@ -417,6 +419,15 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     /**************************************************** Execution ***************************************************/
+
+    function validateNewOwner(address _newOwner, bytes memory _signature) private view {
+        require(_newOwner != address(0), "argent/null-owner");
+        bytes4 selector = this.changeOwner.selector;
+        bytes memory message = abi.encodePacked(selector, block.chainid, address(this), owner);
+        bytes32 messageHash = keccak256(message).toEthSignedMessageHash();
+        address signer = Signatures.recoverSigner(messageHash, _signature);
+        require(signer != address(0) && signer == _newOwner, "argent/invalid-owner-sig");
+    }
 
     function _execute(address to, uint256 value, bytes memory data) internal {
         uint128 value128 = Utils.safeCastToU128(value);
