@@ -403,49 +403,49 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
         if (to == address(this)) {
             if(selector == this.triggerEscapeOwner.selector) {
-                if (!isValidGuardianSignature(_transactionHash, signature)) {
-                    return bytes4(0);
-                }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
                 requireGuardian();
-                guardian_escape_attempts++;
                 require(guardian_escape_attempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-guardian-escape-attempts");
                 return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+                if (isValidGuardianSignature(_transactionHash, signature)) {
+                    return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+                }
+                return bytes4(0);
             }
 
             if(selector == this.escapeOwner.selector) {
-                if (!isValidGuardianSignature(_transactionHash, signature)) {
-                    return bytes4(0);
-                }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
-                address newOwner = abi.decode(_transaction.data[4:], (address));
+                address newOwner = abi.decode(_transaction.data[4:], (address)); //
                 escapeOwnerPreValidation();
                 guardian_escape_attempts++;
                 require(guardian_escape_attempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-guardian-escape-attempts");
-                return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+                if (isValidGuardianSignature(_transactionHash, signature)) {
+                    return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+                }
+                return bytes4(0);
             }
 
             if(selector == this.triggerEscapeGuardian.selector) {
-                if (!isValidOwnerSignature(_transactionHash, signature)) {
-                    return bytes4(0);
-                }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
                 requireGuardian();
                 owner_escape_attempts++;
                 require(owner_escape_attempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-owner-escape-attempts");
-                return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+                if (isValidOwnerSignature(_transactionHash, signature)) {
+                    return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+                }
+                return bytes4(0);
             }
 
             if(selector == this.escapeGuardian.selector) {
-                if (!isValidOwnerSignature(_transactionHash, signature)) {
-                    return bytes4(0);
-                }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
                 address newGuardian = abi.decode(_transaction.data[4:], (address));
                 escapeGuardianPreValidation();
                 owner_escape_attempts++;
                 require(owner_escape_attempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-owner-escape-attempts");
-                return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+                if (isValidOwnerSignature(_transactionHash, signature)) {
+                    return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+                }
+                return bytes4(0);
             }
 
             if (selector == this.executeAfterUpgrade.selector) {
@@ -511,8 +511,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     /**************************************************** Recovery ****************************************************/
-
-
 
 
     function escapeOwnerPreValidation() private view {
