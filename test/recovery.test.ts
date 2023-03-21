@@ -204,18 +204,15 @@ describe("Recovery", () => {
       await response.wait();
 
       // should fail to escape before the end of the period
-      await expect(account.escapeGuardian(newGuardian.address)).to.be.rejectedWith("argent/inactive-escape");
+      await expect(account.escapeGuardian()).to.be.rejectedWith("argent/inactive-escape");
 
       // wait security period
       const [{ activeAt }] = await account.getEscape();
       await waitForTimestamp(activeAt, provider);
 
-      // should fail to escape to wrong address
-      await expect(account.escapeGuardian(wrongGuardian.address)).to.be.rejectedWith("argent/invalid-escape-signer");
-
       // should escape after the security period
       await expect(account.guardian()).to.eventually.equal(guardian.address);
-      const promise = account.escapeGuardian(newGuardian.address);
+      const promise = account.escapeGuardian();
       await expect(promise).to.emit(account, "GuardianEscaped").withArgs(newGuardian.address);
       await expect(account.guardian()).to.eventually.equal(newGuardian.address);
 
@@ -239,18 +236,15 @@ describe("Recovery", () => {
       await response.wait();
 
       // should fail to escape before the end of the period
-      await expect(account.escapeOwner(newOwner.address)).to.be.rejectedWith("argent/inactive-escape");
+      await expect(account.escapeOwner()).to.be.rejectedWith("argent/inactive-escape");
 
       // wait security period
       const [{ activeAt }] = await account.getEscape();
       await waitForTimestamp(activeAt, provider);
 
-      // should fail to escape to wrong address
-      await expect(account.escapeOwner(wrongOwner.address)).to.be.rejectedWith("argent/invalid-escape-signer");
-
       // should escape after the security period
       await expect(account.owner()).to.eventually.equal(owner.address);
-      const promise = account.escapeOwner(newOwner.address);
+      const promise = account.escapeOwner();
       await expect(promise).to.emit(account, "OwnerEscaped").withArgs(newOwner.address);
       await expect(account.owner()).to.eventually.equal(newOwner.address);
 

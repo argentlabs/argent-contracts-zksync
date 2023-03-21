@@ -21,6 +21,12 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
 
+    struct Version {
+        uint8 major;
+        uint8 minor;
+        uint8 patch;
+    }
+
     enum EscapeType {
         None,
         Guardian,
@@ -110,6 +116,10 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Lifecycle ***************************************************/
 
+    function version() public pure returns (Version memory) {
+        return Version(0, 1, 0);
+    }
+
     function initialize(address _owner, address _guardian, address _guardianBackup) external {
         require(_owner != address(0), "argent/null-owner");
         require(owner == address(0), "argent/already-initialized");
@@ -126,12 +136,14 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         implementation = _newImplementation;
         emit AccountUpgraded(_newImplementation);
         // using delegatecall to run the `executeAfterUpgrade` function of the new implementation
-        (bool success, ) = _newImplementation.delegatecall(abi.encodeCall(this.executeAfterUpgrade, (VERSION, _data)));
+        (bool success, ) = _newImplementation.delegatecall(
+            abi.encodeCall(this.executeAfterUpgrade, (version(), _data))
+        );
         require(success, "argent/upgrade-callback-failed");
     }
 
     // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
-    function executeAfterUpgrade(bytes32 /*_previousVersion*/, bytes calldata /*_data*/) external {
+    function executeAfterUpgrade(Version memory /*_previousVersion*/, bytes calldata /*_data*/) external {
         requireOnlySelf();
         // reserved upgrade callback for future account versions
     }
@@ -234,30 +246,26 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         emit EscapeCanceled();
     }
 
-    function escapeOwner(address _newOwner) external {
+    function escapeOwner() external {
         requireOnlySelf();
         requireGuardian();
-        require(_newOwner != address(0), "argent/null-owner");
         require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
         require(escape.escapeType == uint8(EscapeType.Owner), "argent/invalid-escape-type");
-        require(escape.newSigner == _newOwner, "argent/invalid-escape-signer");
 
+        owner = escape.newSigner;
+        emit OwnerEscaped(escape.newSigner);
         delete escape;
-        owner = _newOwner;
-        emit OwnerEscaped(_newOwner);
     }
 
-    function escapeGuardian(address _newGuardian) external {
+    function escapeGuardian() external {
         requireOnlySelf();
         requireGuardian();
-        require(_newGuardian != address(0), "argent/null-guardian");
         require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
         require(escape.escapeType == uint8(EscapeType.Guardian), "argent/invalid-escape-type");
-        require(escape.newSigner == _newGuardian, "argent/invalid-escape-signer");
 
+        guardian = escape.newSigner;
+        emit GuardianEscaped(escape.newSigner);
         delete escape;
-        guardian = _newGuardian;
-        emit GuardianEscaped(_newGuardian);
     }
 
     /*************************************************** Validation ***************************************************/
