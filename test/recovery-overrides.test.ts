@@ -150,12 +150,12 @@ describe("Recovery overrides", () => {
         it(`${escapeName}() should FAIL with escapeType=${EscapeType[escapeType]} when in invalid statuses`, async () => {
           await testAccountInStatuses(escapeType, {
             [EscapeStatus.None]: async (account) =>
-              expect(account[escapeName](other.address)).to.be.rejectedWith("argent/inactive-escape"),
+              expect(account[escapeName]()).to.be.rejectedWith("argent/inactive-escape"),
             [EscapeStatus.Triggered]: async (account) =>
-              expect(account[escapeName](other.address)).to.be.rejectedWith("argent/inactive-escape"),
+              expect(account[escapeName]()).to.be.rejectedWith("argent/inactive-escape"),
             // [EscapeStatus.Active]: // skipped
             [EscapeStatus.Expired]: async (account) =>
-              expect(account[escapeName](other.address)).to.be.rejectedWith("argent/inactive-escape"),
+              expect(account[escapeName]()).to.be.rejectedWith("argent/inactive-escape"),
           });
         });
       }
@@ -171,13 +171,13 @@ describe("Recovery overrides", () => {
         it(`${escapeName}() should FAIL with escapeType=${EscapeType[escapeType]}`, async () => {
           await testAccountInStatuses(escapeType, {
             [EscapeStatus.None]: async (account) =>
-              expect(account[escapeName](other.address)).to.be.rejectedWith("argent/inactive-escape"),
+              expect(account[escapeName]()).to.be.rejectedWith("argent/inactive-escape"),
             [EscapeStatus.Triggered]: async (account) =>
-              expect(account[escapeName](other.address)).to.be.rejectedWith("argent/inactive-escape"),
+              expect(account[escapeName]()).to.be.rejectedWith("argent/inactive-escape"),
             [EscapeStatus.Active]: async (account) =>
-              expect(account[escapeName](other.address)).to.be.rejectedWith("argent/invalid-escape-type"),
+              expect(account[escapeName]()).to.be.rejectedWith("argent/invalid-escape-type"),
             [EscapeStatus.Expired]: async (account) =>
-              expect(account[escapeName](other.address)).to.be.rejectedWith("argent/inactive-escape"),
+              expect(account[escapeName]()).to.be.rejectedWith("argent/inactive-escape"),
           });
         });
       }
