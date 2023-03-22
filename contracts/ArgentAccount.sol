@@ -61,6 +61,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     address public owner;
     address public guardian;
     address public guardianBackup;
+    // escape attempts keeps track of how many escaping tx the guardian/owner has submitted. Used to limit the number of transactions the account will pay for
     uint32 public guardianEscapeAttempts;
     uint32 public ownerEscapeAttempts;
     Escape private escape;
@@ -400,15 +401,15 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
         if (to == address(this)) {
             if(selector == this.triggerEscapeOwner.selector) {
-//                if (!_isFromOutside) { // TODO check gas price
-//                    require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice);
-//                }
+                if(!_isFromOutside) {
+                    // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice); // TODO check gas price
+                    require(guardianEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-guardian-escape-attempts");
+                    guardianEscapeAttempts++;
+                }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
                 address newOwner = abi.decode(_transaction.data[4:], (address)); // This also asserts that the call data is valid
                 require(newOwner != address(0), 'argent/null-owner');
                 requireGuardian();
-                guardianEscapeAttempts++;
-                require(guardianEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-guardian-escape-attempts");
 
                 if (isValidGuardianSignature(_transactionHash, signature)) {
                     return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
@@ -417,11 +418,13 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             }
 
             if(selector == this.escapeOwner.selector) {
-                // TODO check gas price
+                if(!_isFromOutside) {
+                    // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice); // TODO check gas price
+                    require(guardianEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-guardian-escape-attempts");
+                    guardianEscapeAttempts++;
+                }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
                 requirePreValidEscapeOwner();
-                guardianEscapeAttempts++;
-                require(guardianEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-guardian-escape-attempts");
                 if (isValidGuardianSignature(_transactionHash, signature)) {
                     return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
                 }
@@ -429,12 +432,14 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             }
 
             if(selector == this.triggerEscapeGuardian.selector) {
-                // TODO check gas price
+                if(!_isFromOutside) {
+                    // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice); // TODO check gas price
+                    require(ownerEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-owner-escape-attempts");
+                    ownerEscapeAttempts++;
+                }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
                 abi.decode(_transaction.data[4:], (address)); // This asserts that the call data is valid
                 requireGuardian();
-                ownerEscapeAttempts++;
-                require(ownerEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-owner-escape-attempts");
                 if (isValidOwnerSignature(_transactionHash, signature)) {
                     return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
                 }
@@ -442,11 +447,13 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             }
 
             if(selector == this.escapeGuardian.selector) {
-                // TODO check gas price
+                if(!_isFromOutside) {
+                    // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice); // TODO check gas price
+                    require(ownerEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-owner-escape-attempts");
+                    ownerEscapeAttempts++;
+                }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
                 requirePreValidEscapeGuardian();
-                ownerEscapeAttempts++;
-                require(ownerEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-owner-escape-attempts");
                 if (isValidOwnerSignature(_transactionHash, signature)) {
                     return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
                 }
