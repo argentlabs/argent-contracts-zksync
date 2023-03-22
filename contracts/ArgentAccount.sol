@@ -255,7 +255,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     function escapeOwner() external {
         requireOnlySelf();
-        requirePreValidEscapeOwner();
+        // This method assumes that there is a guardian, and that the there is an escape for the owner
+        // This must be guaranteed before calling this method. Usually when validating the transaction
         require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
 
         resetEscapeAttempts();
@@ -267,7 +268,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     function escapeGuardian() external {
         requireOnlySelf();
-        requirePreValidEscapeGuardian();
+        // this method assumes that there is a guardian, and that the there is an escape for the guardian
+        // This must be guaranteed before calling this method. Usually when validating the transaction
         require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
 
         resetEscapeAttempts();
@@ -424,7 +426,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                     guardianEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
-                requirePreValidEscapeOwner();
+                requireGuardian();
+                require(escape.escapeType == uint8(EscapeType.Owner) && escape.activeAt != 0, "argent/inactive-escape");
                 if (isValidGuardianSignature(_transactionHash, signature)) {
                     return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
                 }
@@ -453,7 +456,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
-                requirePreValidEscapeGuardian();
+                requireGuardian();
+                require(escape.escapeType == uint8(EscapeType.Guardian) && escape.activeAt != 0, "argent/inactive-escape");
                 if (isValidOwnerSignature(_transactionHash, signature)) {
                     return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
                 }
@@ -521,18 +525,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     /**************************************************** Recovery ****************************************************/
-
-    // Only performs the checks that can be done during the validation phase
-    function requirePreValidEscapeOwner() private view {
-        requireGuardian();
-        require(escape.escapeType == uint8(EscapeType.Owner) && escape.activeAt != 0, "argent/inactive-escape");
-    }
-
-    // Only performs the checks that can be done during the validation phase
-    function requirePreValidEscapeGuardian() private view {
-        requireGuardian();
-        require(escape.escapeType == uint8(EscapeType.Guardian) && escape.activeAt != 0, "argent/inactive-escape");
-    }
 
     function resetEscapeAttempts() private {
         ownerEscapeAttempts = 0;
