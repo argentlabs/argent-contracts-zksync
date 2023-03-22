@@ -6,6 +6,7 @@ import "@nomiclabs/hardhat-ethers";
 import "@typechain/hardhat";
 import "chai-as-promised";
 import "dotenv/config";
+import "hardhat-storage-layout";
 
 module.exports = {
   zksolc: {

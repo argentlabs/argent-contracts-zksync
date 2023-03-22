@@ -33,6 +33,7 @@
     "dotenv": "^16.0.3",
     "ethers": "^5.7.2",
     "hardhat": "^2.13.0",
+    "hardhat-storage-layout": "^0.1.7",
     "prettier": "^2.8.4",
     "prettier-plugin-organize-imports": "^3.2.2",
     "solhint": "^3.4.1",

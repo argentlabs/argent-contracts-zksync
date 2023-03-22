@@ -20,10 +20,9 @@ contract AccountFactory {
         bytes32 _salt,
         address _implementation,
         address _owner,
-        address _guardian,
-        address _guardianBackup
+        address _guardian
     ) external returns (address _accountAddress) {
-        bytes memory input = proxyContructorData(_implementation, _owner, _guardian, _guardianBackup);
+        bytes memory input = proxyContructorData(_implementation, _owner, _guardian);
         bytes memory deployData = abi.encodeCall(
             DEPLOYER_SYSTEM_CONTRACT.create2Account,
             (_salt, proxyBytecodeHash, input, IContractDeployer.AccountAbstractionVersion.Version1)
@@ -42,20 +41,18 @@ contract AccountFactory {
         bytes32 _salt,
         address _implementation,
         address _owner,
-        address _guardian,
-        address _guardianBackup
+        address _guardian
     ) public view returns (address) {
-        bytes32 inputHash = keccak256(proxyContructorData(_implementation, _owner, _guardian, _guardianBackup));
+        bytes32 inputHash = keccak256(proxyContructorData(_implementation, _owner, _guardian));
         return L2ContractHelper.computeCreate2Address(address(this), _salt, proxyBytecodeHash, inputHash);
     }
 
     function proxyContructorData(
         address _implementation,
         address _owner,
-        address _guardian,
-        address _guardianBackup
+        address _guardian
     ) public pure returns (bytes memory) {
-        bytes memory initData = abi.encodeCall(ArgentAccount.initialize, (_owner, _guardian, _guardianBackup));
+        bytes memory initData = abi.encodeCall(ArgentAccount.initialize, (_owner, _guardian));
         return abi.encode(_implementation, initData);
     }
 }
