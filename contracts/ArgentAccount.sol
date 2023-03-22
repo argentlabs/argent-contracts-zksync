@@ -404,7 +404,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 //                    require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice);
 //                }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
-                address newOwner = abi.decode(_transaction.data[4:], (address)); // TODO
+                address newOwner = abi.decode(_transaction.data[4:], (address)); // This also asserts that the call data is valid
                 require(newOwner != address(0), 'argent/null-owner');
                 requireGuardian();
                 guardianEscapeAttempts++;
@@ -431,7 +431,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             if(selector == this.triggerEscapeGuardian.selector) {
                 // TODO check gas price
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
-                address newGuardian = abi.decode(_transaction.data[4:], (address)); // TODO
+                abi.decode(_transaction.data[4:], (address)); // This asserts that the call data is valid
                 requireGuardian();
                 ownerEscapeAttempts++;
                 require(ownerEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-owner-escape-attempts");
