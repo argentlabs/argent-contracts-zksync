@@ -114,6 +114,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     function initialize(address _owner, address _guardian, address _guardianBackup) external {
         require(_owner != address(0), "argent/null-owner");
+        require(_guardian != address(0) || _guardianBackup == address(0), "argent/backup-should-be-null");
         require(owner == address(0), "argent/already-initialized");
         owner = _owner;
         guardian = _guardian;
