@@ -48,6 +48,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         uint8 escapeType;   // bits [32...40[   packed EscapeType enum
         address newSigner;  // bits [40...200[  new owner or new guardian
     }
+
     bytes32 public constant NAME = "ArgentAccount";
     uint32 public constant MAX_ESCAPE_ATTEMPTS = 5;
 
