@@ -37,7 +37,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     enum EscapeStatus {
         None,
-        Triggered,
+        Pending,
         Active,
         Expired
     }
@@ -217,9 +217,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         requireOnlySelf();
         requireGuardian();
 
-        // no escape if there is an guardian escape triggered by the owner in progress
+        // no escape if there is a pending guardian escape by the owner in progress
         EscapeStatus status = escapeStatus(escape);
-        if (status == EscapeStatus.Triggered || status == EscapeStatus.Active) {
+        if (status == EscapeStatus.Pending || status == EscapeStatus.Active) {
             require(escape.escapeType == uint8(EscapeType.Owner), "argent/cannot-override-escape");
         }
 
@@ -483,7 +483,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             return EscapeStatus.None;
         }
         if (block.timestamp < _escape.activeAt) {
-            return EscapeStatus.Triggered;
+            return EscapeStatus.Pending;
         }
         if (_escape.activeAt + escapeExpiryPeriod <= block.timestamp) {
             return EscapeStatus.Expired;
