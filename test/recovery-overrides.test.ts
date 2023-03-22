@@ -175,7 +175,7 @@ describe("Recovery overrides", () => {
             [EscapeStatus.Triggered]: async (account) =>
               expect(account[escapeName]()).to.be.rejectedWith("argent/inactive-escape"),
             [EscapeStatus.Active]: async (account) =>
-              expect(account[escapeName]()).to.be.rejectedWith("argent/invalid-escape-type"),
+              expect(account[escapeName]()).to.be.rejectedWith("argent/inactive-escape"),
             [EscapeStatus.Expired]: async (account) =>
               expect(account[escapeName]()).to.be.rejectedWith("argent/inactive-escape"),
           });

@@ -219,7 +219,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function triggerEscapeOwner(address _newOwner) external {
         requireOnlySelf();
         requireGuardian();
-        
+        require(_newOwner != address(0), 'argent/null-owner');
+
         // no escape if there is an guardian escape triggered by the owner in progress
         if (escape.escapeType == uint8(EscapeType.Guardian)) {
             require(escapeStatus(escape) == EscapeStatus.Expired, "argent/cannot-override-escape");
@@ -399,9 +400,12 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
         if (to == address(this)) {
             if(selector == this.triggerEscapeOwner.selector) {
-                // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice) // TODO check gas price
+//                if (!_isFromOutside) { // TODO check gas price
+//                    require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice);
+//                }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
                 address newOwner = abi.decode(_transaction.data[4:], (address)); // TODO
+                require(newOwner != address(0), 'argent/null-owner');
                 requireGuardian();
                 guardianEscapeAttempts++;
                 require(guardianEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-guardian-escape-attempts");
@@ -449,9 +453,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                 return bytes4(0);
             }
 
-            if (selector == this.executeAfterUpgrade.selector) {
-                revert("argent/invalid-selector");
-            }
+            require(selector != this.executeAfterUpgrade.selector, "argent/forbidden-call");
         }
 
         if (_isValidSignature(_transactionHash, signature)) {
@@ -513,17 +515,16 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Recovery ****************************************************/
 
-
+    // Only performs the checks that can be done during the validation phase
     function requirePreValidEscapeOwner() private view {
         requireGuardian();
-        require(escape.escapeType == uint8(EscapeType.Owner), "argent/invalid-escape-type");
-        require(escape.activeAt != 0, "argent/invalid-active-at");
+        require(escape.escapeType == uint8(EscapeType.Owner) && escape.activeAt != 0, "argent/inactive-escape");
     }
 
+    // Only performs the checks that can be done during the validation phase
     function requirePreValidEscapeGuardian() private view {
         requireGuardian();
-        require(escape.escapeType == uint8(EscapeType.Guardian), "argent/invalid-escape-type");
-        require(escape.activeAt != 0, "argent/invalid-active-at");
+        require(escape.escapeType == uint8(EscapeType.Guardian) && escape.activeAt != 0, "argent/inactive-escape");
     }
 
     function resetEscapeAttempts() private {
