@@ -77,6 +77,17 @@ describe("Argent account", () => {
       const promise = accountFromEoa.initialize(ownerAddress, guardianAddress, guardianBackupAddress);
       await expect(promise).to.be.rejectedWith("argent/already-init");
     });
+
+    it("Should refuse to initialize with backup and no guardian", async () => {
+      const promise = deployAccount({
+        argent,
+        ownerAddress,
+        guardianAddress: AddressZero,
+        guardianBackupAddress,
+        funds: false,
+      });
+      await expect(promise).to.be.rejectedWith("argent/proxy-init-failed");
+    });
   });
 
   describe("Transfers", () => {
