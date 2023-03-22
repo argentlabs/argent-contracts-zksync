@@ -37,7 +37,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     enum EscapeStatus {
         None,
-        Triggered,
+        Pending,
         Active,
         Expired
     }
@@ -222,7 +222,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function triggerEscapeOwner(address _newOwner) external {
         requireOnlySelf();
         requireGuardian();
-        require(_newOwner != address(0), 'argent/null-owner');
+        require(_newOwner != address(0), "argent/null-owner");
 
         // no escape if there is an guardian escape triggered by the owner in progress
         if (escape.escapeType == uint8(EscapeType.Guardian)) {
@@ -250,7 +250,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         require(escapeStatus(escape) != EscapeStatus.None, "argent/null-escape");
 
         resetEscapeAttempts();
-
         delete escape;
         emit EscapeCanceled();
     }
@@ -262,7 +261,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
 
         resetEscapeAttempts();
-
         owner = escape.newSigner;
         emit OwnerEscaped(escape.newSigner);
         delete escape;
@@ -275,7 +273,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
 
         resetEscapeAttempts();
-
         guardian = escape.newSigner;
         emit GuardianEscaped(escape.newSigner);
         delete escape;
@@ -326,9 +323,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     // IAccount
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
         bytes4 result = _validateTransaction(_transaction.encodeHash(), _transaction, true);
-        if (result != ACCOUNT_VALIDATION_SUCCESS_MAGIC) {
-            revert("argent/invalid-transaction");
-        }
+        require(result == ACCOUNT_VALIDATION_SUCCESS_MAGIC, "argent/invalid-transaction");
         _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
     }
 
@@ -404,15 +399,15 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         }
 
         if (to == address(this)) {
-            if(selector == this.triggerEscapeOwner.selector) {
-                if(!_isFromOutside) {
+            if (selector == this.triggerEscapeOwner.selector) {
+                if (!_isFromOutside) {
                     // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice); // TODO check gas price
                     require(guardianEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     guardianEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
                 address newOwner = abi.decode(_transaction.data[4:], (address)); // This also asserts that the call data is valid
-                require(newOwner != address(0), 'argent/null-owner');
+                require(newOwner != address(0), "argent/null-owner");
                 requireGuardian();
 
                 if (isValidGuardianSignature(_transactionHash, signature)) {
@@ -421,8 +416,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                 return bytes4(0);
             }
 
-            if(selector == this.escapeOwner.selector) {
-                if(!_isFromOutside) {
+            if (selector == this.escapeOwner.selector) {
+                if (!_isFromOutside) {
                     // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice); // TODO check gas price
                     require(guardianEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     guardianEscapeAttempts++;
@@ -436,8 +431,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                 return bytes4(0);
             }
 
-            if(selector == this.triggerEscapeGuardian.selector) {
-                if(!_isFromOutside) {
+            if (selector == this.triggerEscapeGuardian.selector) {
+                if (!_isFromOutside) {
                     // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice); // TODO check gas price
                     require(ownerEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     ownerEscapeAttempts++;
@@ -451,15 +446,18 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                 return bytes4(0);
             }
 
-            if(selector == this.escapeGuardian.selector) {
-                if(!_isFromOutside) {
+            if (selector == this.escapeGuardian.selector) {
+                if (!_isFromOutside) {
                     // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice); // TODO check gas price
                     require(ownerEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
                 requireGuardian();
-                require(escape.escapeType == uint8(EscapeType.Guardian) && escape.activeAt != 0, "argent/inactive-escape");
+                require(
+                    escape.escapeType == uint8(EscapeType.Guardian) && escape.activeAt != 0,
+                    "argent/inactive-escape"
+                );
                 if (isValidOwnerSignature(_transactionHash, signature)) {
                     return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
                 }
@@ -554,14 +552,14 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             return EscapeStatus.None;
         }
         if (block.timestamp < _escape.activeAt) {
-            return EscapeStatus.Triggered;
+            return EscapeStatus.Pending;
         }
         if (_escape.activeAt + escapeExpiryPeriod <= block.timestamp) {
             return EscapeStatus.Expired;
         }
         return EscapeStatus.Active;
     }
-    
+
     function isOwnerEscapeCall(bytes4 _selector) private pure returns (bool) {
         return _selector == this.escapeOwner.selector || _selector == this.triggerEscapeOwner.selector;
     }
