@@ -406,7 +406,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             if(selector == this.triggerEscapeOwner.selector) {
                 if(!_isFromOutside) {
                     // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice); // TODO check gas price
-                    require(guardianEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-guardian-escape-attempts");
+                    require(guardianEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     guardianEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
@@ -423,7 +423,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             if(selector == this.escapeOwner.selector) {
                 if(!_isFromOutside) {
                     // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice); // TODO check gas price
-                    require(guardianEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-guardian-escape-attempts");
+                    require(guardianEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     guardianEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
@@ -438,7 +438,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             if(selector == this.triggerEscapeGuardian.selector) {
                 if(!_isFromOutside) {
                     // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice); // TODO check gas price
-                    require(ownerEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-owner-escape-attempts");
+                    require(ownerEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
@@ -453,7 +453,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             if(selector == this.escapeGuardian.selector) {
                 if(!_isFromOutside) {
                     // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice); // TODO check gas price
-                    require(ownerEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-owner-escape-attempts");
+                    require(ownerEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
