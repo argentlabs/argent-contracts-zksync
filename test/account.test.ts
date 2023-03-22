@@ -5,6 +5,7 @@ import { computeCreate2AddressFromSdk, connect, deployAccount } from "../src/acc
 import { checkDeployer, CustomDeployer } from "../src/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
+import { changeOwnerWithSignature } from "../src/recovery.service";
 import { ArgentSigner } from "../src/signer.service";
 import { ArgentAccount, TestDapp } from "../typechain-types";
 import {
@@ -13,7 +14,6 @@ import {
   deployerAddress,
   guardian,
   guardianAddress,
-  guardianBackup,
   newGuardian,
   newOwner,
   owner,
@@ -33,21 +33,13 @@ describe("Argent account", () => {
 
   describe("AccountFactory", () => {
     const salt = ethers.utils.randomBytes(32);
-    const guardianBackupAddress = guardianBackup.address;
 
     before(async () => {
-      account = await deployAccount({
-        argent,
-        ownerAddress,
-        guardianAddress,
-        guardianBackupAddress,
-        funds: false,
-        salt,
-      });
+      account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: false, salt });
     });
 
     it("Should predict the account address from the JS SDK", async () => {
-      const address = computeCreate2AddressFromSdk(argent, salt, ownerAddress, guardianAddress, guardianBackupAddress);
+      const address = computeCreate2AddressFromSdk(argent, salt, ownerAddress, guardianAddress);
       expect(account.address).to.equal(address);
     });
 
@@ -57,7 +49,6 @@ describe("Argent account", () => {
         argent.implementation.address,
         ownerAddress,
         guardianAddress,
-        guardianBackupAddress,
       );
       expect(account.address).to.equal(address);
     });
@@ -67,13 +58,13 @@ describe("Argent account", () => {
       expect([major, minor, patch]).to.deep.equal([0, 1, 0]);
       await expect(account.owner()).to.eventually.equal(ownerAddress);
       await expect(account.guardian()).to.eventually.equal(guardianAddress);
-      await expect(account.guardianBackup()).to.eventually.equal(guardianBackupAddress);
+      await expect(account.guardianBackup()).to.eventually.equal(AddressZero);
     });
 
     it("Should refuse to be initialized twice", async () => {
       const { abi } = argent.artifacts.implementation;
       const accountFromEoa = new zksync.Contract(account.address, abi, deployer.zkWallet);
-      const promise = accountFromEoa.initialize(ownerAddress, guardianAddress, guardianBackupAddress);
+      const promise = accountFromEoa.initialize(ownerAddress, guardianAddress);
       await expect(promise).to.be.rejectedWith("argent/already-init");
     });
   });
@@ -233,7 +224,7 @@ describe("Argent account", () => {
       it("Should change the owner", async () => {
         await expect(account.owner()).to.eventually.equal(owner.address);
 
-        const promise = account.changeOwner(newOwner.address);
+        const promise = changeOwnerWithSignature(newOwner, account);
 
         await expect(promise).to.emit(account, "OwnerChanged").withArgs(newOwner.address);
         await expect(account.owner()).to.eventually.equal(newOwner.address);

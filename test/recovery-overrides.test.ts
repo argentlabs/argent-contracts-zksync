@@ -4,6 +4,7 @@ import { checkDeployer } from "../src/deployer.service";
 import { getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure, EscapeStatus, EscapeType } from "../src/model";
 import { waitForTimestamp } from "../src/provider.service";
+import { changeOwnerWithSignature } from "../src/recovery.service";
 import { ArgentAccount } from "../typechain-types";
 import {
   deployer,
@@ -85,7 +86,7 @@ describe("Recovery overrides", () => {
 
   describe("Should cancel existing escape when calling changeSigner methods", () => {
     const changeOwner = async (account: ArgentAccount) =>
-      connect(account, [owner, guardian]).changeOwner(other.address);
+      changeOwnerWithSignature(other, connect(account, [owner, guardian]));
     const changeGuardian = async (account: ArgentAccount) =>
       connect(account, [owner, guardian]).changeGuardian(other.address);
     const changeGuardianBackup = async (account: ArgentAccount) =>

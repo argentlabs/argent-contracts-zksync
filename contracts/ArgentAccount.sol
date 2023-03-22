@@ -4,6 +4,7 @@ pragma solidity 0.8.18;
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccount.sol";
@@ -20,6 +21,7 @@ import {Signatures} from "./Signatures.sol";
 contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
+    using ECDSA for bytes32;
 
     struct Version {
         uint8 major;
@@ -47,7 +49,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         address newSigner;  // bits [40...200[  new owner or new guardian
     }
     bytes32 public constant NAME = "ArgentAccount";
-    bytes32 public constant VERSION = "0.1.0-alpha.1";
     uint32 public constant MAX_ESCAPE_ATTEMPTS = 5;
 
     uint32 public immutable escapeSecurityPeriod;
@@ -70,7 +71,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     //                                                     Events                                                     //
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    event AccountCreated(address account, address indexed owner, address guardian, address guardianBackup);
+    event AccountCreated(address account, address indexed owner, address guardian);
     event AccountUpgraded(address newImplementation);
     event TransactionExecuted(bytes32 hashed, bytes response);
 
@@ -122,13 +123,12 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         return Version(0, 1, 0);
     }
 
-    function initialize(address _owner, address _guardian, address _guardianBackup) external {
+    function initialize(address _owner, address _guardian) external {
         require(_owner != address(0), "argent/null-owner");
         require(owner == address(0), "argent/already-initialized");
         owner = _owner;
         guardian = _guardian;
-        guardianBackup = _guardianBackup;
-        emit AccountCreated(address(this), _owner, _guardian, _guardianBackup);
+        emit AccountCreated(address(this), _owner, _guardian);
     }
 
     function upgrade(address _newImplementation, bytes calldata _data) external {
@@ -147,6 +147,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
     function executeAfterUpgrade(Version memory /*_previousVersion*/, bytes calldata /*_data*/) external {
         requireOnlySelf();
+        owner = owner; // useless code to suppress warning about pure function
         // reserved upgrade callback for future account versions
     }
 
@@ -187,9 +188,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         return (escape, escapeStatus(escape));
     }
 
-    function changeOwner(address _newOwner) external {
+    function changeOwner(address _newOwner, bytes memory _signature) external {
         requireOnlySelf();
-        require(_newOwner != address(0), "argent/null-owner");
+        validateNewOwner(_newOwner, _signature);
 
         cancelCurrentEscape();
         resetEscapeAttempts();
@@ -505,6 +506,15 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     /**************************************************** Execution ***************************************************/
+
+    function validateNewOwner(address _newOwner, bytes memory _signature) private view {
+        require(_newOwner != address(0), "argent/null-owner");
+        bytes4 selector = this.changeOwner.selector;
+        bytes memory message = abi.encodePacked(selector, block.chainid, address(this), owner);
+        bytes32 messageHash = keccak256(message).toEthSignedMessageHash();
+        address signer = Signatures.recoverSigner(messageHash, _signature);
+        require(signer != address(0) && signer == _newOwner, "argent/invalid-owner-sig");
+    }
 
     function _execute(address to, uint256 value, bytes memory data) private {
         uint128 value128 = Utils.safeCastToU128(value);

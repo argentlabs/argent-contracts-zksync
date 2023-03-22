@@ -4,6 +4,7 @@ import { checkDeployer } from "../src/deployer.service";
 import { getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure, EscapeStatus, EscapeType } from "../src/model";
 import { waitForL1BatchBlock, waitForTimestamp } from "../src/provider.service";
+import { changeOwnerWithSignature, signChangeOwner } from "../src/recovery.service";
 import { ArgentAccount } from "../typechain-types";
 import {
   AddressZero,
@@ -42,20 +43,30 @@ describe("Recovery", () => {
       account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
     });
 
-    it("Should revert with the wrong owner signature", async () => {
-      const promise = connect(account, [wrongOwner, guardian]).changeOwner(newOwner.address);
+    it("Should revert with the wrong old owner signature", async () => {
+      const promise = changeOwnerWithSignature(newOwner, connect(account, [wrongOwner, guardian]));
       await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
     });
 
+    it("Should revert with the wrong new owner signature", async () => {
+      let signature = await newOwner.signMessage("hello");
+      let promise = account.changeOwner(newOwner.address, signature);
+      await expect(promise).to.be.rejectedWith("argent/invalid-owner-sig");
+
+      signature = await signChangeOwner(wrongOwner, account);
+      promise = account.changeOwner(newOwner.address, signature);
+      await expect(promise).to.be.rejectedWith("argent/invalid-owner-sig");
+    });
+
     it("Should revert with the wrong guardian signature", async () => {
-      const promise = connect(account, [owner, wrongGuardian]).changeOwner(newOwner.address);
+      const promise = changeOwnerWithSignature(newOwner, connect(account, [owner, wrongGuardian]));
       await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
     });
 
     it("Should work with the correct signatures", async () => {
       await expect(account.owner()).to.eventually.equal(owner.address);
 
-      const promise = account.changeOwner(newOwner.address);
+      const promise = changeOwnerWithSignature(newOwner, account);
 
       await expect(promise).to.emit(account, "OwnerChanged").withArgs(newOwner.address);
       await expect(account.owner()).to.eventually.equal(newOwner.address);
