@@ -401,7 +401,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         if (to == address(this)) {
             if (selector == this.triggerEscapeOwner.selector) {
                 if (!_isFromOutside) {
-                    // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice); // TODO check gas price
                     require(guardianEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     guardianEscapeAttempts++;
                 }
@@ -418,7 +417,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
             if (selector == this.escapeOwner.selector) {
                 if (!_isFromOutside) {
-                    // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice); // TODO check gas price
                     require(guardianEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     guardianEscapeAttempts++;
                 }
@@ -433,7 +431,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
             if (selector == this.triggerEscapeGuardian.selector) {
                 if (!_isFromOutside) {
-                    // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice); // TODO check gas price
                     require(ownerEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     ownerEscapeAttempts++;
                 }
@@ -448,7 +445,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
             if (selector == this.escapeGuardian.selector) {
                 if (!_isFromOutside) {
-                    // require(_transaction.maxPriorityFeePerGas < 2 * block.baseGasPrice); // TODO check gas price
                     require(ownerEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     ownerEscapeAttempts++;
                 }
@@ -535,16 +531,16 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Recovery ****************************************************/
 
-    function resetEscapeAttempts() private {
-        ownerEscapeAttempts = 0;
-        guardianEscapeAttempts = 0;
-    }
-
     function cancelCurrentEscape() private {
         if (escapeStatus(escape) != EscapeStatus.None) {
             delete escape;
             emit EscapeCanceled();
         }
+    }
+
+    function resetEscapeAttempts() private {
+        ownerEscapeAttempts = 0;
+        guardianEscapeAttempts = 0;
     }
 
     function escapeStatus(Escape memory _escape) private view returns (EscapeStatus) {
