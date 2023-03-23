@@ -184,6 +184,55 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         _transaction.processPaymasterInput();
     }
 
+    /*************************************************** Validation ***************************************************/
+
+    // IAccount
+    function validateTransaction(
+        bytes32, // _transactionHash
+        bytes32 _suggestedSignedHash,
+        Transaction calldata _transaction
+    ) external payable override returns (bytes4) {
+        requireOnlyBootloader();
+        bytes32 transactionHash = _suggestedSignedHash != bytes32(0) ? _suggestedSignedHash : _transaction.encodeHash();
+        return _validateTransaction(transactionHash, _transaction, false);
+    }
+
+    // IERC1271
+    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4 _magic) {
+        if (_isValidSignature(_hash, _signature)) {
+            _magic = IERC1271.isValidSignature.selector;
+        }
+    }
+
+    /**************************************************** Execution ***************************************************/
+
+    // IMulticall
+    function multicall(IMulticall.Call[] memory _calls) external {
+        requireOnlySelf();
+        for (uint256 i = 0; i < _calls.length; i++) {
+            IMulticall.Call memory call = _calls[i];
+            require(call.to != address(this), "argent/no-multicall-to-self");
+            _execute(call.to, call.value, call.data);
+        }
+    }
+
+    // IAccount
+    function executeTransaction(
+        bytes32, // _transactionHash
+        bytes32, // _suggestedSignedHash
+        Transaction calldata _transaction
+    ) external payable override {
+        requireOnlyBootloader();
+        _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
+    }
+
+    // IAccount
+    function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
+        bytes4 result = _validateTransaction(_transaction.encodeHash(), _transaction, true);
+        require(result == ACCOUNT_VALIDATION_SUCCESS_MAGIC, "argent/invalid-transaction");
+        _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
+    }
+
     /**************************************************** Recovery ****************************************************/
 
     function getEscape() external view returns (Escape memory, EscapeStatus) {
@@ -270,55 +319,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         guardian = escape.newSigner;
         emit GuardianEscaped(escape.newSigner);
         delete escape;
-    }
-
-    /*************************************************** Validation ***************************************************/
-
-    // IAccount
-    function validateTransaction(
-        bytes32, // _transactionHash
-        bytes32 _suggestedSignedHash,
-        Transaction calldata _transaction
-    ) external payable override returns (bytes4) {
-        requireOnlyBootloader();
-        bytes32 transactionHash = _suggestedSignedHash != bytes32(0) ? _suggestedSignedHash : _transaction.encodeHash();
-        return _validateTransaction(transactionHash, _transaction, false);
-    }
-
-    // IERC1271
-    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4 _magic) {
-        if (_isValidSignature(_hash, _signature)) {
-            _magic = IERC1271.isValidSignature.selector;
-        }
-    }
-
-    /**************************************************** Execution ***************************************************/
-
-    // IMulticall
-    function multicall(IMulticall.Call[] memory _calls) external {
-        requireOnlySelf();
-        for (uint256 i = 0; i < _calls.length; i++) {
-            IMulticall.Call memory call = _calls[i];
-            require(call.to != address(this), "argent/no-multicall-to-self");
-            _execute(call.to, call.value, call.data);
-        }
-    }
-
-    // IAccount
-    function executeTransaction(
-        bytes32, // _transactionHash
-        bytes32, // _suggestedSignedHash
-        Transaction calldata _transaction
-    ) external payable override {
-        requireOnlyBootloader();
-        _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
-    }
-
-    // IAccount
-    function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
-        bytes4 result = _validateTransaction(_transaction.encodeHash(), _transaction, true);
-        require(result == ACCOUNT_VALIDATION_SUCCESS_MAGIC, "argent/invalid-transaction");
-        _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
     }
 
     /************************************************** Miscellaneous *************************************************/
