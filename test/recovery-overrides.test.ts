@@ -151,12 +151,12 @@ describe("Recovery overrides", () => {
         it(`${escapeName}() should FAIL with escapeType=${EscapeType[escapeType]} when in invalid statuses`, async () => {
           await testAccountInStatuses(escapeType, {
             [EscapeStatus.None]: async (account) =>
-              expect(account[escapeName]()).to.be.rejectedWith("argent/inactive-escape"),
+              expect(account[escapeName]()).to.be.rejectedWith("argent/invalid-escape"),
             [EscapeStatus.Pending]: async (account) =>
-              expect(account[escapeName]()).to.be.rejectedWith("argent/inactive-escape"),
+              expect(account[escapeName]()).to.be.rejectedWith("argent/invalid-escape"),
             // [EscapeStatus.Active]: // skipped
             [EscapeStatus.Expired]: async (account) =>
-              expect(account[escapeName]()).to.be.rejectedWith("argent/inactive-escape"),
+              expect(account[escapeName]()).to.be.rejectedWith("argent/invalid-escape"),
           });
         });
       }
@@ -172,13 +172,13 @@ describe("Recovery overrides", () => {
         it(`${escapeName}() should FAIL with escapeType=${EscapeType[escapeType]}`, async () => {
           await testAccountInStatuses(escapeType, {
             [EscapeStatus.None]: async (account) =>
-              expect(account[escapeName]()).to.be.rejectedWith("argent/inactive-escape"),
+              expect(account[escapeName]()).to.be.rejectedWith("argent/invalid-escape"),
             [EscapeStatus.Pending]: async (account) =>
-              expect(account[escapeName]()).to.be.rejectedWith("argent/inactive-escape"),
+              expect(account[escapeName]()).to.be.rejectedWith("argent/invalid-escape"),
             [EscapeStatus.Active]: async (account) =>
-              expect(account[escapeName]()).to.be.rejectedWith("argent/invalid-escape-type"),
+              expect(account[escapeName]()).to.be.rejectedWith("argent/invalid-escape"),
             [EscapeStatus.Expired]: async (account) =>
-              expect(account[escapeName]()).to.be.rejectedWith("argent/inactive-escape"),
+              expect(account[escapeName]()).to.be.rejectedWith("argent/invalid-escape"),
           });
         });
       }

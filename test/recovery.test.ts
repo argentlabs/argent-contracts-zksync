@@ -215,7 +215,7 @@ describe("Recovery", () => {
       await response.wait();
 
       // should fail to escape before the end of the period
-      await expect(account.escapeGuardian()).to.be.rejectedWith("argent/inactive-escape");
+      await expect(account.escapeGuardian()).to.be.rejectedWith("argent/invalid-escape");
 
       // wait security period
       const [{ activeAt }] = await account.getEscape();
@@ -247,7 +247,7 @@ describe("Recovery", () => {
       await response.wait();
 
       // should fail to escape before the end of the period
-      await expect(account.escapeOwner()).to.be.rejectedWith("argent/inactive-escape");
+      await expect(account.escapeOwner()).to.be.rejectedWith("argent/invalid-escape");
 
       // wait security period
       const [{ activeAt }] = await account.getEscape();
