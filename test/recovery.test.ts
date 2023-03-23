@@ -302,7 +302,7 @@ describe("Recovery", () => {
 
       // TODO: do evm_increaseTime + evm_mine here when testing locally
 
-      // guardian cannot override in Pending state
+      // guardian cannot override in NotReady state
       let promise = connect(account, [guardian]).triggerEscapeOwner(newOwner.address);
       await expect(promise).to.be.rejectedWith("argent/cannot-override-escape");
 
@@ -312,7 +312,7 @@ describe("Recovery", () => {
 
       await waitForTimestamp(escape.activeAt, provider);
 
-      // guardian cannot override in Active state
+      // guardian cannot override in Ready state
       promise = connect(account, [guardian]).triggerEscapeOwner(newOwner.address);
       await expect(promise).to.be.rejectedWith("argent/cannot-override-escape");
 

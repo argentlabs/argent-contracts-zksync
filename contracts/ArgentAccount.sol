@@ -37,8 +37,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     enum EscapeStatus {
         None,
-        Pending,
-        Active,
+        NotReady,
+        Ready,
         Expired
     }
 
@@ -301,7 +301,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         _requireOnlySelf();
         // This method assumes that there is a guardian, and that the there is an escape for the owner
         // This must be guaranteed before calling this method. Usually when validating the transaction
-        require(_escapeStatus(escape) == EscapeStatus.Active, "argent/invalid-escape");
+        require(_escapeStatus(escape) == EscapeStatus.Ready, "argent/invalid-escape");
 
         _resetEscapeAttempts();
         owner = escape.newSigner;
@@ -313,7 +313,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         _requireOnlySelf();
         // this method assumes that there is a guardian, and that the there is an escape for the guardian
         // This must be guaranteed before calling this method. Usually when validating the transaction
-        require(_escapeStatus(escape) == EscapeStatus.Active, "argent/invalid-escape");
+        require(_escapeStatus(escape) == EscapeStatus.Ready, "argent/invalid-escape");
 
         _resetEscapeAttempts();
         guardian = escape.newSigner;
@@ -543,12 +543,12 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             return EscapeStatus.None;
         }
         if (block.timestamp < _escape.activeAt) {
-            return EscapeStatus.Pending;
+            return EscapeStatus.NotReady;
         }
         if (_escape.activeAt + escapeExpiryPeriod <= block.timestamp) {
             return EscapeStatus.Expired;
         }
-        return EscapeStatus.Active;
+        return EscapeStatus.Ready;
     }
 
     function _isOwnerEscapeCall(bytes4 _selector) private pure returns (bool) {

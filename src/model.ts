@@ -13,8 +13,8 @@ export enum EscapeType {
 
 export enum EscapeStatus {
   None,
-  Pending,
-  Active,
+  NotReady,
+  Ready,
   Expired,
 }
 
