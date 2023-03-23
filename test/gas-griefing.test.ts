@@ -30,7 +30,7 @@ describe("Gas griefing", () => {
       const newOwner = zksync.Wallet.createRandom();
       await (await account.triggerEscapeOwner(newOwner.address)).wait();
 
-      const [escape] = await account.getEscape();
+      const [escape] = await account.escapeAndStatus();
       expect(escape.escapeType).to.equal(EscapeType.Owner);
       expect(escape.newSigner).to.equal(newOwner.address);
       await expect(account.guardianEscapeAttempts()).to.eventually.equal(attemptIndex + 1);

@@ -54,7 +54,7 @@ describe("Recovery overrides", () => {
       return account;
     }
 
-    const [{ activeAt }] = await account.getEscape();
+    const [{ activeAt }] = await account.escapeAndStatus();
     await waitForTimestamp(activeAt, provider);
     await tests[EscapeStatus.Active]?.(account);
     if (!hasTestsAfter(EscapeStatus.Active)) {
@@ -73,7 +73,7 @@ describe("Recovery overrides", () => {
 
   it("Should be in the right status", async () => {
     const expectStatus = async (account: ArgentAccount, expectedStatus: EscapeStatus) => {
-      const [, actualStatus] = await account.getEscape();
+      const [, actualStatus] = await account.escapeAndStatus();
       expect(actualStatus).to.equal(expectedStatus);
     };
     await testAccountInStatuses(EscapeType.Owner, {
