@@ -252,7 +252,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         requireOnlySelf();
         // This method assumes that there is a guardian, and that the there is an escape for the owner
         // This must be guaranteed before calling this method. Usually when validating the transaction
-        require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
+        require(escapeStatus(escape) == EscapeStatus.Active, "argent/invalid-escape");
 
         resetEscapeAttempts();
         owner = escape.newSigner;
@@ -264,7 +264,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         requireOnlySelf();
         // this method assumes that there is a guardian, and that the there is an escape for the guardian
         // This must be guaranteed before calling this method. Usually when validating the transaction
-        require(escapeStatus(escape) == EscapeStatus.Active, "argent/inactive-escape");
+        require(escapeStatus(escape) == EscapeStatus.Active, "argent/invalid-escape");
 
         resetEscapeAttempts();
         guardian = escape.newSigner;
@@ -418,7 +418,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
                 requireGuardian();
-                require(escape.escapeType == uint8(EscapeType.Owner) && escape.activeAt != 0, "argent/inactive-escape");
+                require(escape.escapeType == uint8(EscapeType.Owner), "argent/invalid-escape");
                 if (isValidGuardianSignature(_transactionHash, signature)) {
                     return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
                 }
@@ -448,10 +448,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
                 requireGuardian();
-                require(
-                    escape.escapeType == uint8(EscapeType.Guardian) && escape.activeAt != 0,
-                    "argent/inactive-escape"
-                );
+                require(escape.escapeType == uint8(EscapeType.Guardian), "argent/invalid-escape");
                 if (isValidOwnerSignature(_transactionHash, signature)) {
                     return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
                 }
