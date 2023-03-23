@@ -221,9 +221,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     function triggerEscapeOwner(address _newOwner) external {
         requireOnlySelf();
-        requireGuardian();
-        require(_newOwner != address(0), "argent/null-owner");
-
         // no escape if there is an guardian escape triggered by the owner in progress
         if (escape.escapeType == uint8(EscapeType.Guardian)) {
             require(escapeStatus(escape) == EscapeStatus.Expired, "argent/cannot-override-escape");
@@ -237,7 +234,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     function triggerEscapeGuardian(address _newGuardian) external {
         requireOnlySelf();
-        requireGuardian();
 
         cancelCurrentEscape();
         uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
