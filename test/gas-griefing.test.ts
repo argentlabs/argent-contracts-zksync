@@ -26,7 +26,7 @@ describe("Gas griefing", () => {
   it("Should block too many triggerEscapeOwner() by guardian", async () => {
     const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [guardian] });
 
-    for (let attemptIndex = 0; attemptIndex <= maxAttempts; attemptIndex++) {
+    for (let attemptIndex = 0; attemptIndex < maxAttempts; attemptIndex++) {
       const newOwner = zksync.Wallet.createRandom();
       await (await account.triggerEscapeOwner(newOwner.address)).wait();
 
@@ -38,6 +38,6 @@ describe("Gas griefing", () => {
 
     const newOwner = zksync.Wallet.createRandom();
     await expect(account.triggerEscapeOwner(newOwner.address)).to.be.rejectedWith("argent/max-escape-attempts");
-    await expect(account.guardianEscapeAttempts()).to.eventually.equal(maxAttempts + 1);
+    await expect(account.guardianEscapeAttempts()).to.eventually.equal(maxAttempts);
   });
 });

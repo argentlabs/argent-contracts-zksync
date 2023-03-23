@@ -50,7 +50,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     bytes32 public constant NAME = "ArgentAccount";
-    uint32 public constant MAX_ESCAPE_ATTEMPTS = 5;
+    uint32 public constant MAX_ESCAPE_ATTEMPTS = 5; // Limit escape attempts by only one party
+    uint256 public constant MAX_ESCAPE_PRIORITY_FEE = 50 gwei; // Limit gas usage by only one party
 
     uint32 public immutable escapeSecurityPeriod;
     uint32 public immutable escapeExpiryPeriod;
@@ -397,7 +398,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         if (to == address(this)) {
             if (selector == this.triggerEscapeOwner.selector) {
                 if (!_isFromOutside) {
-                    require(guardianEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
+                    require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
+                    require(guardianEscapeAttempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     guardianEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
@@ -413,7 +415,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
             if (selector == this.escapeOwner.selector) {
                 if (!_isFromOutside) {
-                    require(guardianEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
+                    require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
+                    require(guardianEscapeAttempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     guardianEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
@@ -427,7 +430,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
             if (selector == this.triggerEscapeGuardian.selector) {
                 if (!_isFromOutside) {
-                    require(ownerEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
+                    require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
+                    require(ownerEscapeAttempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
@@ -441,7 +445,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
             if (selector == this.escapeGuardian.selector) {
                 if (!_isFromOutside) {
-                    require(ownerEscapeAttempts <= MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
+                    require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
+                    require(ownerEscapeAttempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
