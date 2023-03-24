@@ -255,7 +255,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     /// @inheritdoc IERC1271
-    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4 /*_magic*/) {
+    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4) {
         if (_isValidSignature(_hash, _signature)) {
             return IERC1271.isValidSignature.selector;
         }
