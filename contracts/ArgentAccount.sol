@@ -185,7 +185,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     /// @notice Upgrades the implementation of the account
-    /// @dev Also call `execute_after_upgrade` on the new impl.
+    /// @dev Also call `executeAfterUpgrade` on the new implementation
     /// Must be called by the account and authorised by the owner and a guardian (if guardian is set).
     /// @param _newImplementation The address of the new implementation
     /// @param _data Data to pass to the the implementation in `executeAfterUpgrade`
