@@ -424,10 +424,10 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function supportsInterface(bytes4 _interfaceId) external pure override returns (bool) {
         // NOTE: it's more efficient to use a mapping based implementation if there are more than 3 interfaces
         return
-        _interfaceId == type(IERC165).interfaceId ||
-        _interfaceId == type(IERC1271).interfaceId ||
-        _interfaceId == type(IMulticall).interfaceId ||
-        _interfaceId == type(IAccount).interfaceId;
+            _interfaceId == type(IERC165).interfaceId ||
+            _interfaceId == type(IERC1271).interfaceId ||
+            _interfaceId == type(IMulticall).interfaceId ||
+            _interfaceId == type(IAccount).interfaceId;
     }
 
     fallback() external {
@@ -497,8 +497,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                     guardianEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
-                address newOwner = abi.decode(_transaction.data[4 :], (address));
-                // This also asserts that the call data is valid
+                address newOwner = abi.decode(_transaction.data[4 :], (address)); // This also asserts that the call data is valid
                 require(newOwner != address(0), "argent/null-owner");
                 _requireGuardian();
 
@@ -530,8 +529,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
-                abi.decode(_transaction.data[4 :], (address));
-                // This asserts that the call data is valid
+                abi.decode(_transaction.data[4 :], (address)); // This asserts that the call data is valid
                 _requireGuardian();
                 if (_isValidOwnerSignature(_transactionHash, signature)) {
                     return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
