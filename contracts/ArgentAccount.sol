@@ -9,6 +9,7 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccount.sol";
 import {INonceHolder} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/INonceHolder.sol";
+import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
 import {SystemContractsCaller} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/SystemContractsCaller.sol";
 import {SystemContractHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/SystemContractHelper.sol";
 import {Transaction, TransactionHelper, IPaymasterFlow} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
@@ -207,10 +208,10 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     /**************************************************** Execution ***************************************************/
 
     // IMulticall
-    function multicall(IMulticall.Call[] memory _calls) external {
+    function multicall(IMulticall.Call[] calldata _calls) external {
         _requireOnlySelf();
         for (uint256 i = 0; i < _calls.length; i++) {
-            IMulticall.Call memory call = _calls[i];
+            IMulticall.Call calldata call = _calls[i];
             require(call.to != address(this), "argent/no-multicall-to-self");
             _execute(call.to, call.value, call.data);
         }
@@ -334,7 +335,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             _interfaceId == type(IAccount).interfaceId;
     }
 
-    fallback() external {
+    fallback() external payable {
         // fallback of default account shouldn't be called by bootloader under no circumstances
         assert(msg.sender != BOOTLOADER_FORMAL_ADDRESS);
 
@@ -368,10 +369,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         address to = address(uint160(_transaction.to));
         bytes4 selector = bytes4(_transaction.data);
         bytes memory signature = _transaction.signature;
-
-        if (to == address(DEPLOYER_SYSTEM_CONTRACT)) {
-            require(_transaction.data.length >= 4, "argent/invalid-call-to-deployer");
-        }
 
         if (!_isFromOutside) {
             // The fact there is are enough balance for the account
@@ -507,21 +504,25 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Execution ***************************************************/
 
-    function _execute(address to, uint256 value, bytes memory data) private {
+    function _execute(address to, uint256 value, bytes calldata data) private {
         uint128 value128 = Utils.safeCastToU128(value);
-        if (to == address(DEPLOYER_SYSTEM_CONTRACT)) {
-            uint32 gas = Utils.safeCastToU32(gasleft());
-            SystemContractsCaller.systemCallWithPropagatedRevert(gas, to, value128, data);
-        } else {
-            // using assembly saves us a returndatacopy of the entire return data
-            assembly {
-                let success := call(gas(), to, value, add(data, 0x20), mload(data), 0, 0)
-                if iszero(success) {
-                    let size := returndatasize()
-                    returndatacopy(0, 0, size)
-                    revert(0, size)
-                }
-            }
+        uint32 gas = Utils.safeCastToU32(gasleft());
+
+        // Note, that the deployment method from the deployer contract can only be called with a "systemCall" flag.
+        bool isSystemCall;
+        if (to == address(DEPLOYER_SYSTEM_CONTRACT) && data.length >= 4) {
+            bytes4 selector = bytes4(data[:4]);
+            // Check that called function is the deployment method,
+            // the others deployer method is not supposed to be called from the default account.
+            isSystemCall =
+                selector == DEPLOYER_SYSTEM_CONTRACT.create.selector ||
+                selector == DEPLOYER_SYSTEM_CONTRACT.create2.selector ||
+                selector == DEPLOYER_SYSTEM_CONTRACT.createAccount.selector ||
+                selector == DEPLOYER_SYSTEM_CONTRACT.create2Account.selector;
+        }
+        bool success = EfficientCall.rawCall(gas, to, value128, data, isSystemCall);
+        if (!success) {
+            EfficientCall.propagateRevert();
         }
     }
 
