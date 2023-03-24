@@ -184,7 +184,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         emit AccountCreated(address(this), _owner, _guardian);
     }
 
-
     /// @notice Upgrades the implementation of the account
     /// @dev Also call `execute_after_upgrade` on the new impl.
     /// Must be called by the account and authorised by the owner and a guardian (if guardian is set).
@@ -197,7 +196,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         implementation = _newImplementation;
         emit AccountUpgraded(_newImplementation);
         // using delegatecall to run the `executeAfterUpgrade` function of the new implementation
-        (bool success,) = _newImplementation.delegatecall(
+        (bool success, ) = _newImplementation.delegatecall(
             abi.encodeCall(this.executeAfterUpgrade, (version(), _data))
         );
         require(success, "argent/upgrade-callback-failed");
@@ -387,7 +386,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         _resetEscapeAttempts();
     }
 
-
     /// @notice Completes the escape and changes the owner after the security period
     /// Must be called by the account and authorised by just a guardian
     /// @dev
@@ -497,7 +495,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                     guardianEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
-                address newOwner = abi.decode(_transaction.data[4 :], (address)); // This also asserts that the call data is valid
+                address newOwner = abi.decode(_transaction.data[4:], (address)); // This also asserts that the call data is valid
                 require(newOwner != address(0), "argent/null-owner");
                 _requireGuardian();
 
@@ -529,7 +527,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
-                abi.decode(_transaction.data[4 :], (address)); // This asserts that the call data is valid
+                abi.decode(_transaction.data[4:], (address)); // This asserts that the call data is valid
                 _requireGuardian();
                 if (_isValidOwnerSignature(_transactionHash, signature)) {
                     return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
