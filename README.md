@@ -42,7 +42,7 @@ yarn test
 On goerli:
 
 ```
-NODE_ENV=goerli yarn test test/test-account.ts
+yarn test test/test-account.ts --network zkSyncTestnet
 ```
 
 ### Deploy on goerli
@@ -50,11 +50,11 @@ NODE_ENV=goerli yarn test test/test-account.ts
 Run once for every new contract version, the addresses will be stored in `config/`:
 
 ```
-NODE_ENV=goerli yarn hardhat run scripts/deploy-infrastructure.ts
+yarn hardhat run scripts/deploy-infrastructure.ts --network zkSyncTestnet
 ```
 
 Deploy a new account:
 
 ```
-NODE_ENV=goerli yarn hardhat run scripts/deploy-account.ts
+yarn hardhat run scripts/deploy-account.ts --network zkSyncTestnet
 ```
