@@ -171,7 +171,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /// Semantic version of this contract
     function version() public pure returns (Version memory) {
-        return Version(0, 1, 0);
+        return Version(0, 0, 2);
     }
 
     /// @dev Set the initial parameters for the account. It's mandatory to call this methods to secure the account.
@@ -310,7 +310,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         _requireOnlySelf();
         _validateNewOwner(_newOwner, _signature);
 
-        _cancelEscapeIfAny();
+        _resetEscape();
         _resetEscapeAttempts();
         owner = _newOwner;
         emit OwnerChanged(_newOwner);
@@ -323,7 +323,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         _requireOnlySelf();
         require(_newGuardian != address(0) || guardianBackup == address(0), "argent/backup-should-be-null");
 
-        _cancelEscapeIfAny();
+        _resetEscape();
         _resetEscapeAttempts();
         guardian = _newGuardian;
         emit GuardianChanged(_newGuardian);
@@ -336,7 +336,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         _requireOnlySelf();
         _requireGuardian();
 
-        _cancelEscapeIfAny();
+        _resetEscape();
         _resetEscapeAttempts();
         guardianBackup = _newGuardianBackup;
         emit GuardianBackupChanged(_newGuardianBackup);
@@ -356,7 +356,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             require(_escapeStatus(escape) == EscapeStatus.Expired, "argent/cannot-override-escape");
         }
 
-        _cancelEscapeIfAny();
+        _resetEscape();
         uint32 readyAt = uint32(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(readyAt, uint8(EscapeType.Owner), _newOwner);
         emit EscapeOwnerTriggerred(readyAt, _newOwner);
@@ -372,7 +372,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     function triggerEscapeGuardian(address _newGuardian) external {
         _requireOnlySelf();
 
-        _cancelEscapeIfAny();
+        _resetEscape();
         uint32 readyAt = uint32(block.timestamp) + escapeSecurityPeriod;
         escape = Escape(readyAt, uint8(EscapeType.Guardian), _newGuardian);
         emit EscapeGuardianTriggerred(readyAt, _newGuardian);
@@ -382,8 +382,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     /// Must be called by the account and authorised by the owner and a guardian (if guardian is set).
     function cancelEscape() external {
         _requireOnlySelf();
-        require(_escapeStatus(escape) != EscapeStatus.None, "argent/null-escape");
-        _cancelEscapeIfAny();
+        require(_escapeStatus(escape) != EscapeStatus.None, "argent/invalid-escape");
+        _resetEscape();
         _resetEscapeAttempts();
     }
 
@@ -625,10 +625,13 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Recovery ****************************************************/
 
-    function _cancelEscapeIfAny() private {
-        if (_escapeStatus(escape) != EscapeStatus.None) {
+    function _resetEscape() private {
+        EscapeStatus status = _escapeStatus(escape);
+        if (status != EscapeStatus.None) {
             delete escape;
-            emit EscapeCanceled();
+            if (status != EscapeStatus.Expired) {
+                emit EscapeCanceled();
+            }
         }
     }
 

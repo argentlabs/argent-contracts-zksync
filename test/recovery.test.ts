@@ -281,8 +281,9 @@ describe("Recovery", () => {
       // TODO: do evm_increaseTime + evm_mine here when testing locally
 
       // owner overrides the guardian's escape
-      const ownerResponse = await connect(account, [owner]).triggerEscapeGuardian(newGuardian.address);
-      await ownerResponse.wait();
+      const response = await connect(account, [owner]).triggerEscapeGuardian(newGuardian.address);
+      await expect(response).to.emit(account, "EscapeCanceled");
+      await expect(response).to.emit(account, "EscapeGuardianTriggerred");
 
       const [secondEscape] = await account.escapeAndStatus();
       expect(secondEscape.readyAt).to.be.greaterThanOrEqual(firstEscape.readyAt); // TODO: greaterThan after evm_mine
@@ -329,7 +330,7 @@ describe("Recovery", () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress });
 
       let promise = connect(account, [owner, guardian]).cancelEscape();
-      await expect(promise).to.be.rejectedWith("null-escape");
+      await expect(promise).to.be.rejectedWith("invalid-escape");
 
       // guardian triggers a owner escape
       const response = await connect(account, [guardian]).triggerEscapeOwner(newOwner.address);
