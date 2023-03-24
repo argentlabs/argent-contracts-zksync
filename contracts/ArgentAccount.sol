@@ -85,7 +85,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     event EscapeGuardianTriggerred(uint32 readyAt, address newGuardian);
     event OwnerEscaped(address newOwner);
     event GuardianEscaped(address newGuardian);
-    event EscapeCanceled();
+    event EscapeCanceled(Escape escape);
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //                                                    Modifiers                                                   //
@@ -532,7 +532,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         if (status != EscapeStatus.None) {
             delete escape;
             if (status != EscapeStatus.Expired) {
-                emit EscapeCanceled();
+                emit EscapeCanceled(escape);
             }
         }
     }

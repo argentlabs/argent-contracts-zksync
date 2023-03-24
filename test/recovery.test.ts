@@ -345,7 +345,7 @@ describe("Recovery", () => {
       await expect(promise).to.be.rejectedWith("Account validation returned invalid magic value");
 
       promise = connect(account, [owner, guardian]).cancelEscape();
-      await expect(promise).to.emit(account, "EscapeCanceled");
+      await expect(promise).to.emit(account, "EscapeCanceled").withArgs(escape);
 
       const [secondEscape, secondStatus] = await account.escapeAndStatus();
       expectEqualEscapes(secondEscape, nullEscape);
