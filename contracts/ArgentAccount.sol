@@ -44,7 +44,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     // prettier-ignore
     struct Escape {
-        uint32 activeAt;    // bits [0...32[    timestamp for activation of escape mode, 0 otherwise
+        uint32 readyAt;     // bits [0...32[    timestamp for activation of escape mode, 0 otherwise
         uint8 escapeType;   // bits [32...40[   packed EscapeType enum
         address newSigner;  // bits [40...200[  new owner or new guardian
     }
@@ -81,8 +81,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     event GuardianChanged(address newGuardian);
     event GuardianBackupChanged(address newGuardianBackup);
 
-    event EscapeOwnerTriggerred(uint32 activeAt, address newOwner);
-    event EscapeGuardianTriggerred(uint32 activeAt, address newGuardian);
+    event EscapeOwnerTriggerred(uint32 readyAt, address newOwner);
+    event EscapeGuardianTriggerred(uint32 readyAt, address newGuardian);
     event OwnerEscaped(address newOwner);
     event GuardianEscaped(address newGuardian);
     event EscapeCanceled();
@@ -277,18 +277,18 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         }
 
         _cancelEscapeIfAny();
-        uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
-        escape = Escape(activeAt, uint8(EscapeType.Owner), _newOwner);
-        emit EscapeOwnerTriggerred(activeAt, _newOwner);
+        uint32 readyAt = uint32(block.timestamp) + escapeSecurityPeriod;
+        escape = Escape(readyAt, uint8(EscapeType.Owner), _newOwner);
+        emit EscapeOwnerTriggerred(readyAt, _newOwner);
     }
 
     function triggerEscapeGuardian(address _newGuardian) external {
         _requireOnlySelf();
 
         _cancelEscapeIfAny();
-        uint32 activeAt = uint32(block.timestamp) + escapeSecurityPeriod;
-        escape = Escape(activeAt, uint8(EscapeType.Guardian), _newGuardian);
-        emit EscapeGuardianTriggerred(activeAt, _newGuardian);
+        uint32 readyAt = uint32(block.timestamp) + escapeSecurityPeriod;
+        escape = Escape(readyAt, uint8(EscapeType.Guardian), _newGuardian);
+        emit EscapeGuardianTriggerred(readyAt, _newGuardian);
     }
 
     function cancelEscape() external {
@@ -539,13 +539,13 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     function _escapeStatus(Escape memory _escape) private view returns (EscapeStatus) {
-        if (_escape.activeAt == 0) {
+        if (_escape.readyAt == 0) {
             return EscapeStatus.None;
         }
-        if (block.timestamp < _escape.activeAt) {
+        if (block.timestamp < _escape.readyAt) {
             return EscapeStatus.NotReady;
         }
-        if (_escape.activeAt + escapeExpiryPeriod <= block.timestamp) {
+        if (_escape.readyAt + escapeExpiryPeriod <= block.timestamp) {
             return EscapeStatus.Expired;
         }
         return EscapeStatus.Ready;

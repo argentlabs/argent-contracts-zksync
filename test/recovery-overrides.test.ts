@@ -54,14 +54,14 @@ describe("Recovery overrides", () => {
       return account;
     }
 
-    const [{ activeAt }] = await account.escapeAndStatus();
-    await waitForTimestamp(activeAt, provider);
+    const [{ readyAt }] = await account.escapeAndStatus();
+    await waitForTimestamp(readyAt, provider);
     await tests[EscapeStatus.Ready]?.(account);
     if (!hasTestsAfter(EscapeStatus.Ready)) {
       return account;
     }
 
-    await waitForTimestamp(activeAt + escapeExpiryPeriod + 1, provider);
+    await waitForTimestamp(readyAt + escapeExpiryPeriod + 1, provider);
     await tests[EscapeStatus.Expired]?.(account);
     return account;
   };
@@ -154,7 +154,7 @@ describe("Recovery overrides", () => {
               expect(account[escapeName]()).to.be.rejectedWith("argent/invalid-escape"),
             [EscapeStatus.NotReady]: async (account) =>
               expect(account[escapeName]()).to.be.rejectedWith("argent/invalid-escape"),
-            // [EscapeStatus.Active]: // skipped
+            // [EscapeStatus.Ready]: // skipped
             [EscapeStatus.Expired]: async (account) =>
               expect(account[escapeName]()).to.be.rejectedWith("argent/invalid-escape"),
           });
