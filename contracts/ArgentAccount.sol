@@ -208,8 +208,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     // @param _data Generic call data that can be passed to the method for future upgrade logic
     function executeAfterUpgrade(Version memory /*_previousVersion*/, bytes calldata /*_data*/) external {
         _requireOnlySelf();
-        owner = owner;
-        // useless code to suppress warning about pure function
+        owner = owner; // useless code to suppress warning about pure function
         // reserved upgrade callback for future account versions
     }
 
@@ -256,7 +255,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     /// @inheritdoc IERC1271
-    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4 _magic) {
+    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4 /*_magic*/) {
         if (_isValidSignature(_hash, _signature)) {
             return IERC1271.isValidSignature.selector;
         }
@@ -342,7 +341,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     /// @notice Triggers the escape of the owner when it is lost or compromised.
-    /// Must be called by the account and authorised by just a guardian
+    /// Must be called by the account and authorised by just a guardian.
     /// Cannot override an ongoing escape of the guardian.
     /// @param _newOwner The new account owner if the escape completes
     /// @dev
@@ -362,7 +361,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     /// @notice Triggers the escape of the guardian when it is lost or compromised.
-    /// Must be called by the account and authorised by the owner alone
+    /// Must be called by the account and authorised by the owner alone.
     /// Can override an ongoing escape of the owner.
     /// @param _newGuardian The new account guardian if the escape completes
     /// @dev
