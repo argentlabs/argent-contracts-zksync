@@ -174,7 +174,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         return Version(0, 0, 2);
     }
 
-    /// @dev Set the initial parameters for the account. It's mandatory to call this methods to secure the account.
+    /// @dev Sets the initial parameters of the account. It's mandatory to call this method to secure the account.
     /// It's recommended to call this method in the same transaction that deploys the account to make sure it's always initialized
     function initialize(address _owner, address _guardian) external {
         require(_owner != address(0), "argent/null-owner");
