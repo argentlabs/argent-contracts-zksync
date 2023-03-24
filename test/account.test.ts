@@ -54,8 +54,9 @@ describe("Argent account", () => {
     });
 
     it("Should be initialized properly", async () => {
-      const { major, minor, patch } = await account.version();
-      expect([major, minor, patch]).to.deep.equal([0, 0, 2]);
+      const implementationVersion = await argent.implementation.version();
+      const accountVersion = await account.version();
+      expect(accountVersion).to.deep.equal(implementationVersion);
       await expect(account.owner()).to.eventually.equal(ownerAddress);
       await expect(account.guardian()).to.eventually.equal(guardianAddress);
       await expect(account.guardianBackup()).to.eventually.equal(AddressZero);
