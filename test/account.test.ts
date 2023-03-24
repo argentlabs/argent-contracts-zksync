@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { computeCreate2AddressFromSdk, connect, deployAccount } from "../src/account.service";
-import { checkDeployer, CustomDeployer } from "../src/deployer.service";
+import { CustomDeployer, checkDeployer } from "../src/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
 import { changeOwnerWithSignature } from "../src/recovery.service";

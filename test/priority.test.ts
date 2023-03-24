@@ -55,12 +55,8 @@ describe("Priority mode (from outside / L1)", () => {
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
 
     // initiating L2 transfer via L1 execute from zksync wallet
-    const response = await deployer.zkWallet.requestExecute({
-      contractAddress: account.address,
-      calldata,
-      l2GasLimit: zksync.utils.RECOMMENDED_DEPOSIT_L2_GAS_LIMIT,
-    });
-    await expect(response.wait()).to.be.rejected;
+    const promise = deployer.zkWallet.requestExecute({ contractAddress: account.address, calldata });
+    await expect(promise).to.be.rejectedWith("argent/invalid-transaction");
 
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
   });
@@ -75,15 +71,11 @@ describe("Priority mode (from outside / L1)", () => {
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
 
     // initiating L2 transfer via L1 execute from zksync wallet
-    const response = await deployer.zkWallet.requestExecute({
-      contractAddress: account.address,
-      calldata,
-      l2GasLimit: zksync.utils.RECOMMENDED_DEPOSIT_L2_GAS_LIMIT,
-    });
+    const response = await deployer.zkWallet.requestExecute({ contractAddress: account.address, calldata });
     await response.wait();
 
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(42n);
-  });
+  }).timeout(5 * 60e3);
 
   it("Should execute a priority transaction from L2", async () => {
     testDapp = (await deployTestDapp(deployer)).connect(signer);
