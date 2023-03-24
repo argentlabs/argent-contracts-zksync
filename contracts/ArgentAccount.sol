@@ -295,6 +295,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         _requireOnlySelf();
         require(_escapeStatus(escape) != EscapeStatus.None, "argent/null-escape");
         _cancelEscapeIfAny();
+        _resetEscapeAttempts();
     }
 
     function escapeOwner() external {
