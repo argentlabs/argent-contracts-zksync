@@ -10,6 +10,8 @@ TODO
 
 ### Local setup
 
+Install Docker Desktop.
+
 ```
 yarn
 ```

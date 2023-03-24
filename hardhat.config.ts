@@ -6,7 +6,7 @@ import "@nomiclabs/hardhat-ethers";
 import "@typechain/hardhat";
 import "chai-as-promised";
 import "dotenv/config";
-import "hardhat-storage-layout";
+// import "hardhat-storage-layout"; // uncomment when using the script as it slows things down otherwise
 
 module.exports = {
   zksolc: {
@@ -42,6 +42,6 @@ module.exports = {
     version: "0.8.18",
   },
   mocha: {
-    timeout: 120_000, // milliseconds
+    timeout: 2 * 60e3, // milliseconds
   },
 };

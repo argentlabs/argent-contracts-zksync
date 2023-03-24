@@ -8,8 +8,8 @@ import { changeOwnerWithSignature, signChangeOwner } from "../src/recovery.servi
 import { ArgentAccount } from "../typechain-types";
 import {
   AddressZero,
-  deployer,
   EscapeStruct,
+  deployer,
   guardian,
   guardianAddress,
   newGuardian,
