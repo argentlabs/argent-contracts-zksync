@@ -123,7 +123,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     /**************************************************** Lifecycle ***************************************************/
 
     function version() public pure returns (Version memory) {
-        return Version(0, 1, 0);
+        return Version(0, 0, 2);
     }
 
     function initialize(address _owner, address _guardian) external {
