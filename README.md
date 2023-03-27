@@ -50,11 +50,11 @@ yarn test test/test-account.ts --network zkSyncTestnet
 Run once for every new contract version, the addresses will be stored in `config/`:
 
 ```
-yarn hardhat run scripts/deploy-infrastructure.ts --network zkSyncTestnet
+VERIFY=true yarn hardhat run scripts/deploy-infrastructure.ts --network zkSyncTestnet
 ```
 
 Deploy a new account:
 
 ```
-yarn hardhat run scripts/deploy-account.ts --network zkSyncTestnet
+VERIFY=true yarn hardhat run scripts/deploy-account.ts --network zkSyncTestnet
 ```

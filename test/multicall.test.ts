@@ -20,7 +20,7 @@ describe("Account multicall", () => {
       ownerAddress,
       guardianAddress,
       connect: [owner, guardian],
-      funds: "0.002",
+      funds: "0.008",
     });
     testDapp = await deployTestDapp(deployer);
   });
