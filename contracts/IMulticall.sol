@@ -8,5 +8,5 @@ interface IMulticall {
         bytes data;
     }
 
-    function multicall(Call[] calldata _calls) external returns (bytes[] memory returnData);
+    function multicall(Call[] calldata _calls) external returns (bytes[] memory _returnData);
 }
