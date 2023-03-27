@@ -175,7 +175,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /// Semantic version of this contract
     function version() public pure returns (Version memory) {
-        return Version(0, 0, 2);
+        return Version(0, 1, 0);
     }
 
     /// @dev Sets the initial parameters of the account. It's mandatory to call this method to secure the account.

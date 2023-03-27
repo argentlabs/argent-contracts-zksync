@@ -32,8 +32,9 @@ export const getInfrastructure: typeof deployInfrastructure = async (deployer) =
     throw new Error("Infrastructure not deployed");
   }
 
-  const implementation = new zksync.Contract(config.implementation, artifacts.implementation.abi);
-  const factory = new zksync.Contract(config.factory, artifacts.factory.abi, deployer.zkWallet) as AccountFactory;
+  const wallet = deployer.zkWallet;
+  const implementation = new zksync.Contract(config.implementation, artifacts.implementation.abi, wallet.provider);
+  const factory = new zksync.Contract(config.factory, artifacts.factory.abi, wallet) as AccountFactory;
 
   return { deployer, artifacts, implementation, factory };
 };

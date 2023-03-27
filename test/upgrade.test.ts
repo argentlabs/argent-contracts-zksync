@@ -16,7 +16,7 @@ describe("Account upgrade", () => {
   before(async () => {
     await checkDeployer(deployer);
     argent = await getTestInfrastructure(deployer);
-    account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: "0.0005" });
+    account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: "0.008" });
     newImplementation = await deployer.deploy(argent.artifacts.implementation, [10]);
   });
 
@@ -62,7 +62,7 @@ describe("Account upgrade", () => {
       argent,
       ownerAddress,
       guardianAddress,
-      funds: "0.0005",
+      funds: "0.008",
       connect: [owner, guardian],
     });
 
