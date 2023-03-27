@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
-import { computeCreate2AddressFromSdk, connect, deployAccount, argentAccountContract } from "../src/account.service";
+import { argentAccountContract, computeCreate2AddressFromSdk, connect, deployAccount } from "../src/account.service";
 import { CustomDeployer, checkDeployer } from "../src/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
@@ -55,7 +55,12 @@ describe("Argent account", () => {
 
     it("Should emit event when initialized", async () => {
       const salt = ethers.utils.randomBytes(32);
-      const response = await argent.factory.deployProxyAccount(salt, argent.implementation.address, ownerAddress, guardianAddress);
+      const response = await argent.factory.deployProxyAccount(
+        salt,
+        argent.implementation.address,
+        ownerAddress,
+        guardianAddress,
+      );
       const address = computeCreate2AddressFromSdk(argent, salt, ownerAddress, guardianAddress);
       const account = argentAccountContract(address, argent);
       await expect(response).to.emit(account, "AccountCreated").withArgs(ownerAddress, guardianAddress);
