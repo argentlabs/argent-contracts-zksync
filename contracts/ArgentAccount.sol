@@ -91,10 +91,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /// @notice Emitted exactly once when the account is initialized
-    /// @param account This account address
     /// @param owner The owner address
     /// @param guardian The guardian address
-    event AccountCreated(address account, address indexed owner, address guardian);
+    event AccountCreated(address indexed owner, address guardian);
 
     /// @notice Emitted when the implementation of the account changes
     /// @param newImplementation The new implementation
@@ -181,7 +180,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         require(owner == address(0), "argent/already-initialized");
         owner = _owner;
         guardian = _guardian;
-        emit AccountCreated(address(this), _owner, _guardian);
+        emit AccountCreated(_owner, _guardian);
     }
 
     /// @notice Upgrades the implementation of the account
