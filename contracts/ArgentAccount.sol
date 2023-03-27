@@ -36,36 +36,53 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     enum EscapeStatus {
+        /// No escape triggered, or it was canceled
         None,
+        /// Escape was triggered and it's waiting for the `escapeSecurityPeriod`
         NotReady,
+        /// The security period has elapsed and the escape is ready to be completed
         Ready,
+        /// No confirmation happened for `escapeExpiryPeriod` since it became `Ready`. The escape cannot be completed now, only canceled
         Expired
     }
 
     // prettier-ignore
     struct Escape {
-        uint32 readyAt;     // bits [0...32[    timestamp for activation of escape mode, 0 otherwise
-        uint8 escapeType;   // bits [32...40[   packed EscapeType enum
-        address newSigner;  // bits [40...200[  new owner or new guardian
+        /// timestamp for activation of escape mode, 0 otherwise
+        uint32 readyAt;     // bits [0...32[
+        /// packed `EscapeType` enum
+        uint8 escapeType;   // bits [32...40[
+        /// new owner or new guardian address
+        address newSigner;  // bits [40...200[
     }
 
     bytes32 public constant NAME = "ArgentAccount";
-    uint32 public constant MAX_ESCAPE_ATTEMPTS = 5; // Limit escape attempts by only one party
+
+    /// Limit escape attempts by only one party
+    uint32 public constant MAX_ESCAPE_ATTEMPTS = 5;
+    /// Limit escape attempts by only one party
     uint256 public constant MAX_ESCAPE_PRIORITY_FEE = 50 gwei; // Limit gas usage by only one party
 
+    /// Time it takes for the escape to become ready after being triggered
     uint32 public immutable escapeSecurityPeriod;
+    /// The escape will be ready and can be completed for this duration
     uint32 public immutable escapeExpiryPeriod;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //                                                     Storage                                                    //
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    /// Account implementation
     address public implementation; // !!! storage slot shared with proxy
+    /// Current account owner
     address public owner;
+    /// Current account guardian
     address public guardian;
+    /// Current account backup guardian
     address public guardianBackup;
-    // escape attempts keeps track of how many escaping tx the guardian/owner has submitted. Used to limit the number of transactions the account will pay for
+    /// Keeps track of how many escaping tx the guardian has submitted. Used to limit the number of transactions the account will pay for
     uint32 public guardianEscapeAttempts;
+    /// Keeps track of how many escaping tx the owner has submitted. Used to limit the number of transactions the account will pay for
     uint32 public ownerEscapeAttempts;
     Escape private escape;
 
@@ -73,18 +90,48 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     //                                                     Events                                                     //
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    event AccountCreated(address account, address indexed owner, address guardian);
+    /// @notice Emitted exactly once when the account is initialized
+    /// @param owner The owner address
+    /// @param guardian The guardian address
+    event AccountCreated(address indexed owner, address guardian);
+
+    /// @notice Emitted when the implementation of the account changes
+    /// @param newImplementation The new implementation
     event AccountUpgraded(address newImplementation);
+
     event TransactionExecuted(bytes32 hashed, bytes response);
 
+    /// @notice The account owner was changed
+    /// @param newOwner new owner address
     event OwnerChanged(address newOwner);
+
+    /// @notice The account guardian was changed or removed
+    /// @param newGuardian address of the new guardian or 0 if it was removed
     event GuardianChanged(address newGuardian);
+
+    /// @notice The account backup guardian was changed or removed
+    /// @param newGuardianBackup address of the backup guardian or 0 if it was removed
     event GuardianBackupChanged(address newGuardianBackup);
 
+    /// @notice Owner escape was triggered by the guardian
+    /// @param readyAt when the escape can be completed
+    /// @param newOwner new owner address to be set after the security period
     event EscapeOwnerTriggerred(uint32 readyAt, address newOwner);
+
+    /// @notice Guardian escape was triggered by the owner
+    /// @param readyAt when the escape can be completed
+    /// @param newGuardian address of the new guardian to be set after the security period. O if the guardian will be removed
     event EscapeGuardianTriggerred(uint32 readyAt, address newGuardian);
+
+    /// @notice Owner escape was completed and there is a new account owner
+    /// @param newOwner new owner address
     event OwnerEscaped(address newOwner);
+
+    /// @notice Guardian escape was completed and there is a new account guardian
+    /// @param newGuardian address of the new guardian or 0 if it was removed
     event GuardianEscaped(address newGuardian);
+
+    /// An ongoing escape was canceled
     event EscapeCanceled();
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -121,18 +168,26 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Lifecycle ***************************************************/
 
+    /// Semantic version of this contract
     function version() public pure returns (Version memory) {
         return Version(0, 0, 2);
     }
 
+    /// @dev Sets the initial parameters of the account. It's mandatory to call this method to secure the account.
+    /// It's recommended to call this method in the same transaction that deploys the account to make sure it's always initialized
     function initialize(address _owner, address _guardian) external {
         require(_owner != address(0), "argent/null-owner");
         require(owner == address(0), "argent/already-initialized");
         owner = _owner;
         guardian = _guardian;
-        emit AccountCreated(address(this), _owner, _guardian);
+        emit AccountCreated(_owner, _guardian);
     }
 
+    /// @notice Upgrades the implementation of the account
+    /// @dev Also call `executeAfterUpgrade` on the new implementation
+    /// Must be called by the account and authorised by the owner and a guardian (if guardian is set).
+    /// @param _newImplementation The address of the new implementation
+    /// @param _data Data to pass to the the implementation in `executeAfterUpgrade`
     function upgrade(address _newImplementation, bytes calldata _data) external {
         _requireOnlySelf();
         bool isSupported = _newImplementation.supportsInterface(type(IAccount).interfaceId);
@@ -146,14 +201,17 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         require(success, "argent/upgrade-callback-failed");
     }
 
-    // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
+    // @dev Logic to execute after an upgrade.
+    // Can only be called by the account after a call to `upgrade`.
+    // @param _previousVersion The previous account version
+    // @param _data Generic call data that can be passed to the method for future upgrade logic
     function executeAfterUpgrade(Version memory /*_previousVersion*/, bytes calldata /*_data*/) external {
         _requireOnlySelf();
         owner = owner; // useless code to suppress warning about pure function
         // reserved upgrade callback for future account versions
     }
 
-    // IAccount
+    /// @inheritdoc IAccount
     function payForTransaction(
         bytes32, // _transactionHash
         bytes32, // _suggestedSignedHash
@@ -164,9 +222,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         require(success, "argent/failed-fee-payment");
     }
 
-    // IAccount
-    // Here, the user should prepare for the transaction to be paid for by a paymaster
-    // Here, the account should set the allowance for the smart contracts
+    /// @inheritdoc IAccount
     function prepareForPaymaster(
         bytes32, // _transactionHash
         bytes32, // _suggestedSignedHash
@@ -186,7 +242,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /*************************************************** Validation ***************************************************/
 
-    // IAccount
+    /// @inheritdoc IAccount
     function validateTransaction(
         bytes32, // _transactionHash
         bytes32 _suggestedSignedHash,
@@ -197,16 +253,17 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         return _validateTransaction(transactionHash, _transaction, false);
     }
 
-    // IERC1271
-    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4 _magic) {
+    /// @inheritdoc IERC1271
+    function isValidSignature(bytes32 _hash, bytes calldata _signature) public view override returns (bytes4) {
         if (_isValidSignature(_hash, _signature)) {
-            _magic = IERC1271.isValidSignature.selector;
+            return IERC1271.isValidSignature.selector;
         }
+        return bytes4(0);
     }
 
     /**************************************************** Execution ***************************************************/
 
-    // IMulticall
+    /// @inheritdoc IMulticall
     function multicall(IMulticall.Call[] memory _calls) external {
         _requireOnlySelf();
         for (uint256 i = 0; i < _calls.length; i++) {
@@ -216,7 +273,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         }
     }
 
-    // IAccount
+    /// @inheritdoc IAccount
     function executeTransaction(
         bytes32, // _transactionHash
         bytes32, // _suggestedSignedHash
@@ -226,7 +283,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
     }
 
-    // IAccount
+    /// @inheritdoc IAccount
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
         bytes4 result = _validateTransaction(_transaction.encodeHash(), _transaction, true);
         require(result == ACCOUNT_VALIDATION_SUCCESS_MAGIC, "argent/invalid-transaction");
@@ -235,10 +292,17 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Recovery ****************************************************/
 
+    /// Current escape if any, and its status
     function escapeAndStatus() external view returns (Escape memory, EscapeStatus) {
         return (escape, _escapeStatus(escape));
     }
 
+    /// @notice Changes the owner
+    /// Must be called by the account and authorised by the owner and a guardian (if guardian is set).
+    /// @param _newOwner New owner address
+    /// @param _signature Signature from the new owner to prevent changing to an address which is not in control of the user
+    /// Signature is the Ethereum Signed Message of this hash:
+    /// hash = keccak256(abi.encodePacked(changeOwner.selector, block.chainid, accountAddress, oldOwner))
     function changeOwner(address _newOwner, bytes memory _signature) external {
         _requireOnlySelf();
         _validateNewOwner(_newOwner, _signature);
@@ -249,6 +313,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         emit OwnerChanged(_newOwner);
     }
 
+    /// @notice Changes the guardian
+    /// Must be called by the account and authorised by the owner and a guardian (if guardian is set).
+    /// @param _newGuardian The address of the new guardian, or 0 to disable the guardian
     function changeGuardian(address _newGuardian) external {
         _requireOnlySelf();
         require(_newGuardian != address(0) || guardianBackup == address(0), "argent/backup-should-be-null");
@@ -259,6 +326,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         emit GuardianChanged(_newGuardian);
     }
 
+    /// @notice Changes the backup guardian
+    /// Must be called by the account and authorised by the owner and a guardian (if guardian is set).
+    /// @param _newGuardianBackup The address of the new backup guardian, or 0 to disable the backup guardian
     function changeGuardianBackup(address _newGuardianBackup) external {
         _requireOnlySelf();
         _requireGuardian();
@@ -269,6 +339,13 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         emit GuardianBackupChanged(_newGuardianBackup);
     }
 
+    /// @notice Triggers the escape of the owner when it is lost or compromised.
+    /// Must be called by the account and authorised by just a guardian.
+    /// Cannot override an ongoing escape of the guardian.
+    /// @param _newOwner The new account owner if the escape completes
+    /// @dev
+    /// This method assumes that there is a guardian, and that `_newOwner` is not 0
+    /// This must be guaranteed before calling this method. Usually when validating the transaction
     function triggerEscapeOwner(address _newOwner) external {
         _requireOnlySelf();
         // no escape if there is an guardian escape triggered by the owner in progress
@@ -282,6 +359,13 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         emit EscapeOwnerTriggerred(readyAt, _newOwner);
     }
 
+    /// @notice Triggers the escape of the guardian when it is lost or compromised.
+    /// Must be called by the account and authorised by the owner alone.
+    /// Can override an ongoing escape of the owner.
+    /// @param _newGuardian The new account guardian if the escape completes
+    /// @dev
+    /// This method assumes that there is a guardian
+    /// This must be guaranteed before calling this method. Usually when validating the transaction
     function triggerEscapeGuardian(address _newGuardian) external {
         _requireOnlySelf();
 
@@ -291,6 +375,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         emit EscapeGuardianTriggerred(readyAt, _newGuardian);
     }
 
+    /// @notice Cancels an ongoing escape if any.
+    /// Must be called by the account and authorised by the owner and a guardian (if guardian is set).
     function cancelEscape() external {
         _requireOnlySelf();
         require(_escapeStatus(escape) != EscapeStatus.None, "argent/invalid-escape");
@@ -298,10 +384,13 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         _resetEscapeAttempts();
     }
 
+    /// @notice Completes the escape and changes the owner after the security period
+    /// Must be called by the account and authorised by just a guardian
+    /// @dev
+    /// This method assumes that there is a guardian, and that the there is an escape for the owner
+    /// This must be guaranteed before calling this method. Usually when validating the transaction
     function escapeOwner() external {
         _requireOnlySelf();
-        // This method assumes that there is a guardian, and that the there is an escape for the owner
-        // This must be guaranteed before calling this method. Usually when validating the transaction
         require(_escapeStatus(escape) == EscapeStatus.Ready, "argent/invalid-escape");
 
         _resetEscapeAttempts();
@@ -310,10 +399,13 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         delete escape;
     }
 
+    /// @notice Completes the escape and changes the guardian after the security period
+    /// Must be called by the account and authorised by just the owner
+    /// @dev
+    /// This method assumes that there is a guardian, and that the there is an escape for the guardian
+    /// This must be guaranteed before calling this method. Usually when validating the transaction
     function escapeGuardian() external {
         _requireOnlySelf();
-        // this method assumes that there is a guardian, and that the there is an escape for the guardian
-        // This must be guaranteed before calling this method. Usually when validating the transaction
         require(_escapeStatus(escape) == EscapeStatus.Ready, "argent/invalid-escape");
 
         _resetEscapeAttempts();
@@ -324,7 +416,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /************************************************** Miscellaneous *************************************************/
 
-    // IERC165
+    /// @inheritdoc IERC165
     function supportsInterface(bytes4 _interfaceId) external pure override returns (bool) {
         // NOTE: it's more efficient to use a mapping based implementation if there are more than 3 interfaces
         return
