@@ -118,7 +118,7 @@ describe("Argent account", () => {
 
       const value = 42;
       const response = await account1.signer.sendTransaction({ to: account2.address, value });
-      await response.wait();
+      await expect(response).to.emit(account1, "TransactionExecuted").withArgs(response.hash, "0x");
 
       const balanceAfter1 = await provider.getBalance(account1.address);
       const balanceAfter2 = await provider.getBalance(account2.address);

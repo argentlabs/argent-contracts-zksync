@@ -8,8 +8,9 @@ contract TestDapp {
         userNumbers[msg.sender] = _number;
     }
 
-    function increaseNumber(uint256 _increment) external {
-        userNumbers[msg.sender] += _increment;
+    function increaseNumber(uint256 _increment) external returns (uint256 _newNumber) {
+        _newNumber = userNumbers[msg.sender] + _increment;
+        userNumbers[msg.sender] = _newNumber;
     }
 
     function doRevert() external pure {

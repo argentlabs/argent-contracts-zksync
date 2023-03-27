@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity 0.8.18;
 
+import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
+
 interface IProxy {
     /**
      * @notice Returns the implementation of the account.
@@ -19,10 +21,16 @@ contract Proxy is IProxy {
     }
 
     fallback() external payable {
-        address target = implementation;
+        _delegate();
+    }
+
+    receive() external payable {
+        _delegate();
+    }
+
+    function _delegate() private {
+        bool result = EfficientCall.rawDelegateCall(gasleft(), implementation, msg.data);
         assembly {
-            calldatacopy(0, 0, calldatasize())
-            let result := delegatecall(gas(), target, 0, calldatasize(), 0, 0)
             returndatacopy(0, 0, returndatasize())
             switch result
             case 0 {
@@ -33,6 +41,4 @@ contract Proxy is IProxy {
             }
         }
     }
-
-    receive() external payable {}
 }

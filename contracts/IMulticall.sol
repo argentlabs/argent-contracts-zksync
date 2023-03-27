@@ -10,5 +10,5 @@ interface IMulticall {
 
     /// @notice Executes the calls in sequential order, reverting if any of the calls reverts
     /// @param _calls Calls to execute
-    function multicall(Call[] memory _calls) external;
+    function multicall(Call[] calldata _calls) external returns (bytes[] memory _returnData);
 }

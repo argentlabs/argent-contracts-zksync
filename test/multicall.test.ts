@@ -1,4 +1,5 @@
 import { expect } from "chai";
+import { ethers } from "hardhat";
 import { deployAccount, makeCall } from "../src/account.service";
 import { checkDeployer } from "../src/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
@@ -61,5 +62,17 @@ describe("Account multicall", () => {
     await response.wait();
 
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(69n);
+  });
+
+  it("Should emit call return values in event", async () => {
+    const response = await account.multicall([
+      makeCall(await testDapp.populateTransaction.setNumber(20)),
+      makeCall(await testDapp.populateTransaction.increaseNumber(10)),
+      makeCall(await testDapp.populateTransaction.increaseNumber(39)),
+    ]);
+    const coder = new ethers.utils.AbiCoder();
+    const returnValues = ["0x", coder.encode(["uint256"], [30]), coder.encode(["uint256"], [69])];
+    const returnData = coder.encode(["bytes[]"], [returnValues]);
+    await expect(response).to.emit(account, "TransactionExecuted").withArgs(response.hash, returnData);
   });
 });
