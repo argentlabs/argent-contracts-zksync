@@ -52,7 +52,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         uint32 readyAt;     // bits [0...32[
         /// packed `EscapeType` enum
         uint8 escapeType;   // bits [32...40[
-        /// new owner or new guardian
+        /// new owner or new guardian address
         address newSigner;  // bits [40...200[
     }
 
@@ -102,33 +102,33 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     event TransactionExecuted(bytes32 hashed, bytes response);
 
     /// @notice The account owner was changed
-    /// @param newOwner signer of the new owner
+    /// @param newOwner new owner address
     event OwnerChanged(address newOwner);
 
     /// @notice The account guardian was changed or removed
-    /// @param newGuardian signer of the new guardian or 0 if it was removed
+    /// @param newGuardian address of the new guardian or 0 if it was removed
     event GuardianChanged(address newGuardian);
 
     /// @notice The account backup guardian was changed or removed
-    /// @param newGuardianBackup signer of the backup guardian or 0 if it was removed
+    /// @param newGuardianBackup address of the backup guardian or 0 if it was removed
     event GuardianBackupChanged(address newGuardianBackup);
 
     /// @notice Owner escape was triggered by the guardian
     /// @param readyAt when the escape can be completed
-    /// @param newOwner signer of the new owner to be set after the security period
+    /// @param newOwner new owner address to be set after the security period
     event EscapeOwnerTriggerred(uint32 readyAt, address newOwner);
 
-    /// @notice Guardian escape was triggered by the signer
+    /// @notice Guardian escape was triggered by the owner
     /// @param readyAt when the escape can be completed
-    /// @param newGuardian signer of the new guardian to be set after the security period. O if the guardian will be removed
+    /// @param newGuardian address of the new guardian to be set after the security period. O if the guardian will be removed
     event EscapeGuardianTriggerred(uint32 readyAt, address newGuardian);
 
     /// @notice Owner escape was completed and there is a new account owner
-    /// @param newOwner signer of the new owner
+    /// @param newOwner new owner address
     event OwnerEscaped(address newOwner);
 
     /// @notice Guardian escape was completed and there is a new account guardian
-    /// @param newGuardian signer of the new guardian or 0 if it was removed
+    /// @param newGuardian address of the new guardian or 0 if it was removed
     event GuardianEscaped(address newGuardian);
 
     /// An ongoing escape was canceled
@@ -297,9 +297,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         return (escape, _escapeStatus(escape));
     }
 
-    /// @notice Changes the signer
+    /// @notice Changes the owner
     /// Must be called by the account and authorised by the owner and a guardian (if guardian is set).
-    /// @param _newOwner The signer of the new owner
+    /// @param _newOwner New owner address
     /// @param _signature Signature from the new owner to prevent changing to an address which is not in control of the user
     /// Signature is the Ethereum Signed Message of this hash:
     /// hash = keccak256(abi.encodePacked(changeOwner.selector, block.chainid, accountAddress, oldOwner))
@@ -315,7 +315,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /// @notice Changes the guardian
     /// Must be called by the account and authorised by the owner and a guardian (if guardian is set).
-    /// @param _newGuardian The signer of the new guardian, or 0 to disable the guardian
+    /// @param _newGuardian The address of the new guardian, or 0 to disable the guardian
     function changeGuardian(address _newGuardian) external {
         _requireOnlySelf();
         require(_newGuardian != address(0) || guardianBackup == address(0), "argent/backup-should-be-null");
@@ -328,7 +328,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /// @notice Changes the backup guardian
     /// Must be called by the account and authorised by the owner and a guardian (if guardian is set).
-    /// @param _newGuardianBackup The signer of the new backup guardian, or 0 to disable the bakcup guardian
+    /// @param _newGuardianBackup The address of the new backup guardian, or 0 to disable the backup guardian
     function changeGuardianBackup(address _newGuardianBackup) external {
         _requireOnlySelf();
         _requireGuardian();
