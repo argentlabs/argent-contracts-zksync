@@ -8,5 +8,7 @@ interface IMulticall {
         bytes data;
     }
 
+    /// @notice Executes the calls in sequential order, reverting if any of the calls reverts
+    /// @param _calls Calls to execute
     function multicall(Call[] calldata _calls) external returns (bytes[] memory _returnData);
 }
