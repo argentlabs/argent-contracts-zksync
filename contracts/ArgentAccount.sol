@@ -208,13 +208,13 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     /**************************************************** Execution ***************************************************/
 
     // IMulticall
-    function multicall(IMulticall.Call[] calldata _calls) external returns (bytes[] memory returnData) {
+    function multicall(IMulticall.Call[] calldata _calls) external returns (bytes[] memory _returnData) {
         _requireOnlySelf();
-        returnData = new bytes[](_calls.length);
+        _returnData = new bytes[](_calls.length);
         for (uint256 i = 0; i < _calls.length; i++) {
             IMulticall.Call calldata call = _calls[i];
             require(call.to != address(this), "argent/no-multicall-to-self");
-            returnData[i] = _execute(call.to, call.value, call.data);
+            _returnData[i] = _execute(call.to, call.value, call.data);
         }
     }
 
