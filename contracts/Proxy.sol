@@ -20,9 +20,25 @@ contract Proxy is IProxy {
         require(success, "argent/proxy-init-failed");
     }
 
-    fallback(bytes calldata _data) external payable returns (bytes memory) {
-        return EfficientCall.delegateCall(gasleft(), implementation, _data);
+    fallback() external payable {
+        _delegate();
     }
 
-    receive() external payable {}
+    receive() external payable {
+        _delegate();
+    }
+
+    function _delegate() private {
+        bool result = EfficientCall.rawDelegateCall(gasleft(), implementation, msg.data);
+        assembly {
+            returndatacopy(0, 0, returndatasize())
+            switch result
+            case 0 {
+                revert(0, returndatasize())
+            }
+            default {
+                return(0, returndatasize())
+            }
+        }
+    }
 }
