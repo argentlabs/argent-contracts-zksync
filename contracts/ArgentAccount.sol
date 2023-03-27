@@ -76,7 +76,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     event AccountCreated(address account, address indexed owner, address guardian);
     event AccountUpgraded(address newImplementation);
-    event TransactionExecuted(bytes32 hashed, bytes response);
+    event TransactionExecuted(bytes32 indexed hash, bytes returnData);
 
     event OwnerChanged(address newOwner);
     event GuardianChanged(address newGuardian);
@@ -208,30 +208,34 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     /**************************************************** Execution ***************************************************/
 
     // IMulticall
-    function multicall(IMulticall.Call[] calldata _calls) external {
+    function multicall(IMulticall.Call[] calldata _calls) external returns (bytes[] memory returnData) {
         _requireOnlySelf();
+        returnData = new bytes[](_calls.length);
         for (uint256 i = 0; i < _calls.length; i++) {
             IMulticall.Call calldata call = _calls[i];
             require(call.to != address(this), "argent/no-multicall-to-self");
-            _execute(call.to, call.value, call.data);
+            returnData[i] = _execute(call.to, call.value, call.data);
         }
     }
 
     // IAccount
     function executeTransaction(
-        bytes32, // _transactionHash
+        bytes32 _transactionHash,
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
     ) external payable override {
         _requireOnlyBootloader();
-        _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
+        bytes memory returnData = _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
+        emit TransactionExecuted(_transactionHash, returnData);
     }
 
     // IAccount
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
-        bytes4 result = _validateTransaction(_transaction.encodeHash(), _transaction, true);
+        bytes32 transactionHash = _transaction.encodeHash();
+        bytes4 result = _validateTransaction(transactionHash, _transaction, true);
         require(result == ACCOUNT_VALIDATION_SUCCESS_MAGIC, "argent/invalid-transaction");
-        _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
+        bytes memory returnData = _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
+        emit TransactionExecuted(transactionHash, returnData);
     }
 
     /**************************************************** Recovery ****************************************************/
@@ -504,7 +508,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /**************************************************** Execution ***************************************************/
 
-    function _execute(address to, uint256 value, bytes calldata data) private {
+    function _execute(address to, uint256 value, bytes calldata data) private returns (bytes memory) {
         uint128 value128 = Utils.safeCastToU128(value);
         uint32 gas = Utils.safeCastToU32(gasleft());
 
@@ -520,10 +524,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                 selector == DEPLOYER_SYSTEM_CONTRACT.createAccount.selector ||
                 selector == DEPLOYER_SYSTEM_CONTRACT.create2Account.selector;
         }
-        bool success = EfficientCall.rawCall(gas, to, value128, data, isSystemCall);
-        if (!success) {
-            EfficientCall.propagateRevert();
-        }
+        return EfficientCall.call(gas, to, value128, data, isSystemCall);
     }
 
     /**************************************************** Recovery ****************************************************/
