@@ -259,7 +259,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         if (_isValidSignature(_hash, _signature)) {
             return IERC1271.isValidSignature.selector;
         }
-        return 0;
+        return bytes4(0);
     }
 
     /**************************************************** Execution ***************************************************/
