@@ -76,7 +76,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     event AccountCreated(address account, address indexed owner, address guardian);
     event AccountUpgraded(address newImplementation);
-    event TransactionExecuted(bytes32 indexed hash, bytes returnData);
+    event TransactionExecuted(bytes32 indexed transactionHash, bytes returnData);
 
     event OwnerChanged(address newOwner);
     event GuardianChanged(address newGuardian);
