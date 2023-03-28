@@ -4,8 +4,8 @@ import { Bytes, BytesLike } from "ethers/lib/utils";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount } from "../typechain-types";
+import { TransactionRequest } from "./model";
 
-export type TransactionRequest = zksync.types.TransactionRequest;
 export type Signatory = (Signer & TypedDataSigner) | "zeros" | "random";
 
 export class ArgentSigner extends Signer {

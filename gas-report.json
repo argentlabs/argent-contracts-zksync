@@ -1,0 +1,9 @@
+{
+  "deployImplementation": "3,450,000 gas",
+  "deployFactory": "1,173,000 gas",
+  "deployAccount": "193,000 gas",
+  "transferETH": "148,000 gas",
+  "multicall2transfers": "170,000 gas",
+  "changeOwner": "144,000 gas",
+  "changeGuardian": "137,000 gas"
+}

@@ -26,5 +26,8 @@ jobs:
       - name: Start local node
         run: ./bin/start-ci-node.sh
 
+      - name: Gas report
+        run: yarn gas:check
+
       - name: Tests
         run: yarn test
