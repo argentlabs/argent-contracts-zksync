@@ -19,6 +19,8 @@ import {IMulticall} from "./IMulticall.sol";
 import {IProxy} from "./Proxy.sol";
 import {Signatures} from "./Signatures.sol";
 
+/// @title The main Argent account on Era
+/// @notice This is the implementation contract. Actual user accounts are proxies deployed by the `AccountFactory`
 contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
@@ -50,11 +52,11 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     // prettier-ignore
     struct Escape {
         /// timestamp for activation of escape mode, 0 otherwise
-        uint32 readyAt;     // bits [0...32[
+        uint32 readyAt;                         // bits [0...32[
         /// packed `EscapeType` enum
-        uint8 escapeType;   // bits [32...40[
+        uint8 escapeType;                       // bits [32...40[
         /// new owner or new guardian address
-        address newSigner;  // bits [40...200[
+        address newSigner;                      // bits [40...200[
     }
 
     bytes32 public constant NAME = "ArgentAccount";
