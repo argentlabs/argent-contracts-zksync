@@ -1,12 +1,11 @@
 import { expect } from "chai";
-import { Contract } from "ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { deployAccount } from "../src/account.service";
 import { checkDeployer } from "../src/deployer.service";
 import { getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
-import { ArgentAccount } from "../typechain-types";
+import { ArgentAccount, TestErc20 } from "../typechain-types";
 import { deployer, guardian, newOwner, owner, provider } from "./fixtures";
 
 describe("Paymaster tests", () => {
@@ -19,7 +18,7 @@ describe("Paymaster tests", () => {
 
   describe("No approve paymaster for tx signed only by one party", async () => {
     let account: ArgentAccount;
-    let token: Contract;
+    let token: TestErc20;
 
     before(async () => {
       account = await deployAccount({
@@ -30,7 +29,7 @@ describe("Paymaster tests", () => {
         connect: [guardian], // Important, the guardian ALONE is signing
       });
       const tokenArtifact = await deployer.loadArtifact("TestErc20");
-      token = await deployer.deploy(tokenArtifact, ["TestToken", "TestToken", 0]);
+      token = (await deployer.deploy(tokenArtifact, ["TestToken", "TestToken", 0])) as TestErc20;
     });
 
     it("Guardian alone cannot use the approval paymaster", async () => {
