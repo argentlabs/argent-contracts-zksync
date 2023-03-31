@@ -20,7 +20,7 @@ contract AccountFactory {
         proxyBytecodeHash = _proxyBytecodeHash;
     }
 
-    /// @notice Deploys a new account via the `create2Account` system call, then initializes
+    /// Deploys a new account via the `create2Account` system call, then initializes
     /// it by calling the `ArgentAccount.initialize` method
     function deployProxyAccount(
         bytes32 _salt,
@@ -43,8 +43,7 @@ contract AccountFactory {
         (_accountAddress) = abi.decode(returnData, (address));
     }
 
-    /// @notice Predicts the address of an account that will be deployed by `deployProxyAccount`
-    /// with the same arguments
+    /// Computes the address of an account that will be deployed by `deployProxyAccount` with the same arguments
     function computeCreate2Address(
         bytes32 _salt,
         address _implementation,
@@ -55,7 +54,7 @@ contract AccountFactory {
         return L2ContractHelper.computeCreate2Address(address(this), _salt, proxyBytecodeHash, inputHash);
     }
 
-    /// @notice Returns the `_data` argument for the `Proxy` constructor
+    /// Returns the `_data` argument for the `Proxy` constructor
     function proxyContructorData(
         address _implementation,
         address _owner,
