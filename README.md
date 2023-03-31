@@ -6,7 +6,7 @@ _Warning: zkSync Era is still in alpha, so is this project. In particular the `A
 
 The account is similar to a 2-of-2 multisig. With two parties with different roles, the `owner` and the `guardian`. 
 
-The `owner` key is under the user control. Typically stored on the user's phone. Users must keep a safe back up of this key.
+The `owner` key is under user control. Typically stored on the user's phone. Users must keep a safe back up of this key.
 
 The `guardian` is both as a co-validator for typical operations of the wallet (including fraud monitoring), and an actor that can help recover the wallet in case the `owner` key is lost or compromised.
 
