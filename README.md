@@ -19,7 +19,7 @@ Alternatively, he/she can add a second `guardian_backup` key to the account. It 
 Under this model we can build a simple yet highly secure non-custodial wallet.
 
 ## Escape
-In case one party is not cooperating (maybe keys were lost or compromised), the other party alone can trigger the `escape` mode (a.k.a. recovery) on the wallet .
+In case one party is not cooperating (maybe keys were lost or compromised), the other party alone can trigger the `escape` mode (a.k.a. recovery) on the wallet.
 
 An escape takes 7 days before being ready. After the time delay, the non-cooperating party can be replaced.
 
