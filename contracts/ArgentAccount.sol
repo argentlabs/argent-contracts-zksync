@@ -64,7 +64,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     /// Limit escape attempts by only one party
     uint32 public constant MAX_ESCAPE_ATTEMPTS = 5;
     /// Limit escape attempts by only one party
-    uint256 public constant MAX_ESCAPE_PRIORITY_FEE = 50 gwei; // Limit gas usage by only one party
+    uint256 public constant MAX_ESCAPE_PRIORITY_FEE = 50 gwei;
 
     /// Time it takes for the escape to become ready after being triggered
     uint32 public immutable escapeSecurityPeriod;
@@ -257,7 +257,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     ) external payable override returns (bytes4) {
         _requireOnlyBootloader();
         bytes32 transactionHash = _suggestedSignedHash != bytes32(0) ? _suggestedSignedHash : _transaction.encodeHash();
-        return _validateTransaction(transactionHash, _transaction, false);
+        return _validateTransaction(transactionHash, _transaction, /*isFromOutside*/ false);
     }
 
     /// @inheritdoc IERC1271
@@ -295,7 +295,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     /// @inheritdoc IAccount
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
         bytes32 transactionHash = _transaction.encodeHash();
-        bytes4 result = _validateTransaction(transactionHash, _transaction, true);
+        bytes4 result = _validateTransaction(transactionHash, _transaction, /*isFromOutside*/ true);
         require(result == ACCOUNT_VALIDATION_SUCCESS_MAGIC, "argent/invalid-transaction");
         bytes memory returnData = _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
         emit TransactionExecuted(transactionHash, returnData);
