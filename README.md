@@ -21,7 +21,7 @@ Under this model we can build a simple yet highly secure non-custodial wallet.
 ## Escape
 In case one party is not cooperating (maybe keys were lost or compromised), the other party alone can trigger the `escape` mode (a.k.a. recovery) on the wallet.
 
-An escape takes 7 days before being ready. After the time delay, the non-cooperating party can be replaced.
+An escape takes 7 days before being ready. After the time delay, the non-cooperating party can be replaced ("escaped").
 
 The wallet is asymmetric in favor of the `owner` who can override an escape triggered by the `guardian`. So in case both parties try to escape each other the `owner` has the upper hand.
 
