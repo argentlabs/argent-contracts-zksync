@@ -572,12 +572,12 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     function _isValidOwnerSignature(bytes32 _hash, bytes memory _ownerSignature) private view returns (bool) {
-        address signer = Signatures.recoverSigner(_hash, _ownerSignature);
+        (address signer, ) = _hash.tryRecover(_ownerSignature);
         return signer != address(0) && signer == owner;
     }
 
     function _isValidGuardianSignature(bytes32 _hash, bytes memory _guardianSignature) private view returns (bool) {
-        address signer = Signatures.recoverSigner(_hash, _guardianSignature);
+        (address signer, ) = _hash.tryRecover(_guardianSignature);
         return signer != address(0) && (signer == guardian || signer == guardianBackup);
     }
 
@@ -600,7 +600,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         bytes4 selector = this.changeOwner.selector;
         bytes memory message = abi.encodePacked(selector, block.chainid, address(this), owner);
         bytes32 messageHash = keccak256(message).toEthSignedMessageHash();
-        address signer = Signatures.recoverSigner(messageHash, _signature);
+        (address signer, ) = messageHash.tryRecover(_signature);
         require(signer != address(0) && signer == _newOwner, "argent/invalid-owner-sig");
     }
 

@@ -9,44 +9,6 @@ import {Transaction, TransactionHelper} from "@matterlabs/zksync-contracts/l2/sy
 library Signatures {
     uint256 public constant SINGLE_LENGTH = 65;
 
-    /// Non-reverting version of ECDSA.recover that returns address(0) if anything is invalid
-    function recoverSigner(bytes32 _hash, bytes memory _signature) internal pure returns (address) {
-        if (_signature.length != SINGLE_LENGTH) {
-            return address(0);
-        }
-
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-        // Signature loading code
-        // we jump 32 (0x20) as the first slot of bytes contains the length
-        // we jump 65 (0x41) per signature
-        // for v we load 32 bytes ending with v (the first 31 come from s) then apply a mask
-        assembly {
-            r := mload(add(_signature, 0x20))
-            s := mload(add(_signature, 0x40))
-            v := and(mload(add(_signature, 0x41)), 0xff)
-        }
-        if (v != 27 && v != 28) {
-            return address(0);
-        }
-
-        // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
-        // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
-        // the valid range for s in (301): 0 < s < secp256k1n ÷ 2 + 1, and for v in (302): v ∈ {27, 28}. Most
-        // signatures from current libraries generate a unique signature with an s-value in the lower half order.
-        //
-        // If your library generates malleable signatures, such as s-values in the upper range, calculate a new s-value
-        // with 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 - s1 and flip v from 27 to 28 or
-        // vice versa. If your library also generates signatures with 0/1 for v instead 27/28, add 27 to v to accept
-        // these malleable signatures as well.
-        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
-            return address(0);
-        }
-
-        return ecrecover(_hash, v, r, s);
-    }
-
     /// Similar to `return (_fullSignature[:65], _fullSignature[65:]);` with `bytes calldata` but for `bytes memory`
     function splitSignatures(
         bytes memory _fullSignature

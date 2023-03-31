@@ -4,6 +4,7 @@ pragma solidity 0.8.18;
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "@matterlabs/zksync-contracts/l2/system-contracts/interfaces/IAccount.sol";
@@ -18,6 +19,7 @@ import {Signatures} from "../Signatures.sol";
 contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
+    using ECDSA for bytes32;
 
     struct Version {
         uint8 major;
@@ -305,7 +307,7 @@ contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     function isValidOwnerSignature(bytes32 _hash, bytes memory _ownerSignature) internal view returns (bool) {
-        address recovered = Signatures.recoverSigner(_hash, _ownerSignature);
+        (address recovered, ) = _hash.tryRecover(_ownerSignature);
         return recovered != address(0) && recovered == owner;
     }
 
@@ -313,7 +315,7 @@ contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
         if (guardian == address(0) && _guardianSignature.length == 0) {
             return true;
         }
-        address recovered = Signatures.recoverSigner(_hash, _guardianSignature);
+        (address recovered, ) = _hash.tryRecover(_guardianSignature);
         if (recovered == address(0)) {
             return false;
         }
