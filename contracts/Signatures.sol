@@ -9,7 +9,7 @@ import {Transaction, TransactionHelper} from "@matterlabs/zksync-contracts/l2/sy
 library Signatures {
     uint256 public constant SINGLE_LENGTH = 65;
 
-    // non-reverting version of ECDSA.recover that returns address(0) if anything is invalid
+    /// Non-reverting version of ECDSA.recover that returns address(0) if anything is invalid
     function recoverSigner(bytes32 _hash, bytes memory _signature) internal pure returns (address) {
         if (_signature.length != SINGLE_LENGTH) {
             return address(0);
@@ -47,7 +47,7 @@ library Signatures {
         return ecrecover(_hash, v, r, s);
     }
 
-    // similar to `return (_fullSignature[:65], _fullSignature[65:]);` with `bytes calldata` but for `bytes memory`
+    /// Similar to `return (_fullSignature[:65], _fullSignature[65:]);` with `bytes calldata` but for `bytes memory`
     function splitSignatures(
         bytes memory _fullSignature
     ) internal pure returns (bytes memory _signature1, bytes memory _signature2) {

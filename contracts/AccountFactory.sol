@@ -9,13 +9,19 @@ import {SystemContractHelper} from "@matterlabs/zksync-contracts/l2/system-contr
 
 import {ArgentAccount} from "./ArgentAccount.sol";
 
+/// @title The factory that deploys proxies to the `ArgentAccount`
+/// @dev This is hopefully a temporary solution until the Era protocol allows users to pay for the gas fees of their
+/// own account's deployment, without a need for a factory.
 contract AccountFactory {
+    /// The hash of the bytecode of the `Proxy` contract
     bytes32 public proxyBytecodeHash;
 
     constructor(bytes32 _proxyBytecodeHash) {
         proxyBytecodeHash = _proxyBytecodeHash;
     }
 
+    /// Deploys a new account via the `create2Account` system call, then initializes
+    /// it by calling the `ArgentAccount.initialize` method
     function deployProxyAccount(
         bytes32 _salt,
         address _implementation,
@@ -37,6 +43,7 @@ contract AccountFactory {
         (_accountAddress) = abi.decode(returnData, (address));
     }
 
+    /// Computes the address of an account that will be deployed by `deployProxyAccount` with the same arguments
     function computeCreate2Address(
         bytes32 _salt,
         address _implementation,
@@ -47,6 +54,7 @@ contract AccountFactory {
         return L2ContractHelper.computeCreate2Address(address(this), _salt, proxyBytecodeHash, inputHash);
     }
 
+    /// Returns the `_data` argument for the `Proxy` constructor
     function proxyContructorData(
         address _implementation,
         address _owner,
