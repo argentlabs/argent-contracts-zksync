@@ -17,7 +17,7 @@
   },
   "devDependencies": {
     "@matterlabs/hardhat-zksync-deploy": "^0.6.3",
-    "@matterlabs/hardhat-zksync-solc": "^0.3.14",
+    "@matterlabs/hardhat-zksync-solc": "^0.3.15",
     "@matterlabs/hardhat-zksync-verify": "^0.1.4",
     "@matterlabs/zksync-contracts": "^0.6.1",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.6",
@@ -28,7 +28,7 @@
     "@typechain/hardhat": "^6.1.5",
     "@types/chai": "^4.3.4",
     "@types/mocha": "^10.0.1",
-    "@types/node": "^18.15.10",
+    "@types/node": "^18.15.11",
     "chai": "^4.3.7",
     "dotenv": "^16.0.3",
     "ethers": "^5.7.2",
@@ -40,7 +40,7 @@
     "solhint": "^3.4.1",
     "ts-node": "^10.9.1",
     "typechain": "^8.1.1",
-    "typescript": "^5.0.2",
+    "typescript": "^5.0.3",
     "zksync-web3": "^0.14.3"
   }
 }
