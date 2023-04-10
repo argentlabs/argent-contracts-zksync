@@ -163,6 +163,44 @@ describe("Recovery", () => {
       expectEqualEscapes(escape, { readyAt, escapeType: EscapeType.Guardian, newSigner: newGuardian.address });
     });
 
+    it("Should run triggerEscapeGuardian() by owner to remove guardian", async () => {
+      const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner] });
+
+      const [escapeBefore] = await account.escapeAndStatus();
+      expectEqualEscapes(escapeBefore, nullEscape);
+
+      const response = await account.triggerEscapeGuardian(AddressZero);
+      const { timestamp } = await waitForL1BatchBlock(response, provider);
+      const readyAt = timestamp + escapeSecurityPeriod;
+      await expect(response).to.emit(account, "EscapeGuardianTriggerred").withArgs(readyAt, AddressZero);
+
+      const [escape] = await account.escapeAndStatus();
+      expectEqualEscapes(escape, { readyAt, escapeType: EscapeType.Guardian, newSigner: AddressZero });
+    });
+
+    it("Should run triggerEscapeGuardian() by owner when there is a backup guardian", async () => {
+      const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner] });
+      await expect(account.guardianBackup()).to.eventually.equal(AddressZero);
+
+      await (await connect(account, [owner, guardian]).changeGuardianBackup(newGuardianBackup.address)).wait();
+      await expect(account.guardianBackup()).to.eventually.equal(newGuardianBackup.address);
+
+      const [escapeBefore] = await account.escapeAndStatus();
+      expectEqualEscapes(escapeBefore, nullEscape);
+
+      // trigger escape to 0 guardian should fail as we can't have a backup guardian with no guardian
+      const triggerToZeroPromise = connect(account, [owner]).triggerEscapeGuardian(AddressZero);
+      await expect(triggerToZeroPromise).to.be.rejectedWith("argent/backup-should-be-null");
+
+      const response = await account.triggerEscapeGuardian(newGuardian.address);
+      const { timestamp } = await waitForL1BatchBlock(response, provider);
+      const readyAt = timestamp + escapeSecurityPeriod;
+      await expect(response).to.emit(account, "EscapeGuardianTriggerred").withArgs(readyAt, newGuardian.address);
+
+      const [escape] = await account.escapeAndStatus();
+      expectEqualEscapes(escape, { readyAt, escapeType: EscapeType.Guardian, newSigner: newGuardian.address });
+    });
+
     it("Should run triggerEscapeOwner() by guardian", async () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [guardian] });
 
