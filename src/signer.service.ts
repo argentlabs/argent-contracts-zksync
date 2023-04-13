@@ -98,7 +98,7 @@ export class ArgentSigner extends Signer {
     if (transaction.from && transaction.from !== from) {
       throw new Error(`This signer can only sign transactions from ${from}, got ${transaction.from} instead.`);
     }
-    const txForEstimation = {
+    return {
       ...transaction,
       type: zksync.utils.EIP712_TX_TYPE,
       from,
@@ -106,15 +106,12 @@ export class ArgentSigner extends Signer {
       value: transaction.value ?? "0x00",
       chainId: transaction.chainId ?? (await this.getChainId()),
       gasPrice: transaction.gasPrice ?? (await this.provider.getGasPrice()),
+      gasLimit: transaction.gasLimit ?? (await this.provider.estimateGas({ ...transaction, from })),
       nonce: transaction.nonce ?? (await this.provider.getTransactionCount(from, "pending")),
       customData: {
         ...transaction.customData,
         gasPerPubdata: transaction.customData?.gasPerPubdata ?? zksync.utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
       },
-    };
-    return {
-      ...txForEstimation,
-      gasLimit: transaction.gasLimit ?? (await this.provider.estimateGas(txForEstimation)),
     };
   }
 

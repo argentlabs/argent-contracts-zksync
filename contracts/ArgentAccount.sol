@@ -63,8 +63,10 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /// Limit escape attempts by only one party
     uint32 public constant MAX_ESCAPE_ATTEMPTS = 5;
-    /// Limit escape attempts by only one party
+    /// Limits gas price in escapes
     uint256 public constant MAX_ESCAPE_PRIORITY_FEE = 50 gwei;
+    /// Limits pubdata price in escapes
+    uint256 public constant MAX_ESCAPE_GAS_PER_PUBDATA_BYTE = 50000;
 
     /// Time it takes for the escape to become ready after being triggered
     uint32 public immutable escapeSecurityPeriod;
@@ -257,7 +259,11 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     ) external payable override returns (bytes4) {
         _requireOnlyBootloader();
         bytes32 transactionHash = _suggestedSignedHash != bytes32(0) ? _suggestedSignedHash : _transaction.encodeHash();
-        return _validateTransaction(transactionHash, _transaction, /*isFromOutside*/ false);
+        bool validTx = _validateTransaction(transactionHash, _transaction, /*isFromOutside*/ false);
+        if (validTx) {
+            return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+        }
+        return bytes4(0);
     }
 
     /// @inheritdoc IERC1271
@@ -306,8 +312,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         );
 
         bytes32 transactionHash = _transaction.encodeHash();
-        bytes4 result = _validateTransaction(transactionHash, _transaction, /*isFromOutside*/ true);
-        require(result == ACCOUNT_VALIDATION_SUCCESS_MAGIC, "argent/invalid-transaction");
+        bool validTx = _validateTransaction(transactionHash, _transaction, /*isFromOutside*/ true);
+        require(validTx, "argent/invalid-transaction");
         bytes memory returnData = _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
         emit TransactionExecuted(transactionHash, returnData);
     }
@@ -469,11 +475,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         bytes32 _transactionHash,
         Transaction calldata _transaction,
         bool _isFromOutside
-    ) private returns (bytes4) {
+    ) private returns (bool) {
         require(owner != address(0), "argent/uninitialized");
-
-        require(_transaction.txType == EIP_712_TX_TYPE, "argent/invalid-tx-type");
-        require(address(uint160(_transaction.from)) == address(this), "argent/invalid-from-address");
+        bool simulation = false;
 
         SystemContractsCaller.systemCallWithPropagatedRevert(
             uint32(gasleft()),
@@ -482,8 +486,18 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
         );
 
+        if (_transaction.txType != EIP_712_TX_TYPE) {
+            // Returning false instead or reverting to allow estimation with any type
+            simulation = true;
+        }
+        require(address(uint160(_transaction.from)) == address(this), "argent/invalid-from-address");
+
         address to = address(uint160(_transaction.to));
-        bytes4 selector = bytes4(_transaction.data);
+
+        bytes4 selector = bytes4(0);
+        if (_transaction.data.length >= 4) {
+            selector = bytes4(_transaction.data);
+        }
         bytes memory signature = _transaction.signature;
 
         if (!_isFromOutside) {
@@ -504,78 +518,88 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             if (requiredLength == 2 * Signatures.SINGLE_LENGTH) {
                 signature[(2 * Signatures.SINGLE_LENGTH) - 1] = bytes1(uint8(27));
             }
+            simulation = true;
         }
 
         if (to == address(this)) {
             if (selector == this.triggerEscapeOwner.selector) {
                 if (!_isFromOutside) {
-                    require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
-                    require(guardianEscapeAttempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
+                    _requireEscapeGasParameters(_transaction, guardianEscapeAttempts);
                     guardianEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
-                address newOwner = abi.decode(_transaction.data[4:], (address)); // This also asserts that the call data is valid
+                address newOwner = abi.decode(_transaction.data[4:], (address));
+                // This also asserts that the call data is valid
                 require(newOwner != address(0), "argent/null-owner");
                 _requireGuardian();
 
                 if (_isValidGuardianSignature(_transactionHash, signature)) {
-                    return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+                    return !simulation;
                 }
-                return bytes4(0);
+                return false;
             }
 
             if (selector == this.escapeOwner.selector) {
                 if (!_isFromOutside) {
-                    require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
-                    require(guardianEscapeAttempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
+                    _requireEscapeGasParameters(_transaction, guardianEscapeAttempts);
                     guardianEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
                 _requireGuardian();
                 require(escape.escapeType == uint8(EscapeType.Owner), "argent/invalid-escape");
                 if (_isValidGuardianSignature(_transactionHash, signature)) {
-                    return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+                    return !simulation;
                 }
-                return bytes4(0);
+                return false;
             }
 
             if (selector == this.triggerEscapeGuardian.selector) {
                 if (!_isFromOutside) {
-                    require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
-                    require(ownerEscapeAttempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
+                    _requireEscapeGasParameters(_transaction, ownerEscapeAttempts);
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
                 abi.decode(_transaction.data[4:], (address)); // This asserts that the call data is valid
                 _requireGuardian();
                 if (_isValidOwnerSignature(_transactionHash, signature)) {
-                    return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+                    return !simulation;
                 }
-                return bytes4(0);
+                return false;
             }
 
             if (selector == this.escapeGuardian.selector) {
                 if (!_isFromOutside) {
-                    require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
-                    require(ownerEscapeAttempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
+                    _requireEscapeGasParameters(_transaction, ownerEscapeAttempts);
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
                 _requireGuardian();
                 require(escape.escapeType == uint8(EscapeType.Guardian), "argent/invalid-escape");
                 if (_isValidOwnerSignature(_transactionHash, signature)) {
-                    return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+                    return !simulation;
                 }
-                return bytes4(0);
+                return false;
             }
 
             require(selector != this.executeAfterUpgrade.selector, "argent/forbidden-call");
         }
 
+        // We only allow outside calls for escape methods for now
+        // require(!_isFromOutside, "argent/invalid-outside-method");
+
         if (_isValidSignature(_transactionHash, signature)) {
-            return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
+            return !simulation;
         }
-        return bytes4(0);
+        return false;
+    }
+
+    function _requireEscapeGasParameters(Transaction calldata _transaction, uint32 attempts) private view {
+        require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
+        require(
+            _transaction.gasPerPubdataByteLimit <= MAX_ESCAPE_GAS_PER_PUBDATA_BYTE,
+            "argent/gasPerPubdataByte-too-high"
+        );
+        require(attempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
     }
 
     function _requiredSignatureLength(bytes4 _selector) private view returns (uint256) {
