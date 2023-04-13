@@ -5,7 +5,7 @@ import { deployAccount } from "../src/account.service";
 import { checkDeployer } from "../src/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
-import { ArgentSigner, TransactionRequest } from "../src/signer.service";
+import { ArgentSigner, FixedEIP712Signer, TransactionRequest } from "../src/signer.service";
 import { ArgentAccount, TestDapp } from "../typechain-types";
 import { TransactionStruct } from "../typechain-types/contracts/ArgentAccount";
 import { deployer, guardian, guardianAddress, owner, ownerAddress } from "./fixtures";
@@ -21,15 +21,25 @@ describe("Priority mode (from outside / L1)", () => {
     argent = await getTestInfrastructure(deployer);
   });
 
+  const toOutsideTransaction = (transaction: TransactionRequest): TransactionRequest => {
+    return {
+      ...transaction,
+      gasPrice: 0,
+      gasLimit: 0,
+      customData: {
+        ...transaction.customData,
+        gasPerPubdata: 0,
+      },
+    };
+  };
+
   const toSolidityTransaction = (transaction: TransactionRequest, signature: BytesLike): TransactionStruct => {
-    const signInput = zksync.EIP712Signer.getSignInput(transaction);
+    const signInput = FixedEIP712Signer.getSignInput(transaction);
     return {
       ...signInput,
       reserved: [0, 0, 0, 0],
-      signature,
-      factoryDeps: [],
-      paymasterInput: "0x",
       reservedDynamic: "0x",
+      signature,
     };
   };
 
@@ -47,7 +57,8 @@ describe("Priority mode (from outside / L1)", () => {
 
   it("Should refuse to execute a priority transaction with invalid signature", async () => {
     const transaction = await testDapp.populateTransaction.setNumber(42n);
-    const populated = await signer.populateTransaction(transaction);
+    const transactionFromOutside = toOutsideTransaction(transaction);
+    const populated = await signer.populateTransaction(transactionFromOutside);
     const signature = await new ArgentSigner(account, ["random", "random"]).getSignature(populated);
     const struct = toSolidityTransaction(populated, signature);
     const calldata = account.interface.encodeFunctionData("executeTransactionFromOutside", [struct]);
@@ -63,7 +74,8 @@ describe("Priority mode (from outside / L1)", () => {
 
   it("Should execute a priority transaction", async () => {
     const transaction = await testDapp.populateTransaction.setNumber(42n);
-    const populated = await signer.populateTransaction(transaction);
+    const transactionFromOutside = toOutsideTransaction(transaction);
+    const populated = await signer.populateTransaction(transactionFromOutside);
     const signature = await signer.getSignature(populated);
     const struct = toSolidityTransaction(populated, signature);
     const calldata = account.interface.encodeFunctionData("executeTransactionFromOutside", [struct]);
@@ -80,7 +92,8 @@ describe("Priority mode (from outside / L1)", () => {
   it("Should execute a priority transaction from L2", async () => {
     testDapp = (await deployTestDapp(deployer)).connect(signer);
     const transaction = await testDapp.populateTransaction.setNumber(42n);
-    const populated = await signer.populateTransaction(transaction);
+    const transactionFromOutside = toOutsideTransaction(transaction);
+    const populated = await signer.populateTransaction(transactionFromOutside);
     const signature = await signer.getSignature(populated);
     const struct = toSolidityTransaction(populated, signature);
 

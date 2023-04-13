@@ -12,7 +12,7 @@ import {INonceHolder} from "@matterlabs/zksync-contracts/l2/system-contracts/int
 import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
 import {SystemContractsCaller} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/SystemContractsCaller.sol";
 import {SystemContractHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/SystemContractHelper.sol";
-import {Transaction, TransactionHelper, IPaymasterFlow} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
+import {Transaction, TransactionHelper, IPaymasterFlow, EIP_712_TX_TYPE} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
 import {Utils} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/Utils.sol";
 
 import {IMulticall} from "./IMulticall.sol";
@@ -294,6 +294,17 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /// @inheritdoc IAccount
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
+        require(
+            _transaction.gasLimit == 0 &&
+                _transaction.gasPerPubdataByteLimit == 0 &&
+                _transaction.maxFeePerGas == 0 &&
+                _transaction.maxPriorityFeePerGas == 0 &&
+                _transaction.paymaster == 0 &&
+                _transaction.paymasterInput.length == 0 &&
+                _transaction.factoryDeps.length == 0,
+            "argent/invalid-outside-transaction"
+        );
+
         bytes32 transactionHash = _transaction.encodeHash();
         bytes4 result = _validateTransaction(transactionHash, _transaction, /*isFromOutside*/ true);
         require(result == ACCOUNT_VALIDATION_SUCCESS_MAGIC, "argent/invalid-transaction");
@@ -460,6 +471,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         bool _isFromOutside
     ) private returns (bytes4) {
         require(owner != address(0), "argent/uninitialized");
+
+        require(_transaction.txType == EIP_712_TX_TYPE, "argent/invalid-tx-type");
+        require(address(uint160(_transaction.from)) == address(this), "argent/invalid-from-address");
 
         SystemContractsCaller.systemCallWithPropagatedRevert(
             uint32(gasleft()),
