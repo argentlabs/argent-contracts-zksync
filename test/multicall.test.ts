@@ -1,11 +1,12 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import * as zksync from "zksync-web3";
 import { deployAccount, makeCall } from "../src/account.service";
 import { checkDeployer } from "../src/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
 import { ArgentAccount, TestDapp, TestErc20 } from "../typechain-types";
-import { deployer, guardian, guardianAddress, owner, ownerAddress } from "./fixtures";
+import { deployer, guardian, guardianAddress, owner, ownerAddress, provider } from "./fixtures";
 
 describe("Account multicall", () => {
   let argent: ArgentInfrastructure;
@@ -52,7 +53,7 @@ describe("Account multicall", () => {
     await expect(promise).to.be.rejectedWith("foobarbaz");
   });
 
-  it("Should successfully execute multiple calls", async () => {
+  it("Should execute multiple dapp calls", async () => {
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
 
     const response = await account.multicall([
@@ -74,6 +75,29 @@ describe("Account multicall", () => {
     const returnValues = ["0x", coder.encode(["uint256"], [42]), coder.encode(["uint256"], [69])];
     const returnData = coder.encode(["bytes[]"], [returnValues]);
     await expect(response).to.emit(account, "TransactionExecuted").withArgs(response.hash, returnData);
+  });
+
+  it("Should do multiple ETH transfers if account funded", async () => {
+    const account = await deployAccount({
+      argent,
+      ownerAddress,
+      guardianAddress,
+      connect: [owner, guardian],
+      funds: "0.01",
+    });
+    const recipient = zksync.Wallet.createRandom().address;
+
+    await expect(provider.getBalance(recipient)).to.eventually.equal(0n);
+
+    const response = await account.multicall([
+      { to: recipient, value: ethers.utils.parseEther("0.001"), data: "0x" },
+      { to: recipient, value: ethers.utils.parseEther("0.002"), data: "0x" },
+    ]);
+    await response.wait();
+
+    await expect(provider.getBalance(recipient)).to.eventually.equal(ethers.utils.parseEther("0.003"));
+    const balance = await provider.getBalance(account.address);
+    expect(balance).to.be.lessThan(ethers.utils.parseEther("0.007"));
   });
 
   describe("Approve + deposit multicalls", async () => {

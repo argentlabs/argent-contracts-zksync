@@ -22,4 +22,9 @@ contract TestDapp {
     function depositTokens(address token, uint256 amount) external {
         IERC20(token).transferFrom(msg.sender, address(this), amount);
     }
+
+    function depositPair(address token1, uint256 amount1, address token2, uint256 amount2) external {
+        IERC20(token1).transferFrom(msg.sender, address(this), amount1);
+        IERC20(token2).transferFrom(msg.sender, address(this), amount2);
+    }
 }

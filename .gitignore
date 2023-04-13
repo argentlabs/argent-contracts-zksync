@@ -4,6 +4,7 @@ coverage
 coverage.json
 typechain-types
 playground.ts
+dist
 
 #Hardhat files
 cache

@@ -1,0 +1,27 @@
+{
+  "name": "@argent/era-multicall",
+  "version": "0.1.0",
+  "description": "ArgentAccount multicall on Era",
+  "author": "Argent Labs",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "release": "tsc && yarn publish"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "files": [
+    "README.md",
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "ethers": "^5"
+  },
+  "devDependencies": {
+    "typescript": "^4"
+  }
+}
