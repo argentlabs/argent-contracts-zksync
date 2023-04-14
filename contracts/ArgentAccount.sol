@@ -593,13 +593,13 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         return false;
     }
 
-    function _requireEscapeGasParameters(Transaction calldata _transaction, uint32 attempts) private view {
+    function _requireEscapeGasParameters(Transaction calldata _transaction, uint32 _attempts) private view {
         require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
         require(
             _transaction.gasPerPubdataByteLimit <= MAX_ESCAPE_GAS_PER_PUBDATA_BYTE,
             "argent/gasPerPubdataByte-too-high"
         );
-        require(attempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
+        require(_attempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
     }
 
     function _requiredSignatureLength(bytes4 _selector) private view returns (uint256) {
