@@ -16,7 +16,7 @@ const config: HardhatUserConfig = {
     settings: {
       isSystem: true,
       optimizer: {
-        mode: "z",
+        mode: "3",
       },
     },
   },
