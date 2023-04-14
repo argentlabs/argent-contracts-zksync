@@ -61,7 +61,7 @@ const measureGasCosts = async () => {
 
   const argent = argentPartial as ArgentInfrastructure;
 
-  const newAccount = async () => {
+  const newAccountFinalized = async () => {
     ({ owner, guardian, ownerAddress, guardianAddress } = randomSigners());
     let [response, account] = await deployProxyAccount({ argent, ownerAddress, guardianAddress });
     account = connect(account, [owner, guardian]);
@@ -80,8 +80,17 @@ const measureGasCosts = async () => {
 
   console.log("Transactions");
 
-  account = await newAccount();
-  report.transferETH = await measure(() => account.signer.sendTransaction({ to: randomAddress(), value: 1 }));
+  const eoa = zksync.Wallet.createRandom().connect(deployer.zkWallet.provider);
+  await deployer.zkWallet.sendTransaction({ to: eoa.address, value: ethers.utils.parseEther("1") });
+  account = await newAccountFinalized();
+
+  let to = randomAddress();
+  report.transferETHFromEOAtoNewEOA = await measure(() => eoa.sendTransaction({ to, value: 1 }));
+  report.transferETHFromEOAtoExistingEOA = await measure(() => eoa.sendTransaction({ to, value: 1 }));
+
+  to = randomAddress();
+  report.transferETHFromArgentToNewEOA = await measure(() => account.signer.sendTransaction({ to, value: 1 }));
+  report.transferETHFromArgentToExistingEOA = await measure(() => account.signer.sendTransaction({ to, value: 1 }));
 
   report.multicall2transfers = await measure(() =>
     account.multicall([
@@ -94,7 +103,7 @@ const measureGasCosts = async () => {
 
   report.changeOwner = await measure(() => changeOwnerWithSignature(zksync.Wallet.createRandom(), account));
 
-  account = await newAccount();
+  account = await newAccountFinalized();
   report.changeGuardian = await measure(() => account.changeGuardian(randomAddress()));
 
   return report;
