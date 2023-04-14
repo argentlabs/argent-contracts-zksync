@@ -259,7 +259,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     ) external payable override returns (bytes4) {
         _requireOnlyBootloader();
         bytes32 transactionHash = _suggestedSignedHash != bytes32(0) ? _suggestedSignedHash : _transaction.encodeHash();
-        bool validTx = _validateTransaction(transactionHash, _transaction, /*isFromOutside*/ false);
+        bool validTx = _isValidTransaction(transactionHash, _transaction, /*isFromOutside*/ false);
         if (validTx) {
             return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
         }
@@ -316,7 +316,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             abi.encodePacked(this.executeTransactionFromOutside.selector, _transaction.encodeHash(), msg.sender)
         ).toEthSignedMessageHash();
 
-        bool validTx = _validateTransaction(outsideTxHash, _transaction, /*isFromOutside*/ true);
+        bool validTx = _isValidTransaction(outsideTxHash, _transaction, /*isFromOutside*/ true);
         require(validTx, "argent/invalid-transaction");
 
         bytes memory returnData = _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
@@ -476,7 +476,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /*************************************************** Validation ***************************************************/
 
-    function _validateTransaction(
+    function _isValidTransaction(
         bytes32 _transactionHash,
         Transaction calldata _transaction,
         bool _isFromOutside
