@@ -6,14 +6,18 @@ import "@nomiclabs/hardhat-ethers";
 import "@typechain/hardhat";
 import "chai-as-promised";
 import "dotenv/config";
+import { HardhatUserConfig } from "hardhat/config";
 // import "hardhat-storage-layout"; // uncomment when using the script as it slows things down otherwise
 
-module.exports = {
+const config: HardhatUserConfig = {
   zksolc: {
-    version: "1.3.5",
+    version: "1.3.8",
     compilerSource: "binary",
     settings: {
       isSystem: true,
+      optimizer: {
+        mode: "z",
+      },
     },
   },
   defaultNetwork: "local",
@@ -45,3 +49,5 @@ module.exports = {
     timeout: 2 * 60e3, // milliseconds
   },
 };
+
+export default config;

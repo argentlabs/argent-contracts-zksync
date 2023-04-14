@@ -559,7 +559,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
-                abi.decode(_transaction.data[4:], (address)); // This asserts that the call data is valid
+                address newGuardian = abi.decode(_transaction.data[4:], (address)); // This also asserts that the call data is valid
+                require(newGuardian != address(0) || guardianBackup == address(0), "argent/backup-should-be-null");
                 _requireGuardian();
                 if (_isValidOwnerSignature(_transactionHash, signature)) {
                     return !simulation;
