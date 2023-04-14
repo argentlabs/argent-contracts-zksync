@@ -163,6 +163,33 @@ describe("Recovery", () => {
       expectEqualEscapes(escape, { readyAt, escapeType: EscapeType.Guardian, newSigner: newGuardian.address });
     });
 
+    it("Should run triggerEscapeGuardian() by owner to remove guardian", async () => {
+      const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner] });
+
+      await (await account.triggerEscapeGuardian(AddressZero)).wait();
+
+      const [escape] = await account.escapeAndStatus();
+      expect(escape.escapeType).to.equal(EscapeType.Guardian);
+      expect(escape.newSigner).to.equal(AddressZero);
+    });
+
+    it("Should run triggerEscapeGuardian() by owner when there is a backup guardian", async () => {
+      const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner] });
+
+      await (await connect(account, [owner, guardian]).changeGuardianBackup(newGuardianBackup.address)).wait();
+      await expect(account.guardianBackup()).to.eventually.equal(newGuardianBackup.address);
+
+      // trigger escape to 0 guardian should fail as we can't have a backup guardian with no guardian
+      const triggerToZeroPromise = connect(account, [owner]).triggerEscapeGuardian(AddressZero);
+      await expect(triggerToZeroPromise).to.be.rejectedWith("argent/backup-should-be-null");
+
+      await (await account.triggerEscapeGuardian(newGuardian.address)).wait();
+
+      const [escape] = await account.escapeAndStatus();
+      expect(escape.escapeType).to.equal(EscapeType.Guardian);
+      expect(escape.newSigner).to.equal(newGuardian.address);
+    });
+
     it("Should run triggerEscapeOwner() by guardian", async () => {
       const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [guardian] });
 
