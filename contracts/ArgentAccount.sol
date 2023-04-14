@@ -582,6 +582,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             }
 
             require(selector != this.executeAfterUpgrade.selector, "argent/forbidden-call");
+            require(selector != this.executeTransactionFromOutside.selector, "argent/forbidden-call");
         }
 
         // We only allow outside calls for escape methods for now
@@ -593,7 +594,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         return false;
     }
 
-    function _requireEscapeGasParameters(Transaction calldata _transaction, uint32 _attempts) private view {
+    function _requireEscapeGasParameters(Transaction calldata _transaction, uint32 _attempts) private pure {
         require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
         require(
             _transaction.gasPerPubdataByteLimit <= MAX_ESCAPE_GAS_PER_PUBDATA_BYTE,
