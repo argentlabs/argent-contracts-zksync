@@ -1,4 +1,5 @@
 import { TypedDataSigner } from "@ethersproject/abstract-signer";
+import { _TypedDataEncoder } from "@ethersproject/hash";
 import { Signer, TypedDataDomain, TypedDataField } from "ethers";
 import { Bytes, BytesLike } from "ethers/lib/utils";
 import { ethers } from "hardhat";
@@ -46,12 +47,12 @@ export class FixedEIP712Signer {
     };
   }
 
+  async getTransactionHash(transaction: TransactionRequest) : Promise<string> {
+    return _TypedDataEncoder.hash(await this.sdkSigner["eip712Domain"], FixedEIP712Signer.eip712Types, FixedEIP712Signer.getSignInput(transaction));
+  }
+
   async sign(transaction: TransactionRequest): Promise<zksync.types.Signature> {
-    return await this.ethSigner._signTypedData(
-      await this.sdkSigner["eip712Domain"],
-      FixedEIP712Signer.eip712Types,
-      FixedEIP712Signer.getSignInput(transaction),
-    );
+    return await this.ethSigner._signTypedData(await this.sdkSigner["eip712Domain"], FixedEIP712Signer.eip712Types, FixedEIP712Signer.getSignInput(transaction));
   }
 }
 
@@ -128,6 +129,21 @@ export class ArgentSigner extends Signer {
   async getSignature(transaction: TransactionRequest): Promise<string> {
     const chainId = await this.getChainId();
     return this.concatSignatures((signer) => new FixedEIP712Signer(signer, chainId).sign(transaction));
+  }
+
+  async getOutsideSignature(transaction: TransactionRequest, fromAddress: string): Promise<string> {
+    const chainId = await this.getChainId();
+    return this.concatSignatures(async (signer) => {
+      const internalTxHash = await (new FixedEIP712Signer(signer, chainId).getTransactionHash(transaction));
+
+      const selector = this.account.interface.getSighash("executeTransactionFromOutside");
+      const message = ethers.utils.solidityPack(
+        ["bytes4", "uint256", "address"],
+        [selector, internalTxHash, fromAddress],
+      );
+      const messageHash = ethers.utils.arrayify(ethers.utils.keccak256(message));
+      return await signer.signMessage(messageHash);
+    });
   }
 
   private async concatSignatures(sign: (signer: Signer & TypedDataSigner) => Promise<BytesLike>): Promise<string> {

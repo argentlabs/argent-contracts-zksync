@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { BytesLike } from "ethers";
+import { BytesLike, Signer } from "ethers";
 import * as zksync from "zksync-web3";
 import { deployAccount } from "../src/account.service";
 import { checkDeployer } from "../src/deployer.service";
@@ -8,7 +8,7 @@ import { ArgentInfrastructure } from "../src/model";
 import { ArgentSigner, FixedEIP712Signer, TransactionRequest } from "../src/signer.service";
 import { ArgentAccount, TestDapp } from "../typechain-types";
 import { TransactionStruct } from "../typechain-types/contracts/ArgentAccount";
-import { deployer, guardian, guardianAddress, owner, ownerAddress } from "./fixtures";
+import { AddressZero, deployer, guardian, guardianAddress, owner, ownerAddress } from "./fixtures";
 
 describe("Priority mode (from outside / L1)", () => {
   let argent: ArgentInfrastructure;
@@ -20,6 +20,13 @@ describe("Priority mode (from outside / L1)", () => {
     await checkDeployer(deployer);
     argent = await getTestInfrastructure(deployer);
   });
+
+  const buildOutsideTransactionStruct = async (transaction: TransactionRequest, signer: ArgentSigner, senderAddress: string) => {
+    const transactionFromOutside = toOutsideTransaction(transaction);
+    const populated = await signer.populateTransaction(transactionFromOutside);
+    const signature = await signer.getOutsideSignature(populated, senderAddress);
+    return toSolidityTransaction(populated, signature);
+  }
 
   const toOutsideTransaction = (transaction: TransactionRequest): TransactionRequest => {
     return {
@@ -56,14 +63,14 @@ describe("Priority mode (from outside / L1)", () => {
   });
 
   it("Should refuse to execute a priority transaction with invalid signature", async () => {
-    const transaction = await testDapp.populateTransaction.setNumber(42n);
-    const transactionFromOutside = toOutsideTransaction(transaction);
-    const populated = await signer.populateTransaction(transactionFromOutside);
-    const signature = await new ArgentSigner(account, ["random", "random"]).getSignature(populated);
-    const struct = toSolidityTransaction(populated, signature);
-    const calldata = account.interface.encodeFunctionData("executeTransactionFromOutside", [struct]);
-
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
+
+    const struct = await buildOutsideTransactionStruct(
+      await testDapp.populateTransaction.setNumber(42n),
+      new ArgentSigner(account, ["random", "random"]),
+      deployer.zkWallet.address
+    );
+    const calldata = account.interface.encodeFunctionData("executeTransactionFromOutside", [struct])
 
     // initiating L2 transfer via L1 execute from zksync wallet
     const promise = deployer.zkWallet.requestExecute({ contractAddress: account.address, calldata });
@@ -72,18 +79,19 @@ describe("Priority mode (from outside / L1)", () => {
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
   });
 
-  it("Should execute a priority transaction", async () => {
-    const transaction = await testDapp.populateTransaction.setNumber(42n);
-    const transactionFromOutside = toOutsideTransaction(transaction);
-    const populated = await signer.populateTransaction(transactionFromOutside);
-    const signature = await signer.getSignature(populated);
-    const struct = toSolidityTransaction(populated, signature);
-    const calldata = account.interface.encodeFunctionData("executeTransactionFromOutside", [struct]);
-
+  it("Should execute a priority transaction from L1", async () => {
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
 
+    const struct = await buildOutsideTransactionStruct(
+      await testDapp.populateTransaction.setNumber(42n),
+      signer,
+      deployer.zkWallet.address
+    );
+    const calldata = account.interface.encodeFunctionData("executeTransactionFromOutside", [struct])
+
     // initiating L2 transfer via L1 execute from zksync wallet
-    const response = await deployer.zkWallet.requestExecute({ contractAddress: account.address, calldata });
+    const response = await deployer.zkWallet.requestExecute({ contractAddress: account.address, calldata, l2GasLimit: 1_000_000 });
+
     await response.wait();
 
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(42n);
@@ -91,13 +99,14 @@ describe("Priority mode (from outside / L1)", () => {
 
   it("Should execute a priority transaction from L2", async () => {
     testDapp = (await deployTestDapp(deployer)).connect(signer);
-    const transaction = await testDapp.populateTransaction.setNumber(42n);
-    const transactionFromOutside = toOutsideTransaction(transaction);
-    const populated = await signer.populateTransaction(transactionFromOutside);
-    const signature = await signer.getSignature(populated);
-    const struct = toSolidityTransaction(populated, signature);
-
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
+
+    const struct = await buildOutsideTransactionStruct(
+      await testDapp.populateTransaction.setNumber(42n),
+      signer,
+      deployer.zkWallet.address
+    );
+
 
     const fromEoa = new zksync.Contract(account.address, account.interface, deployer.zkWallet) as ArgentAccount;
     const response = await fromEoa.executeTransactionFromOutside(struct);
