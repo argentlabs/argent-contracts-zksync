@@ -312,11 +312,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         );
 
         // This makes sure that the executeTransactionFromOutside for that given transaction is only called from the expected address
-        bytes32 outsideTxHash = keccak256(abi.encodePacked(
-                this.executeTransactionFromOutside.selector,
-                _transaction.encodeHash(),
-                msg.sender
-        )).toEthSignedMessageHash();
+        bytes32 outsideTxHash = keccak256(
+            abi.encodePacked(this.executeTransactionFromOutside.selector, _transaction.encodeHash(), msg.sender)
+        ).toEthSignedMessageHash();
 
         bool validTx = _validateTransaction(outsideTxHash, _transaction, /*isFromOutside*/ true);
         require(validTx, "argent/invalid-transaction");

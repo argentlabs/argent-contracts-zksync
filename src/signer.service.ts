@@ -47,12 +47,20 @@ export class FixedEIP712Signer {
     };
   }
 
-  async getTransactionHash(transaction: TransactionRequest) : Promise<string> {
-    return _TypedDataEncoder.hash(await this.sdkSigner["eip712Domain"], FixedEIP712Signer.eip712Types, FixedEIP712Signer.getSignInput(transaction));
+  async getTransactionHash(transaction: TransactionRequest): Promise<string> {
+    return _TypedDataEncoder.hash(
+      await this.sdkSigner["eip712Domain"],
+      FixedEIP712Signer.eip712Types,
+      FixedEIP712Signer.getSignInput(transaction),
+    );
   }
 
   async sign(transaction: TransactionRequest): Promise<zksync.types.Signature> {
-    return await this.ethSigner._signTypedData(await this.sdkSigner["eip712Domain"], FixedEIP712Signer.eip712Types, FixedEIP712Signer.getSignInput(transaction));
+    return await this.ethSigner._signTypedData(
+      await this.sdkSigner["eip712Domain"],
+      FixedEIP712Signer.eip712Types,
+      FixedEIP712Signer.getSignInput(transaction),
+    );
   }
 }
 
@@ -134,7 +142,7 @@ export class ArgentSigner extends Signer {
   async getOutsideSignature(transaction: TransactionRequest, fromAddress: string): Promise<string> {
     const chainId = await this.getChainId();
     return this.concatSignatures(async (signer) => {
-      const internalTxHash = await (new FixedEIP712Signer(signer, chainId).getTransactionHash(transaction));
+      const internalTxHash = await new FixedEIP712Signer(signer, chainId).getTransactionHash(transaction);
 
       const selector = this.account.interface.getSighash("executeTransactionFromOutside");
       const message = ethers.utils.solidityPack(
