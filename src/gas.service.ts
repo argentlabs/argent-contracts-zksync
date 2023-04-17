@@ -131,7 +131,7 @@ const formatReport = (report: Record<string, BigNumber>) =>
 // currently needed for contract deployments whose costs are not deterministic
 const formatGas = (gasUsed: BigNumber) => {
   const gasRounded = Math.round(gasUsed.toNumber() / 1000) * 1000;
-  return `${gasRounded.toLocaleString()} gas`;
+  return `${gasRounded.toLocaleString("en-US")} gas`;
 };
 
 const randomAddress = () => zksync.Wallet.createRandom().address;
