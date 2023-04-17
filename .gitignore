@@ -5,7 +5,7 @@ coverage.json
 typechain-types
 playground.ts
 dist
-gas-report-new.json
+gas-report-new.txt
 
 #Hardhat files
 cache

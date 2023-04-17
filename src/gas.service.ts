@@ -1,4 +1,5 @@
 import { exec } from "child_process";
+import { BigNumber } from "ethers";
 import fs from "fs";
 import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
@@ -16,14 +17,14 @@ export const runGasReport = async (mode: "write" | "check") => {
   }
 
   const report = await measureGasCosts();
-  const jsonReport = JSON.stringify(report, null, 2);
-  console.log(jsonReport);
+  const formatted = formatReport(report);
+  console.log(formatted);
 
   if (mode === "write") {
-    fs.writeFileSync("./gas-report.json", jsonReport);
+    fs.writeFileSync("./gas-report.txt", formatted);
   } else if (mode === "check") {
-    fs.writeFileSync("./gas-report-new.json", jsonReport);
-    exec("diff gas-report.json gas-report-new.json", (err, stdout, stderr) => {
+    fs.writeFileSync("./gas-report-new.txt", formatted);
+    exec("diff gas-report.txt gas-report-new.txt", (err, stdout, stderr) => {
       if (stdout) {
         console.log(stdout);
         console.error("Changes to gas costs detected. Please review them and update the gas report if appropriate.\n");
@@ -41,19 +42,19 @@ const measureGasCosts = async () => {
   const artifacts = await loadArtifacts(deployer);
 
   const argentPartial = { deployer, artifacts } as Partial<ArgentInfrastructure>;
-  const report: Record<string, string> = {};
+  const report: Record<string, BigNumber> = {};
 
   let response, account: ArgentAccount, owner, guardian, ownerAddress: string, guardianAddress: string;
 
   console.log("Infrastructure deployment");
 
-  report.deployImplementation = await measure(async () => {
+  report["Deploy implementation"] = await measure(async () => {
     const [implementation] = await deployImplementation(deployer);
     argentPartial.implementation = implementation;
     return implementation.deployTransaction;
   });
 
-  report.deployFactory = await measure(async () => {
+  report["Deploy factory"] = await measure(async () => {
     const [factory] = await deployFactory(deployer);
     argentPartial.factory = factory;
     return factory.deployTransaction;
@@ -64,13 +65,13 @@ const measureGasCosts = async () => {
   console.log("Account deployment");
 
   ({ ownerAddress, guardianAddress } = randomSigners());
-  report.deployAccount = await measure(async () => {
+  report["Deploy account"] = await measure(async () => {
     [response] = await deployProxyAccount({ argent, ownerAddress, guardianAddress });
     return response;
   });
 
   const newAccountFinalized = async () => {
-    ({ owner, guardian, ownerAddress, guardianAddress } = randomSigners());
+    const { owner, guardian, ownerAddress, guardianAddress } = randomSigners();
     let [, account] = await deployProxyAccount({ argent, ownerAddress, guardianAddress });
     account = connect(account, [owner, guardian]);
     const response = await deployer.zkWallet.sendTransaction({
@@ -88,14 +89,16 @@ const measureGasCosts = async () => {
   account = await newAccountFinalized();
 
   let to = randomAddress();
-  report.transferETHFromEOAtoNewEOA = await measure(() => eoa.sendTransaction({ to, value: 1 }));
-  report.transferETHFromEOAtoExistingEOA = await measure(() => eoa.sendTransaction({ to, value: 1 }));
+  report["Transfer ETH from EOA to new EOA"] = await measure(() => eoa.sendTransaction({ to, value: 1 }));
+  report["Transfer ETH from EOA to existing EOA"] = await measure(() => eoa.sendTransaction({ to, value: 1 }));
 
   to = randomAddress();
-  report.transferETHFromArgentToNewEOA = await measure(() => account.signer.sendTransaction({ to, value: 1 }));
-  report.transferETHFromArgentToExistingEOA = await measure(() => account.signer.sendTransaction({ to, value: 1 }));
+  report["Transfer ETH from Argent to new EOA"] = await measure(() => account.signer.sendTransaction({ to, value: 1 }));
+  report["Transfer ETH from Argent to existing EOA"] = await measure(() =>
+    account.signer.sendTransaction({ to, value: 1 }),
+  );
 
-  report.multicall2transfers = await measure(() =>
+  report["Multicall with 2 transfers"] = await measure(() =>
     account.multicall([
       { to: randomAddress(), value: 1, data: "0x" },
       { to: randomAddress(), value: 1, data: "0x" },
@@ -104,27 +107,31 @@ const measureGasCosts = async () => {
 
   console.log("Recovery");
 
-  report.changeOwner = await measure(() => changeOwnerWithSignature(zksync.Wallet.createRandom(), account));
+  report["Change owner"] = await measure(() => changeOwnerWithSignature(zksync.Wallet.createRandom(), account));
 
   account = await newAccountFinalized();
-  report.changeGuardian = await measure(() => account.changeGuardian(randomAddress()));
+  report["Change guardian"] = await measure(() => account.changeGuardian(randomAddress()));
 
   return report;
 };
 
-// rounding to the nearest 1000 gas allows not being too bothered by minor gas changes and is
-// currently needed for contract deployments whose costs are not deterministic
-const measure = async (test: () => Promise<unknown>) => {
-  const gasUsed = await measureGas(test);
-  const gasRounded = Math.round(gasUsed.toNumber() / 1000) * 1000;
-  return `${gasRounded.toLocaleString()} gas`;
-};
-
 // passing unknown because typechain doesn't support zksync
-const measureGas = async (test: () => Promise<unknown>) => {
+const measure = async (test: () => Promise<unknown>) => {
   const response = (await test()) as TransactionResponse;
   const { gasUsed } = await response.waitFinalize();
   return gasUsed;
+};
+
+const formatReport = (report: Record<string, BigNumber>) =>
+  Object.entries(report)
+    .map(([name, gasUsed]) => `${name}: ${formatGas(gasUsed)}`)
+    .join("\n");
+
+// rounding to the nearest 1000 gas allows not being too bothered by minor gas changes and is
+// currently needed for contract deployments whose costs are not deterministic
+const formatGas = (gasUsed: BigNumber) => {
+  const gasRounded = Math.round(gasUsed.toNumber() / 1000) * 1000;
+  return `${gasRounded.toLocaleString()} gas`;
 };
 
 const randomAddress = () => zksync.Wallet.createRandom().address;
