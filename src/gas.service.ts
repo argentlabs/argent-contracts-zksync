@@ -44,7 +44,7 @@ const measureGasCosts = async () => {
   const argentPartial = { deployer, artifacts } as Partial<ArgentInfrastructure>;
   const report: Record<string, BigNumber> = {};
 
-  let response, account: ArgentAccount, owner, guardian, ownerAddress: string, guardianAddress: string;
+  let response, account: ArgentAccount;
 
   console.log("Infrastructure deployment");
 
@@ -64,8 +64,8 @@ const measureGasCosts = async () => {
 
   console.log("Account deployment");
 
-  ({ ownerAddress, guardianAddress } = randomSigners());
   report["Deploy account"] = await measure(async () => {
+    const { ownerAddress, guardianAddress } = randomSigners();
     [response] = await deployProxyAccount({ argent, ownerAddress, guardianAddress });
     return response;
   });
