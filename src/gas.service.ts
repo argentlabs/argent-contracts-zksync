@@ -61,15 +61,6 @@ const measureGasCosts = async () => {
 
   const argent = argentPartial as ArgentInfrastructure;
 
-  const newAccountFinalized = async () => {
-    ({ owner, guardian, ownerAddress, guardianAddress } = randomSigners());
-    let [response, account] = await deployProxyAccount({ argent, ownerAddress, guardianAddress });
-    account = connect(account, [owner, guardian]);
-    response = await deployer.zkWallet.sendTransaction({ to: account.address, value: ethers.utils.parseEther("1") });
-    await response.waitFinalize();
-    return account;
-  };
-
   console.log("Account deployment");
 
   ({ ownerAddress, guardianAddress } = randomSigners());
@@ -77,6 +68,18 @@ const measureGasCosts = async () => {
     [response] = await deployProxyAccount({ argent, ownerAddress, guardianAddress });
     return response;
   });
+
+  const newAccountFinalized = async () => {
+    ({ owner, guardian, ownerAddress, guardianAddress } = randomSigners());
+    let [, account] = await deployProxyAccount({ argent, ownerAddress, guardianAddress });
+    account = connect(account, [owner, guardian]);
+    const response = await deployer.zkWallet.sendTransaction({
+      to: account.address,
+      value: ethers.utils.parseEther("1"),
+    });
+    await response.waitFinalize();
+    return account;
+  };
 
   console.log("Transactions");
 
@@ -109,11 +112,19 @@ const measureGasCosts = async () => {
   return report;
 };
 
+// rounding to the nearest 1000 gas allows not being too bothered by minor gas changes and is
+// currently needed for contract deployments whose costs are not deterministic
 const measure = async (test: () => Promise<unknown>) => {
-  const response = (await test()) as TransactionResponse;
-  const { gasUsed } = await response.waitFinalize();
+  const gasUsed = await measureGas(test);
   const gasRounded = Math.round(gasUsed.toNumber() / 1000) * 1000;
   return `${gasRounded.toLocaleString()} gas`;
+};
+
+// passing unknown because typechain doesn't support zksync
+const measureGas = async (test: () => Promise<unknown>) => {
+  const response = (await test()) as TransactionResponse;
+  const { gasUsed } = await response.waitFinalize();
+  return gasUsed;
 };
 
 const randomAddress = () => zksync.Wallet.createRandom().address;
