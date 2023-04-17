@@ -3,13 +3,13 @@ import { BytesLike } from "ethers";
 import * as zksync from "zksync-web3";
 import { deployAccount } from "../src/account.service";
 import { checkDeployer } from "../src/deployer.service";
+import { FixedEip712Signer } from "../src/fixedEip712Signer";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
 import { ArgentSigner, TransactionRequest } from "../src/signer.service";
 import { ArgentAccount, TestDapp } from "../typechain-types";
 import { TransactionStruct } from "../typechain-types/contracts/ArgentAccount";
 import { deployer, guardian, guardianAddress, owner, ownerAddress } from "./fixtures";
-import { FixedEip712Signer } from "../src/fixedEip712Signer";
 
 describe("Priority mode (from outside / L1)", () => {
   let argent: ArgentInfrastructure;
@@ -22,16 +22,17 @@ describe("Priority mode (from outside / L1)", () => {
     argent = await getTestInfrastructure(deployer);
   });
 
-
   interface BuildOutsideTransactionStructParams {
-    transaction: TransactionRequest,
-    signer: ArgentSigner,
-    senderAddress: string,
+    transaction: TransactionRequest;
+    signer: ArgentSigner;
+    senderAddress: string;
   }
 
-  const buildOutsideTransactionStruct = async (
-    { transaction, signer, senderAddress }: BuildOutsideTransactionStructParams,
-  ) => {
+  const buildOutsideTransactionStruct = async ({
+    transaction,
+    signer,
+    senderAddress,
+  }: BuildOutsideTransactionStructParams) => {
     const transactionFromOutside = toOutsideTransaction(transaction);
     const populated = await signer.populateTransaction(transactionFromOutside);
     const signature = await signer.getOutsideSignature(populated, senderAddress);
