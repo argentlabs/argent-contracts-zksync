@@ -1,68 +1,13 @@
 import { TypedDataSigner } from "@ethersproject/abstract-signer";
-import { _TypedDataEncoder } from "@ethersproject/hash";
 import { Signer, TypedDataDomain, TypedDataField } from "ethers";
 import { Bytes, BytesLike } from "ethers/lib/utils";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount } from "../typechain-types";
+import { FixedEip712Signer } from "./fixedEip712Signer";
 
 export type TransactionRequest = zksync.types.TransactionRequest;
 export type Signatory = (Signer & TypedDataSigner) | "zeros" | "random";
-
-// replacement for zksync.EIP712Signer fixing a bug until they include the fix in their library
-export class FixedEIP712Signer {
-  static readonly eip712Types = {
-    Transaction: [
-      { name: "txType", type: "uint256" },
-      { name: "from", type: "uint256" },
-      { name: "to", type: "uint256" },
-      { name: "gasLimit", type: "uint256" },
-      { name: "gasPerPubdataByteLimit", type: "uint256" },
-      { name: "maxFeePerGas", type: "uint256" },
-      { name: "maxPriorityFeePerGas", type: "uint256" },
-      { name: "paymaster", type: "uint256" },
-      { name: "nonce", type: "uint256" },
-      { name: "value", type: "uint256" },
-      { name: "data", type: "bytes" },
-      { name: "factoryDeps", type: "bytes32[]" },
-      { name: "paymasterInput", type: "bytes" },
-    ],
-  };
-  private readonly sdkSigner: zksync.EIP712Signer;
-  constructor(private ethSigner: Signer & TypedDataSigner, chainId: number | Promise<number>) {
-    this.sdkSigner = new zksync.EIP712Signer(ethSigner, chainId);
-  }
-
-  static getSignInput(transaction: TransactionRequest) {
-    const buggySignInput = zksync.EIP712Signer.getSignInput(transaction);
-    // ZkSync implementation treats zeros as if the value was not specified we fix it in the lines below
-    const maxFeePerGas = transaction.maxFeePerGas ?? transaction.gasPrice ?? 0;
-    const maxPriorityFeePerGas = transaction.maxPriorityFeePerGas ?? maxFeePerGas;
-    const gasPerPubdataByteLimit = transaction.customData?.gasPerPubdata ?? zksync.utils.DEFAULT_GAS_PER_PUBDATA_LIMIT;
-    return {
-      ...buggySignInput,
-      gasPerPubdataByteLimit,
-      maxFeePerGas,
-      maxPriorityFeePerGas: maxPriorityFeePerGas,
-    };
-  }
-
-  async getTransactionHash(transaction: TransactionRequest): Promise<string> {
-    return _TypedDataEncoder.hash(
-      await this.sdkSigner["eip712Domain"],
-      FixedEIP712Signer.eip712Types,
-      FixedEIP712Signer.getSignInput(transaction),
-    );
-  }
-
-  async sign(transaction: TransactionRequest): Promise<zksync.types.Signature> {
-    return await this.ethSigner._signTypedData(
-      await this.sdkSigner["eip712Domain"],
-      FixedEIP712Signer.eip712Types,
-      FixedEIP712Signer.getSignInput(transaction),
-    );
-  }
-}
 
 export class ArgentSigner extends Signer {
   public address: string;
@@ -136,18 +81,18 @@ export class ArgentSigner extends Signer {
 
   async getSignature(transaction: TransactionRequest): Promise<string> {
     const chainId = await this.getChainId();
-    return this.concatSignatures((signer) => new FixedEIP712Signer(signer, chainId).sign(transaction));
+    return this.concatSignatures((signer) => new FixedEip712Signer(signer, chainId).sign(transaction));
   }
 
   async getOutsideSignature(transaction: TransactionRequest, fromAddress: string): Promise<string> {
     const chainId = await this.getChainId();
     return this.concatSignatures(async (signer) => {
-      const internalTxHash = await new FixedEIP712Signer(signer, chainId).getTransactionHash(transaction);
+      const internalTransactionHash = await new FixedEip712Signer(signer, chainId).getTransactionHash(transaction);
 
       const selector = this.account.interface.getSighash("executeTransactionFromOutside");
       const message = ethers.utils.solidityPack(
         ["bytes4", "uint256", "address"],
-        [selector, internalTxHash, fromAddress],
+        [selector, internalTransactionHash, fromAddress],
       );
       const messageHash = ethers.utils.arrayify(ethers.utils.keccak256(message));
       return await signer.signMessage(messageHash);

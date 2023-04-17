@@ -260,10 +260,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         _requireOnlyBootloader();
         bytes32 transactionHash = _suggestedSignedHash != bytes32(0) ? _suggestedSignedHash : _transaction.encodeHash();
         bool validTx = _isValidTransaction(transactionHash, _transaction, /*isFromOutside*/ false);
-        if (validTx) {
-            return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
-        }
-        return bytes4(0);
+        return isValid ? ACCOUNT_VALIDATION_SUCCESS_MAGIC : bytes4(0);
     }
 
     /// @inheritdoc IERC1271
@@ -312,15 +309,15 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         );
 
         // This makes sure that the executeTransactionFromOutside for that given transaction is only called from the expected address
-        bytes32 outsideTxHash = keccak256(
+        bytes32 outsideTransactionHash = keccak256(
             abi.encodePacked(this.executeTransactionFromOutside.selector, _transaction.encodeHash(), msg.sender)
         ).toEthSignedMessageHash();
 
-        bool validTx = _isValidTransaction(outsideTxHash, _transaction, /*isFromOutside*/ true);
+        bool validTx = _isValidTransaction(outsideTransactionHash, _transaction, /*isFromOutside*/ true);
         require(validTx, "argent/invalid-transaction");
 
         bytes memory returnData = _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
-        emit TransactionExecuted(outsideTxHash, returnData);
+        emit TransactionExecuted(outsideTransactionHash, returnData);
     }
 
     /**************************************************** Recovery ****************************************************/
@@ -482,7 +479,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         bool _isFromOutside
     ) private returns (bool) {
         require(owner != address(0), "argent/uninitialized");
-        bool simulation = false;
+        bool isSimulation = false;
 
         SystemContractsCaller.systemCallWithPropagatedRevert(
             uint32(gasleft()),
@@ -493,16 +490,13 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
         if (_transaction.txType != EIP_712_TX_TYPE) {
             // Returning false instead or reverting to allow estimation with any type
-            simulation = true;
+            isSimulation = true;
         }
         require(address(uint160(_transaction.from)) == address(this), "argent/invalid-from-address");
 
         address to = address(uint160(_transaction.to));
 
-        bytes4 selector = bytes4(0);
-        if (_transaction.data.length >= 4) {
-            selector = bytes4(_transaction.data);
-        }
+        bytes4 selector = _transaction.data.length >= 4 ? bytes4(_transaction.data) : bytes4(0);
         bytes memory signature = _transaction.signature;
 
         if (!_isFromOutside) {
@@ -523,44 +517,43 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             if (requiredLength == 2 * Signatures.SINGLE_LENGTH) {
                 signature[(2 * Signatures.SINGLE_LENGTH) - 1] = bytes1(uint8(27));
             }
-            simulation = true;
+            isSimulation = true;
         }
 
         if (to == address(this)) {
             if (selector == this.triggerEscapeOwner.selector) {
                 if (!_isFromOutside) {
-                    _requireEscapeGasParameters(_transaction, guardianEscapeAttempts);
+                    _requireValidEscapeGasParameters(_transaction, guardianEscapeAttempts);
                     guardianEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
-                address newOwner = abi.decode(_transaction.data[4:], (address));
-                // This also asserts that the call data is valid
+                address newOwner = abi.decode(_transaction.data[4:], (address)); // This also asserts that the call data is valid
                 require(newOwner != address(0), "argent/null-owner");
                 _requireGuardian();
 
                 if (_isValidGuardianSignature(_transactionHash, signature)) {
-                    return !simulation;
+                    return !isSimulation;
                 }
                 return false;
             }
 
             if (selector == this.escapeOwner.selector) {
                 if (!_isFromOutside) {
-                    _requireEscapeGasParameters(_transaction, guardianEscapeAttempts);
+                    _requireValidEscapeGasParameters(_transaction, guardianEscapeAttempts);
                     guardianEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
                 _requireGuardian();
                 require(escape.escapeType == uint8(EscapeType.Owner), "argent/invalid-escape");
                 if (_isValidGuardianSignature(_transactionHash, signature)) {
-                    return !simulation;
+                    return !isSimulation;
                 }
                 return false;
             }
 
             if (selector == this.triggerEscapeGuardian.selector) {
                 if (!_isFromOutside) {
-                    _requireEscapeGasParameters(_transaction, ownerEscapeAttempts);
+                    _requireValidEscapeGasParameters(_transaction, ownerEscapeAttempts);
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
@@ -568,21 +561,21 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                 require(newGuardian != address(0) || guardianBackup == address(0), "argent/backup-should-be-null");
                 _requireGuardian();
                 if (_isValidOwnerSignature(_transactionHash, signature)) {
-                    return !simulation;
+                    return !isSimulation;
                 }
                 return false;
             }
 
             if (selector == this.escapeGuardian.selector) {
                 if (!_isFromOutside) {
-                    _requireEscapeGasParameters(_transaction, ownerEscapeAttempts);
+                    _requireValidEscapeGasParameters(_transaction, ownerEscapeAttempts);
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
                 _requireGuardian();
                 require(escape.escapeType == uint8(EscapeType.Guardian), "argent/invalid-escape");
                 if (_isValidOwnerSignature(_transactionHash, signature)) {
-                    return !simulation;
+                    return !isSimulation;
                 }
                 return false;
             }
@@ -592,12 +585,12 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         }
 
         if (_isValidSignature(_transactionHash, signature)) {
-            return !simulation;
+            return !isSimulation;
         }
         return false;
     }
 
-    function _requireEscapeGasParameters(Transaction calldata _transaction, uint32 _attempts) private pure {
+    function _requireValidEscapeGasParameters(Transaction calldata _transaction, uint32 _attempts) private pure {
         require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
         require(
             _transaction.gasPerPubdataByteLimit <= MAX_ESCAPE_GAS_PER_PUBDATA_BYTE,

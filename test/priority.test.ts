@@ -5,10 +5,11 @@ import { deployAccount } from "../src/account.service";
 import { checkDeployer } from "../src/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
-import { ArgentSigner, FixedEIP712Signer, TransactionRequest } from "../src/signer.service";
+import { ArgentSigner, TransactionRequest } from "../src/signer.service";
 import { ArgentAccount, TestDapp } from "../typechain-types";
 import { TransactionStruct } from "../typechain-types/contracts/ArgentAccount";
 import { deployer, guardian, guardianAddress, owner, ownerAddress } from "./fixtures";
+import { FixedEip712Signer } from "../src/fixedEip712Signer";
 
 describe("Priority mode (from outside / L1)", () => {
   let argent: ArgentInfrastructure;
@@ -21,10 +22,15 @@ describe("Priority mode (from outside / L1)", () => {
     argent = await getTestInfrastructure(deployer);
   });
 
-  const buildOutsideTransactionStruct = async (
+
+  interface BuildOutsideTransactionStructParams {
     transaction: TransactionRequest,
     signer: ArgentSigner,
     senderAddress: string,
+  }
+
+  const buildOutsideTransactionStruct = async (
+    { transaction, signer, senderAddress }: BuildOutsideTransactionStructParams,
   ) => {
     const transactionFromOutside = toOutsideTransaction(transaction);
     const populated = await signer.populateTransaction(transactionFromOutside);
@@ -45,7 +51,7 @@ describe("Priority mode (from outside / L1)", () => {
   };
 
   const toSolidityTransaction = (transaction: TransactionRequest, signature: BytesLike): TransactionStruct => {
-    const signInput = FixedEIP712Signer.getSignInput(transaction);
+    const signInput = FixedEip712Signer.getSignInput(transaction);
     return {
       ...signInput,
       reserved: [0, 0, 0, 0],
@@ -69,11 +75,11 @@ describe("Priority mode (from outside / L1)", () => {
   it("Should refuse to execute a priority transaction with invalid signature", async () => {
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
 
-    const struct = await buildOutsideTransactionStruct(
-      await testDapp.populateTransaction.setNumber(42n),
-      new ArgentSigner(account, ["random", "random"]),
-      deployer.zkWallet.address,
-    );
+    const struct = await buildOutsideTransactionStruct({
+      transaction: await testDapp.populateTransaction.setNumber(42n),
+      signer: new ArgentSigner(account, ["random", "random"]),
+      senderAddress: deployer.zkWallet.address,
+    });
     const calldata = account.interface.encodeFunctionData("executeTransactionFromOutside", [struct]);
 
     // initiating L2 transfer via L1 execute from zksync wallet
@@ -86,11 +92,11 @@ describe("Priority mode (from outside / L1)", () => {
   it("Should execute a priority transaction from L1", async () => {
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
 
-    const struct = await buildOutsideTransactionStruct(
-      await testDapp.populateTransaction.setNumber(42n),
+    const struct = await buildOutsideTransactionStruct({
+      transaction: await testDapp.populateTransaction.setNumber(42n),
       signer,
-      deployer.zkWallet.address,
-    );
+      senderAddress: deployer.zkWallet.address,
+    });
     const calldata = account.interface.encodeFunctionData("executeTransactionFromOutside", [struct]);
 
     // initiating L2 transfer via L1 execute from zksync wallet
@@ -109,11 +115,11 @@ describe("Priority mode (from outside / L1)", () => {
     testDapp = (await deployTestDapp(deployer)).connect(signer);
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
 
-    const struct = await buildOutsideTransactionStruct(
-      await testDapp.populateTransaction.setNumber(42n),
+    const struct = await buildOutsideTransactionStruct({
+      transaction: await testDapp.populateTransaction.setNumber(42n),
       signer,
-      deployer.zkWallet.address,
-    );
+      senderAddress: deployer.zkWallet.address,
+    });
 
     const fromEoa = new zksync.Contract(account.address, account.interface, deployer.zkWallet) as ArgentAccount;
     const response = await fromEoa.executeTransactionFromOutside(struct);
