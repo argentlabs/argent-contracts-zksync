@@ -2,7 +2,7 @@ import { TypedDataSigner } from "@ethersproject/abstract-signer";
 import { _TypedDataEncoder } from "@ethersproject/hash";
 import { Signer } from "ethers";
 import * as zksync from "zksync-web3";
-import { TransactionRequest } from "./signer.service";
+import { TransactionRequest } from "./model";
 
 // replacement for zksync.EIP712Signer until they fix a bug with this PR https://github.com/matter-labs/zksync-era/pull/24
 export class FixedEip712Signer {

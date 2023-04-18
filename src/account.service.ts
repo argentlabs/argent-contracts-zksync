@@ -3,13 +3,37 @@ import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount, IMulticall } from "../typechain-types";
 import { verifyContract } from "./deployer.service";
-import { AccountDeploymentParams, ArgentInfrastructure } from "./model";
+import {
+  AccountDeploymentParams,
+  ArgentInfrastructure,
+  ProxyAccountDeploymentParams,
+  TransactionResponse,
+} from "./model";
 import { ArgentSigner, Signatory } from "./signer.service";
 
-export const argentAccountContract = (deployedAddress: string, argent: ArgentInfrastructure) => {
+export const argentAccountContract = (proxyAddress: string, argent: ArgentInfrastructure) => {
   const { provider } = argent.deployer.zkWallet;
-  const account = new zksync.Contract(deployedAddress, argent.implementation.interface, provider) as ArgentAccount;
-  return account;
+  return new zksync.Contract(proxyAddress, argent.implementation.interface, provider) as ArgentAccount;
+};
+
+export const deployProxyAccount = async ({
+  argent,
+  ownerAddress,
+  guardianAddress,
+  salt = ethers.utils.randomBytes(32),
+  overrides = {},
+}: ProxyAccountDeploymentParams): Promise<[TransactionResponse, ArgentAccount]> => {
+  const { factory, implementation } = argent;
+  const response = await factory.deployProxyAccount(
+    salt,
+    implementation.address,
+    ownerAddress,
+    guardianAddress,
+    overrides,
+  );
+  const address = computeCreate2AddressFromSdk(argent, salt, ownerAddress, guardianAddress);
+  const account = argentAccountContract(address, argent);
+  return [response as TransactionResponse, account];
 };
 
 export const deployAccount = async ({
@@ -18,26 +42,21 @@ export const deployAccount = async ({
   guardianAddress,
   connect: signatories,
   funds = undefined,
-  salt = ethers.utils.randomBytes(32),
+  salt,
 }: AccountDeploymentParams): Promise<ArgentAccount> => {
-  const { deployer, factory, implementation, artifacts } = argent;
+  const { deployer, implementation, artifacts } = argent;
 
-  const response = await factory.deployProxyAccount(salt, implementation.address, ownerAddress, guardianAddress);
-  const receipt = await response.wait();
-  const [{ deployedAddress }] = zksync.utils.getDeployedContracts(receipt);
+  const [response, account] = await deployProxyAccount({ argent, ownerAddress, guardianAddress, salt });
+  await response.wait();
+
   const initData = implementation.interface.encodeFunctionData("initialize", [ownerAddress, guardianAddress]);
-  await verifyContract(deployedAddress, artifacts.proxy, [implementation.address, initData]);
-
-  const account = argentAccountContract(deployedAddress, argent);
+  await verifyContract(account.address, artifacts.proxy, [implementation.address, initData]);
 
   if (hre.network.name === "local" && funds === undefined) {
     funds = "0.001";
   }
   if (funds) {
-    const response = await deployer.zkWallet.transfer({
-      to: account.address,
-      amount: ethers.utils.parseEther(funds),
-    });
+    const response = await deployer.zkWallet.transfer({ to: account.address, amount: ethers.utils.parseEther(funds) });
     await response.wait();
   }
 

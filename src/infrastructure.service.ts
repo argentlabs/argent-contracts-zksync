@@ -1,27 +1,39 @@
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import hre from "hardhat";
 import * as zksync from "zksync-web3";
-import { AccountFactory, TestDapp } from "../typechain-types";
+import { AccountFactory, ArgentAccount, TestDapp } from "../typechain-types";
 import { loadConfig } from "./config.service";
 import { checkDeployer, loadArtifacts, verifyContract } from "./deployer.service";
 import { ArgentInfrastructure } from "./model";
 
 export const deployInfrastructure = async (deployer: Deployer): Promise<ArgentInfrastructure> => {
-  const config = await loadConfig();
   const artifacts = await loadArtifacts(deployer);
 
-  const constructorArguments = [config.escapeSecurityPeriodInSeconds];
-  const implementation = await deployer.deploy(artifacts.implementation, constructorArguments);
+  const [implementation, implementationArguments] = await deployImplementation(deployer);
   console.log(`Account implementation deployed to ${implementation.address}`);
-  await verifyContract(implementation.address, artifacts.implementation, constructorArguments);
+  await verifyContract(implementation.address, artifacts.implementation, implementationArguments);
 
-  const { bytecode } = artifacts.proxy;
-  const proxyBytecodeHash = zksync.utils.hashBytecode(bytecode);
-  const factory = await deployer.deploy(artifacts.factory, [proxyBytecodeHash], undefined, [bytecode]);
+  const [factory, factoryArguments] = await deployFactory(deployer);
   console.log(`Account factory deployed to ${factory.address}\n`);
-  await verifyContract(factory.address, artifacts.factory, [proxyBytecodeHash]);
+  await verifyContract(factory.address, artifacts.factory, factoryArguments);
 
-  return { deployer, artifacts, implementation, factory: factory as AccountFactory };
+  return { deployer, artifacts, implementation, factory };
+};
+
+export const deployImplementation = async (deployer: Deployer): Promise<[ArgentAccount, unknown[]]> => {
+  const { escapeSecurityPeriodInSeconds } = await loadConfig();
+  const artifact = await deployer.loadArtifact("ArgentAccount");
+  const constructorArguments = [escapeSecurityPeriodInSeconds];
+  const implementation = await deployer.deploy(artifact, constructorArguments);
+  return [implementation as ArgentAccount, constructorArguments];
+};
+
+export const deployFactory = async (deployer: Deployer): Promise<[AccountFactory, unknown[]]> => {
+  const artifacts = await loadArtifacts(deployer);
+  const proxyBytecode = artifacts.proxy.bytecode;
+  const constructorArguments = [zksync.utils.hashBytecode(proxyBytecode)];
+  const factory = await deployer.deploy(artifacts.factory, constructorArguments, undefined, [proxyBytecode]);
+  return [factory as AccountFactory, constructorArguments];
 };
 
 export const getInfrastructure: typeof deployInfrastructure = async (deployer) => {

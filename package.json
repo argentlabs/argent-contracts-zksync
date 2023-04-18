@@ -12,6 +12,8 @@
     "recompile": "hardhat clean && hardhat compile",
     "format": "prettier --write contracts src test scripts",
     "format:check": "prettier --check contracts src test scripts",
+    "gas:write": "hardhat run scripts/write-gas-report.ts",
+    "gas:check": "hardhat run scripts/check-gas-report.ts",
     "postinstall": "./bin/postinstall.sh",
     "clear": "hardhat clean && cd local-setup && ./clear.sh"
   },

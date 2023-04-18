@@ -5,8 +5,8 @@ import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount } from "../typechain-types";
 import { FixedEip712Signer } from "./fixedEip712Signer";
+import { TransactionRequest } from "./model";
 
-export type TransactionRequest = zksync.types.TransactionRequest;
 export type Signatory = (Signer & TypedDataSigner) | "zeros" | "random";
 
 export class ArgentSigner extends Signer {
