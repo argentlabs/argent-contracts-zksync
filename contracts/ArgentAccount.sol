@@ -489,7 +489,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         );
 
         if (_transaction.txType != EIP_712_TX_TYPE) {
-            // Returning false instead or reverting to allow estimation with any type
+            // Returning false instead or reverting to allow estimation with any type. Needed since some dapps might
+            // estimate fees without using the wallet. They might use a different transaction type
             isSimulation = true;
         }
         require(address(uint160(_transaction.from)) == address(this), "argent/invalid-from-address");
@@ -580,8 +581,11 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                 return false;
             }
 
-            require(selector != this.executeAfterUpgrade.selector, "argent/forbidden-call");
-            require(selector != this.executeTransactionFromOutside.selector, "argent/forbidden-call");
+            require(
+                selector != this.executeAfterUpgrade.selector &&
+                    selector != this.executeTransactionFromOutside.selector,
+                "argent/forbidden-call"
+            );
         }
 
         if (_isValidSignature(_transactionHash, signature)) {
