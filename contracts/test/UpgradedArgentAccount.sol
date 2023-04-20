@@ -91,7 +91,7 @@ contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
     }
 
     function version() public pure returns (Version memory) {
-        return Version(0, 1, 1);
+        return Version(99, 9, 9);
     }
 
     function initialize(address _owner, address _guardian) external {
@@ -106,17 +106,18 @@ contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
         requireOnlySelf();
         bool isSupported = _newImplementation.supportsInterface(type(IAccount).interfaceId);
         require(isSupported, "argent/invalid-implementation");
+        address oldImplementation = implementation;
         implementation = _newImplementation;
         emit AccountUpgraded(_newImplementation);
         // using delegatecall to run the `executeAfterUpgrade` function of the new implementation
         (bool success, ) = _newImplementation.delegatecall(
-            abi.encodeCall(this.executeAfterUpgrade, (version(), _data))
+            abi.encodeCall(this.executeAfterUpgrade, (oldImplementation, _data))
         );
         require(success, "argent/upgrade-callback-failed");
     }
 
     // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
-    function executeAfterUpgrade(Version memory /*_previousVersion*/, bytes calldata _data) external {
+    function executeAfterUpgrade(address /*_oldImplementation*/, bytes calldata _data) external {
         requireOnlySelf();
         newStorage = abi.decode(_data, (uint256));
     }
