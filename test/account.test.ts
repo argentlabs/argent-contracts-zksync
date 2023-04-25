@@ -1,7 +1,13 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
-import { computeCreate2AddressFromSdk, connect, deployAccount, deployProxyAccount } from "../src/account.service";
+import {
+  argentAccountAt,
+  computeCreate2AddressFromSdk,
+  connect,
+  deployAccount,
+  deployProxyAccount,
+} from "../src/account.service";
 import { CustomDeployer, checkDeployer } from "../src/deployer.service";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure } from "../src/model";
@@ -34,8 +40,11 @@ describe("Argent account", () => {
   describe("AccountFactory", () => {
     const salt = ethers.utils.randomBytes(32);
 
-    before(async () => {
-      account = await deployAccount({ argent, ownerAddress, guardianAddress, funds: false, salt });
+    it("Should deploy an account", async () => {
+      const response = await deployProxyAccount({ argent, ownerAddress, guardianAddress, salt });
+      const [{ deployedAddress }] = zksync.utils.getDeployedContracts(await response.wait());
+      account = argentAccountAt(deployedAddress, argent);
+      await expect(response).to.emit(account, "AccountCreated").withArgs(ownerAddress, guardianAddress);
     });
 
     it("Should predict the account address from the JS SDK", async () => {
@@ -51,11 +60,6 @@ describe("Argent account", () => {
         guardianAddress,
       );
       expect(account.address).to.equal(address);
-    });
-
-    it("Should emit event when initialized", async () => {
-      const [response, account] = await deployProxyAccount({ argent, ownerAddress, guardianAddress });
-      await expect(response).to.emit(account, "AccountCreated").withArgs(ownerAddress, guardianAddress);
     });
 
     it("Should be initialized properly", async () => {

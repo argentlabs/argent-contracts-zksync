@@ -4,7 +4,7 @@ import fs from "fs";
 import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount } from "../typechain-types";
-import { connect, deployProxyAccount } from "./account.service";
+import { argentAccountAt, deployProxyAccount } from "./account.service";
 import { checkDeployer, getDeployer, loadArtifacts } from "./deployer.service";
 import { deployFactory, deployImplementation } from "./infrastructure.service";
 import { ArgentInfrastructure, TransactionResponse } from "./model";
@@ -66,20 +66,19 @@ const measureGasCosts = async () => {
 
   report["Deploy account"] = await measure(async () => {
     const { ownerAddress, guardianAddress } = randomSigners();
-    [response] = await deployProxyAccount({ argent, ownerAddress, guardianAddress });
-    return response;
+    return deployProxyAccount({ argent, ownerAddress, guardianAddress });
   });
 
   const newAccountFinalized = async () => {
     const { owner, guardian, ownerAddress, guardianAddress } = randomSigners();
-    let [, account] = await deployProxyAccount({ argent, ownerAddress, guardianAddress });
-    account = connect(account, [owner, guardian]);
-    const response = await deployer.zkWallet.sendTransaction({
-      to: account.address,
+    const response = await deployProxyAccount({ argent, ownerAddress, guardianAddress });
+    const [{ deployedAddress }] = zksync.utils.getDeployedContracts(await response.wait());
+    const fundResponse = await deployer.zkWallet.sendTransaction({
+      to: deployedAddress,
       value: ethers.utils.parseEther("1"),
     });
-    await response.waitFinalize();
-    return account;
+    await fundResponse.waitFinalize();
+    return argentAccountAt(deployedAddress, argent, [owner, guardian]);
   };
 
   console.log("Transactions");

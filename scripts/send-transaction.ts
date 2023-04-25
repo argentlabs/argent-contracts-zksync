@@ -1,7 +1,7 @@
 import "@nomiclabs/hardhat-ethers";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
-import { argentAccountContract, connect } from "../src/account.service";
+import { argentAccountAt } from "../src/account.service";
 import { checkDeployer, getDeployer } from "../src/deployer.service";
 import { getInfrastructure } from "../src/infrastructure.service";
 
@@ -17,7 +17,7 @@ const drainAccountBalance = async () => {
   // const signatories = [new zksync.Wallet(ownerPrivateKey)];
   const signatories = [new zksync.Wallet(ownerPrivateKey), new zksync.Wallet(guardianPrivateKey)];
 
-  const account = connect(argentAccountContract(accountAddress, argent), signatories);
+  const account = argentAccountAt(accountAddress, argent, signatories);
 
   const balance = await provider.getBalance(account.address);
   console.log(`balance ${ethers.utils.formatEther(balance)}`);
