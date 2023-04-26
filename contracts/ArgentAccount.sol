@@ -3,7 +3,6 @@ pragma solidity 0.8.18;
 
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
-import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
@@ -17,6 +16,7 @@ import {Utils} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/
 
 import {IMulticall} from "./IMulticall.sol";
 import {IProxy} from "./Proxy.sol";
+import {ERC165Checker} from "./ERC165Checker.sol";
 import {Signatures} from "./Signatures.sol";
 
 /// @title The main Argent account on Era
