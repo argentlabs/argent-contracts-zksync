@@ -17,8 +17,8 @@ import {Utils} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/
 import {IMulticall} from "./IMulticall.sol";
 import {IProxy} from "./Proxy.sol";
 import {ERC165Checker} from "./ERC165Checker.sol";
-import {Signatures} from "./Signatures.sol";
 import {ReentrancyGuard} from "./ReentrancyGuard.sol";
+import {Signatures} from "./Signatures.sol";
 
 /// @title The main Argent account on Era
 /// @notice This is the implementation contract. Actual user accounts are proxies deployed by the `AccountFactory`

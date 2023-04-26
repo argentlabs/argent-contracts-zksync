@@ -1,14 +1,12 @@
 import { expect } from "chai";
-import { BytesLike } from "ethers";
 import * as zksync from "zksync-web3";
 import { deployAccount } from "../src/account.service";
 import { checkDeployer } from "../src/deployer.service";
-import { FixedEip712Signer } from "../src/fixedEip712Signer";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
-import { ArgentInfrastructure, TransactionRequest } from "../src/model";
+import { ArgentInfrastructure } from "../src/model";
+import { buildOutsideTransactionStruct } from "../src/priority.service";
 import { ArgentSigner } from "../src/signer.service";
 import { ArgentAccount, ReentrancyExploiter, TestDapp } from "../typechain-types";
-import { TransactionStruct } from "../typechain-types/contracts/ArgentAccount";
 import { deployer, guardian, guardianAddress, owner, ownerAddress } from "./fixtures";
 
 describe("Priority mode (from outside / L1)", () => {
@@ -30,45 +28,6 @@ describe("Priority mode (from outside / L1)", () => {
     signer = account.signer as ArgentSigner;
     testDapp = (await deployTestDapp(deployer)).connect(signer);
   });
-
-  interface BuildOutsideTransactionStructParams {
-    transaction: TransactionRequest;
-    signer: ArgentSigner;
-    senderAddress: string;
-  }
-
-  const buildOutsideTransactionStruct = async ({
-    transaction,
-    signer,
-    senderAddress,
-  }: BuildOutsideTransactionStructParams) => {
-    const transactionFromOutside = toOutsideTransaction(transaction);
-    const populated = await signer.populateTransaction(transactionFromOutside);
-    const signature = await signer.getOutsideSignature(populated, senderAddress);
-    return toSolidityTransaction(populated, signature);
-  };
-
-  const toOutsideTransaction = (transaction: TransactionRequest): TransactionRequest => {
-    return {
-      ...transaction,
-      gasPrice: 0,
-      gasLimit: 0,
-      customData: {
-        ...transaction.customData,
-        gasPerPubdata: 0,
-      },
-    };
-  };
-
-  const toSolidityTransaction = (transaction: TransactionRequest, signature: BytesLike): TransactionStruct => {
-    const signInput = FixedEip712Signer.getSignInput(transaction);
-    return {
-      ...signInput,
-      reserved: [0, 0, 0, 0],
-      reservedDynamic: "0x",
-      signature,
-    };
-  };
 
   it("Should refuse to execute a priority transaction with invalid signature", async () => {
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
