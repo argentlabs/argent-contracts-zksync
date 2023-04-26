@@ -479,7 +479,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         bool _isFromOutside
     ) private returns (bool) {
         require(owner != address(0), "argent/uninitialized");
-        bool isSimulation = false;
+        bool canBeValid = true;
 
         SystemContractsCaller.systemCallWithPropagatedRevert(
             uint32(gasleft()),
@@ -491,7 +491,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         if (_transaction.txType != EIP_712_TX_TYPE) {
             // Returning false instead or reverting to allow estimation with any type. Needed since some dapps might
             // estimate fees without using the wallet. They might use a different transaction type
-            isSimulation = true;
+            canBeValid = false;
         }
         require(address(uint160(_transaction.from)) == address(this), "argent/invalid-from-address");
 
@@ -518,7 +518,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             if (requiredLength == 2 * Signatures.SINGLE_LENGTH) {
                 signature[(2 * Signatures.SINGLE_LENGTH) - 1] = bytes1(uint8(27));
             }
-            isSimulation = true;
+            canBeValid = false;
         }
 
         if (to == address(this)) {
@@ -533,7 +533,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                 _requireGuardian();
 
                 if (_isValidGuardianSignature(_transactionHash, signature)) {
-                    return !isSimulation;
+                    return canBeValid;
                 }
                 return false;
             }
@@ -547,7 +547,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                 _requireGuardian();
                 require(escape.escapeType == uint8(EscapeType.Owner), "argent/invalid-escape");
                 if (_isValidGuardianSignature(_transactionHash, signature)) {
-                    return !isSimulation;
+                    return canBeValid;
                 }
                 return false;
             }
@@ -562,7 +562,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                 require(newGuardian != address(0) || guardianBackup == address(0), "argent/backup-should-be-null");
                 _requireGuardian();
                 if (_isValidOwnerSignature(_transactionHash, signature)) {
-                    return !isSimulation;
+                    return canBeValid;
                 }
                 return false;
             }
@@ -576,7 +576,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                 _requireGuardian();
                 require(escape.escapeType == uint8(EscapeType.Guardian), "argent/invalid-escape");
                 if (_isValidOwnerSignature(_transactionHash, signature)) {
-                    return !isSimulation;
+                    return canBeValid;
                 }
                 return false;
             }
@@ -589,7 +589,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         }
 
         if (_isValidSignature(_transactionHash, signature)) {
-            return !isSimulation;
+            return canBeValid;
         }
         return false;
     }
