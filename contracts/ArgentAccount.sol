@@ -18,10 +18,11 @@ import {IMulticall} from "./IMulticall.sol";
 import {IProxy} from "./Proxy.sol";
 import {ERC165Checker} from "./ERC165Checker.sol";
 import {Signatures} from "./Signatures.sol";
+import {ReentrancyGuard} from "./ReentrancyGuard.sol";
 
 /// @title The main Argent account on Era
 /// @notice This is the implementation contract. Actual user accounts are proxies deployed by the `AccountFactory`
-contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
+contract ArgentAccount is ReentrancyGuard, IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
     using ECDSA for bytes32;
@@ -73,9 +74,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     /// The escape will be ready and can be completed for this duration
     uint32 public immutable escapeExpiryPeriod;
 
-    uint256 private constant _NOT_ENTERED = 1;
-    uint256 private constant _ENTERED = 2;
-
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //                                                     Storage                                                    //
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,7 +92,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     uint32 public ownerEscapeAttempts;
     /// The ongoing escape, if any
     Escape private escape;
-    uint256 private _status;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //                                                     Events                                                     //
@@ -165,35 +162,14 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "argent/only-bootloader");
     }
 
-    modifier nonReentrant() {
-        _nonReentrantBefore();
-        _;
-        _nonReentrantAfter();
-    }
-
-    function _nonReentrantBefore() private {
-        // On the first call to nonReentrant, _status will be _NOT_ENTERED
-        require(_status != _ENTERED, "ReentrancyGuard: reentrant call");
-
-        // Any calls to nonReentrant after this point will fail
-        _status = _ENTERED;
-    }
-
-    function _nonReentrantAfter() private {
-        // By storing the original value once again, a refund is triggered (see
-        // https://eips.ethereum.org/EIPS/eip-2200)
-        _status = _NOT_ENTERED;
-    }
-
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //                                                   Constructor                                                  //
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    constructor(uint32 _escapeSecurityPeriod) {
+    constructor(uint32 _escapeSecurityPeriod) ReentrancyGuard() {
         require(_escapeSecurityPeriod != 0, "argent/null-escape-security-period");
         escapeSecurityPeriod = _escapeSecurityPeriod;
         escapeExpiryPeriod = _escapeSecurityPeriod;
-        _status = _NOT_ENTERED;
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -141,7 +141,7 @@ describe("Priority mode (from outside / L1)", () => {
     const struct = await buildOutsideTransactionStruct({ transaction, signer, senderAddress: exploiter.address });
 
     const promise = exploiter.reenterFromOutside(struct);
-    await expect(promise).to.be.rejectedWith("ReentrancyGuard: reentrant call");
+    await expect(promise).to.be.rejectedWith("argent/reentrant-call");
 
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
   });
