@@ -36,14 +36,12 @@ describe("Account upgrade", () => {
   });
 
   it("Should revert when calling upgrade callback directly", async () => {
-    const version = await account.version();
-    const promise = connect(account, [owner, guardian]).executeAfterUpgrade(version, "0x");
+    const promise = connect(account, [owner, guardian]).executeAfterUpgrade(argent.implementation.address, "0x");
     await expect(promise).to.be.rejectedWith("argent/forbidden-call");
   });
 
   it("Should revert when calling upgrade callback via multicall", async () => {
-    const version = await account.version();
-    const call = makeCall(await account.populateTransaction.executeAfterUpgrade(version, "0x"));
+    const call = makeCall(await account.populateTransaction.executeAfterUpgrade(argent.implementation.address, "0x"));
     const promise = connect(account, [owner, guardian]).multicall([call]);
     await expect(promise).to.be.rejectedWith("argent/no-multicall-to-self");
   });

@@ -201,23 +201,23 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         _requireOnlySelf();
         bool isSupported = _newImplementation.supportsInterface(type(IAccount).interfaceId);
         require(isSupported, "argent/invalid-implementation");
+        address oldImplementation = implementation;
         implementation = _newImplementation;
         emit AccountUpgraded(_newImplementation);
         // using delegatecall to run the `executeAfterUpgrade` function of the new implementation
         (bool success, ) = _newImplementation.delegatecall(
-            abi.encodeCall(this.executeAfterUpgrade, (version(), _data))
+            abi.encodeCall(this.executeAfterUpgrade, (oldImplementation, _data))
         );
         require(success, "argent/upgrade-callback-failed");
     }
 
-    // @dev Logic to execute after an upgrade.
-    // Can only be called by the account after a call to `upgrade`.
-    // @param _previousVersion The previous account version
-    // @param _data Generic call data that can be passed to the method for future upgrade logic
-    function executeAfterUpgrade(Version memory /*_previousVersion*/, bytes calldata /*_data*/) external {
+    /// @dev Logic to execute after an upgrade.
+    /// Can only be called by the account after a call to `upgrade`.
+    //  @param _oldImplementation Address of the previous account implementation
+    //  @param _data Generic call data that can be passed to the method for future upgrade logic
+    function executeAfterUpgrade(address /*_oldImplementation*/, bytes calldata /*_data*/) external {
         _requireOnlySelf();
         owner = owner; // useless code to suppress warning about pure function
-        // reserved upgrade callback for future account versions
     }
 
     /// @inheritdoc IAccount
@@ -335,7 +335,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     /// hash = keccak256(abi.encodePacked(changeOwner.selector, block.chainid, accountAddress, oldOwner))
     function changeOwner(address _newOwner, bytes memory _signature) external {
         _requireOnlySelf();
-        _validateNewOwner(_newOwner, _signature);
+        _requireValidNewOwner(_newOwner, _signature);
 
         _resetEscape();
         _resetEscapeAttempts();
@@ -634,7 +634,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         return guardianIsValid;
     }
 
-    function _validateNewOwner(address _newOwner, bytes memory _signature) private view {
+    function _requireValidNewOwner(address _newOwner, bytes memory _signature) private view {
         require(_newOwner != address(0), "argent/null-owner");
         bytes4 selector = this.changeOwner.selector;
         bytes memory message = abi.encodePacked(selector, block.chainid, address(this), owner);
