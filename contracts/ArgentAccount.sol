@@ -456,11 +456,10 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
             _interfaceId == type(IAccount).interfaceId;
     }
 
+    /// @dev Disallow fallback as it isn't needed and for forwards compatibility with future versions of
+    /// the account abstraction protocol
     fallback() external payable {
-        // fallback of default account shouldn't be called by bootloader under no circumstances
-        assert(msg.sender != BOOTLOADER_FORMAL_ADDRESS);
-
-        // If the contract is called directly, behave like an EOA
+        revert("argent/forbidden-fallback");
     }
 
     receive() external payable {
