@@ -71,7 +71,7 @@ describe("Paymaster tests", () => {
         customData: { paymasterParams },
       });
 
-      await expect(promise).to.be.rejectedWith("argent/no-paymaster-with-single-signature");
+      await expect(promise).to.be.rejectedWith("argent/forbidden-paymaster");
     });
   });
 });
