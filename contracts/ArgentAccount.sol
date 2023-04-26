@@ -502,13 +502,10 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         // in gas estimation mode, we're called with a single signature filled with zeros
         // substituting the signature with some signature-like array to make sure that the
         // validation step uses as much steps as the validation with the correct signature provided
-        uint256 requiredLength = _requiredSignatureLength(selector);
-        if (signature.length < requiredLength) {
-            signature = new bytes(requiredLength);
+        if (signature.length < _requiredSignatureLength(selector)) {
+            signature = new bytes(Signatures.DOUBLE_LENGTH);
             signature[Signatures.SINGLE_LENGTH - 1] = bytes1(uint8(27));
-            if (requiredLength == 2 * Signatures.SINGLE_LENGTH) {
-                signature[(2 * Signatures.SINGLE_LENGTH) - 1] = bytes1(uint8(27));
-            }
+            signature[Signatures.DOUBLE_LENGTH - 1] = bytes1(uint8(27));
             canBeValid = false;
         }
 
@@ -600,7 +597,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         if (guardian == address(0) || _isOwnerEscapeCall(_selector) || _isGuardianEscapeCall(_selector)) {
             return Signatures.SINGLE_LENGTH;
         }
-        return 2 * Signatures.SINGLE_LENGTH;
+        return Signatures.DOUBLE_LENGTH;
     }
 
     function _isValidOwnerSignature(bytes32 _hash, bytes memory _ownerSignature) private view returns (bool) {

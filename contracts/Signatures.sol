@@ -3,6 +3,7 @@ pragma solidity 0.8.18;
 
 library Signatures {
     uint256 public constant SINGLE_LENGTH = 65;
+    uint256 public constant DOUBLE_LENGTH = 2 * SINGLE_LENGTH;
 
     /// Non-reverting version of ECDSA.recover that returns address(0) if anything is invalid
     function recoverSigner(bytes32 _hash, bytes memory _signature) internal pure returns (address) {
@@ -50,7 +51,7 @@ library Signatures {
             return (_fullSignature, _signature2);
         }
 
-        require(_fullSignature.length == 2 * SINGLE_LENGTH, "argent/invalid-signature-length");
+        require(_fullSignature.length == DOUBLE_LENGTH, "argent/invalid-signature-length");
         _signature1 = new bytes(SINGLE_LENGTH);
         _signature2 = new bytes(SINGLE_LENGTH);
 
