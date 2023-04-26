@@ -451,9 +451,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         // NOTE: it's more efficient to use a mapping based implementation if there are more than 3 interfaces
         return
             _interfaceId == type(IERC165).interfaceId ||
+            _interfaceId == type(IAccount).interfaceId ||
             _interfaceId == type(IERC1271).interfaceId ||
-            _interfaceId == type(IMulticall).interfaceId ||
-            _interfaceId == type(IAccount).interfaceId;
+            _interfaceId == type(IMulticall).interfaceId;
     }
 
     /// @dev Disallow fallback as it isn't needed and for forwards compatibility with future versions of
