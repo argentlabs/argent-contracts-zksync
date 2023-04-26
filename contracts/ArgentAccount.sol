@@ -569,11 +569,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                 return false;
             }
 
-            require(
-                selector != this.executeAfterUpgrade.selector &&
-                    selector != this.executeTransactionFromOutside.selector,
-                "argent/forbidden-call"
-            );
+            require(selector != this.executeAfterUpgrade.selector && "argent/forbidden-call");
         }
 
         if (_isValidSignature(_transactionHash, signature)) {
