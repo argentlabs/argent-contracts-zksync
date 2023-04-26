@@ -1,10 +1,10 @@
-Deploy implementation: 3,455,000 gas
+Deploy implementation: 3,526,000 gas
 Deploy factory: 1,173,000 gas
-Deploy account: 193,000 gas
+Deploy account: 194,000 gas
 Transfer ETH from EOA to new EOA: 132,000 gas
 Transfer ETH from EOA to existing EOA: 130,000 gas
 Transfer ETH from Argent to new EOA: 148,000 gas
-Transfer ETH from Argent to existing EOA: 145,000 gas
+Transfer ETH from Argent to existing EOA: 146,000 gas
 Multicall with 2 transfers: 170,000 gas
-Change owner: 144,000 gas
-Change guardian: 137,000 gas
+Change owner: 145,000 gas
+Change guardian: 138,000 gas

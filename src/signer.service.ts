@@ -4,6 +4,7 @@ import { Bytes, BytesLike } from "ethers/lib/utils";
 import { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
 import { ArgentAccount } from "../typechain-types";
+import { FixedEip712Signer } from "./fixedEip712Signer";
 import { TransactionRequest } from "./model";
 
 export type Signatory = (Signer & TypedDataSigner) | "zeros" | "random";
@@ -80,7 +81,22 @@ export class ArgentSigner extends Signer {
 
   async getSignature(transaction: TransactionRequest): Promise<string> {
     const chainId = await this.getChainId();
-    return this.concatSignatures((signer) => new zksync.EIP712Signer(signer, chainId).sign(transaction));
+    return this.concatSignatures((signer) => new FixedEip712Signer(signer, chainId).sign(transaction));
+  }
+
+  async getOutsideSignature(transaction: TransactionRequest, fromAddress: string): Promise<string> {
+    const chainId = await this.getChainId();
+    return this.concatSignatures(async (signer) => {
+      const internalTransactionHash = await new FixedEip712Signer(signer, chainId).getTransactionHash(transaction);
+
+      const selector = this.account.interface.getSighash("executeTransactionFromOutside");
+      const message = ethers.utils.solidityPack(
+        ["bytes4", "uint256", "address"],
+        [selector, internalTransactionHash, fromAddress],
+      );
+      const messageHash = ethers.utils.arrayify(ethers.utils.keccak256(message));
+      return await signer.signMessage(messageHash);
+    });
   }
 
   private async concatSignatures(sign: (signer: Signer & TypedDataSigner) => Promise<BytesLike>): Promise<string> {
