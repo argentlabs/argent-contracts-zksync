@@ -73,6 +73,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     /// The escape will be ready and can be completed for this duration
     uint32 public immutable escapeExpiryPeriod;
 
+    uint256 private constant _NOT_ENTERED = 1;
+    uint256 private constant _ENTERED = 2;
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //                                                     Storage                                                    //
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,6 +94,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     uint32 public ownerEscapeAttempts;
     /// The ongoing escape, if any
     Escape private escape;
+    uint256 private _status;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //                                                     Events                                                     //
@@ -161,6 +165,26 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "argent/only-bootloader");
     }
 
+    modifier nonReentrant() {
+        _nonReentrantBefore();
+        _;
+        _nonReentrantAfter();
+    }
+
+    function _nonReentrantBefore() private {
+        // On the first call to nonReentrant, _status will be _NOT_ENTERED
+        require(_status != _ENTERED, "ReentrancyGuard: reentrant call");
+
+        // Any calls to nonReentrant after this point will fail
+        _status = _ENTERED;
+    }
+
+    function _nonReentrantAfter() private {
+        // By storing the original value once again, a refund is triggered (see
+        // https://eips.ethereum.org/EIPS/eip-2200)
+        _status = _NOT_ENTERED;
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //                                                   Constructor                                                  //
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -169,6 +193,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         require(_escapeSecurityPeriod != 0, "argent/null-escape-security-period");
         escapeSecurityPeriod = _escapeSecurityPeriod;
         escapeExpiryPeriod = _escapeSecurityPeriod;
+        _status = _NOT_ENTERED;
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -281,14 +306,14 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         bytes32 _transactionHash,
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
-    ) external payable override {
+    ) external payable override nonReentrant {
         _requireOnlyBootloader();
         bytes memory returnData = _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
         emit TransactionExecuted(_transactionHash, returnData);
     }
 
     /// @inheritdoc IAccount
-    function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
+    function executeTransactionFromOutside(Transaction calldata _transaction) external payable override nonReentrant {
         require(
             _transaction.gasLimit == 0 &&
                 _transaction.gasPerPubdataByteLimit == 0 &&

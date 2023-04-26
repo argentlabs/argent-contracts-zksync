@@ -7,7 +7,7 @@ import { FixedEip712Signer } from "../src/fixedEip712Signer";
 import { deployTestDapp, getTestInfrastructure } from "../src/infrastructure.service";
 import { ArgentInfrastructure, TransactionRequest } from "../src/model";
 import { ArgentSigner } from "../src/signer.service";
-import { ArgentAccount, TestDapp } from "../typechain-types";
+import { ArgentAccount, ReentrancyExploiter, TestDapp } from "../typechain-types";
 import { TransactionStruct } from "../typechain-types/contracts/ArgentAccount";
 import { deployer, guardian, guardianAddress, owner, ownerAddress } from "./fixtures";
 
@@ -20,6 +20,15 @@ describe("Priority mode (from outside / L1)", () => {
   before(async () => {
     await checkDeployer(deployer);
     argent = await getTestInfrastructure(deployer);
+    account = await deployAccount({
+      argent,
+      ownerAddress,
+      guardianAddress,
+      connect: [owner, guardian],
+      funds: false, // priority transaction should work even if the account has no funds
+    });
+    signer = account.signer as ArgentSigner;
+    testDapp = (await deployTestDapp(deployer)).connect(signer);
   });
 
   interface BuildOutsideTransactionStructParams {
@@ -60,18 +69,6 @@ describe("Priority mode (from outside / L1)", () => {
       signature,
     };
   };
-
-  before(async () => {
-    account = await deployAccount({
-      argent,
-      ownerAddress,
-      guardianAddress,
-      connect: [owner, guardian],
-      funds: false, // priority transaction should work even if the account has no funds
-    });
-    signer = account.signer as ArgentSigner;
-    testDapp = (await deployTestDapp(deployer)).connect(signer);
-  });
 
   it("Should refuse to execute a priority transaction with invalid signature", async () => {
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
@@ -127,5 +124,25 @@ describe("Priority mode (from outside / L1)", () => {
     await response.wait();
 
     await expect(testDapp.userNumbers(account.address)).to.eventually.equal(42n);
+  });
+
+  it("Should refuse reentrant priority transactions", async () => {
+    const account = await deployAccount({ argent, ownerAddress, guardianAddress, connect: [owner, guardian] });
+    const signer = account.signer as ArgentSigner;
+
+    const artifact = await deployer.loadArtifact("ReentrancyExploiter");
+    const exploiter = (await deployer.deploy(artifact)).connect(signer) as ReentrancyExploiter;
+
+    testDapp = (await deployTestDapp(deployer)).connect(signer);
+    await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
+
+    const nonce = await signer.getTransactionCount();
+    const transaction = await testDapp.populateTransaction.setNumber(42n, { nonce: nonce + 1 });
+    const struct = await buildOutsideTransactionStruct({ transaction, signer, senderAddress: exploiter.address });
+
+    const promise = exploiter.reenterFromOutside(struct);
+    await expect(promise).to.be.rejectedWith("ReentrancyGuard: reentrant call");
+
+    await expect(testDapp.userNumbers(account.address)).to.eventually.equal(0n);
   });
 });
