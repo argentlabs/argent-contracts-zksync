@@ -238,14 +238,6 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         Transaction calldata _transaction
     ) external payable override {
         _requireOnlyBootloader();
-        require(_transaction.paymasterInput.length >= 4, "argent/invalid-paymaster-data");
-        bytes4 paymasterInputSelector = bytes4(_transaction.paymasterInput[0:4]);
-        if (paymasterInputSelector == IPaymasterFlow.approvalBased.selector && guardian != address(0)) {
-            // The approval paymaster can take account tokens, up to the approved amount.
-            // It should be only allowed if both parties agree to the token amount (unless there is no guardian)
-            bool isValid = _transaction.signature.length == 2 * Signatures.SINGLE_LENGTH;
-            require(isValid, "argent/no-paymaster-with-single-signature");
-        }
         _transaction.processPaymasterInput();
     }
 
@@ -524,7 +516,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         if (to == address(this)) {
             if (selector == this.triggerEscapeOwner.selector) {
                 if (!_isFromOutside) {
-                    _requireValidEscapeGasParameters(_transaction, guardianEscapeAttempts);
+                    _requireValidEscapeParameters(_transaction, guardianEscapeAttempts);
                     guardianEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
@@ -540,7 +532,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
             if (selector == this.escapeOwner.selector) {
                 if (!_isFromOutside) {
-                    _requireValidEscapeGasParameters(_transaction, guardianEscapeAttempts);
+                    _requireValidEscapeParameters(_transaction, guardianEscapeAttempts);
                     guardianEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
@@ -554,7 +546,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
             if (selector == this.triggerEscapeGuardian.selector) {
                 if (!_isFromOutside) {
-                    _requireValidEscapeGasParameters(_transaction, ownerEscapeAttempts);
+                    _requireValidEscapeParameters(_transaction, ownerEscapeAttempts);
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
@@ -569,7 +561,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
             if (selector == this.escapeGuardian.selector) {
                 if (!_isFromOutside) {
-                    _requireValidEscapeGasParameters(_transaction, ownerEscapeAttempts);
+                    _requireValidEscapeParameters(_transaction, ownerEscapeAttempts);
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
@@ -594,13 +586,15 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         return false;
     }
 
-    function _requireValidEscapeGasParameters(Transaction calldata _transaction, uint32 _attempts) private pure {
+    function _requireValidEscapeParameters(Transaction calldata _transaction, uint32 _attempts) private pure {
         require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
         require(
             _transaction.gasPerPubdataByteLimit <= MAX_ESCAPE_GAS_PER_PUBDATA_BYTE,
             "argent/gasPerPubdataByte-too-high"
         );
         require(_attempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
+        require(_transaction.paymaster == 0 && _transaction.paymasterInput.length == 0, "argent/no_paymaster_allowed");
+        require(_transaction.factoryDeps.length == 0, "argent/no_factory_deps_allowed");
     }
 
     function _requiredSignatureLength(bytes4 _selector) private view returns (uint256) {
