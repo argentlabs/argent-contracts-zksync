@@ -166,7 +166,7 @@ contract ArgentAccount is ReentrancyGuard, IAccount, IProxy, IMulticall, IERC165
     //                                                   Constructor                                                  //
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    constructor(uint32 _escapeSecurityPeriod) ReentrancyGuard() {
+    constructor(uint32 _escapeSecurityPeriod) {
         require(_escapeSecurityPeriod != 0, "argent/null-escape-security-period");
         escapeSecurityPeriod = _escapeSecurityPeriod;
         escapeExpiryPeriod = _escapeSecurityPeriod;
@@ -282,7 +282,7 @@ contract ArgentAccount is ReentrancyGuard, IAccount, IProxy, IMulticall, IERC165
         bytes32 _transactionHash,
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
-    ) external payable override nonReentrant {
+    ) external payable override {
         _requireOnlyBootloader();
         bytes memory returnData = _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
         emit TransactionExecuted(_transactionHash, returnData);
