@@ -288,7 +288,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     }
 
     /// @inheritdoc IAccount
-    /// @notice This method allows reentrancy. A call to `executeTransaction` or  `executeTransactionFromOutside ` can trigger another nested transaction to `executeTransactionFromOutside `.
+    /// @notice This method allows reentrancy. A call to `executeTransaction` or  `executeTransactionFromOutside` can trigger another nested transaction to `executeTransactionFromOutside `.
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
         require(
             _transaction.gasLimit == 0 &&
