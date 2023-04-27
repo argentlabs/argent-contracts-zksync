@@ -299,6 +299,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
                 _transaction.factoryDeps.length == 0,
             "argent/invalid-outside-transaction"
         );
+        bytes4 selector = _transaction.data.length >= 4 ? bytes4(_transaction.data) : bytes4(0);
+
+        require(_isOwnerEscapeCall(selector) || _isGuardianEscapeCall(selector), "argent/invalid-outside-method");
 
         // This makes sure that the executeTransactionFromOutside for that given transaction is only called from the expected address
         bytes32 outsideTransactionHash = keccak256(
