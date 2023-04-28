@@ -179,7 +179,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /// Semantic version of this contract
     function version() public pure returns (Version memory) {
-        return Version(0, 1, 0);
+        return Version(0, 1, 1);
     }
 
     /// @dev Sets the initial parameters of the account. It's mandatory to call this method to secure the account.
@@ -366,9 +366,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     /// Must be called by the account and authorised by just a guardian.
     /// Cannot override an ongoing escape of the guardian.
     /// @param _newOwner The new account owner if the escape completes
-    /// @dev
-    /// This method assumes that there is a guardian, and that `_newOwner` is not 0
-    /// This must be guaranteed before calling this method. Usually when validating the transaction
+    /// @dev This method assumes that there is a guardian, and that `_newOwner` is not 0.
+    /// This must be guaranteed before calling this method, usually when validating the transaction.
     function triggerEscapeOwner(address _newOwner) external {
         _requireOnlySelf();
         // no escape if there is an guardian escape triggered by the owner in progress
@@ -386,9 +385,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     /// Must be called by the account and authorised by the owner alone.
     /// Can override an ongoing escape of the owner.
     /// @param _newGuardian The new account guardian if the escape completes
-    /// @dev
-    /// This method assumes that there is a guardian
-    /// This must be guaranteed before calling this method. Usually when validating the transaction
+    /// @dev This method assumes that there is a guardian.
+    /// This must be guaranteed before calling this method, usually when validating the transaction
     function triggerEscapeGuardian(address _newGuardian) external {
         _requireOnlySelf();
 
@@ -409,9 +407,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
 
     /// @notice Completes the escape and changes the owner after the security period
     /// Must be called by the account and authorised by just a guardian
-    /// @dev
-    /// This method assumes that there is a guardian, and that the there is an escape for the owner
-    /// This must be guaranteed before calling this method. Usually when validating the transaction
+    /// @dev This method assumes that there is a guardian, and that the there is an escape for the owner.
+    /// This must be guaranteed before calling this method, usually when validating the transaction.
     function escapeOwner() external {
         _requireOnlySelf();
         require(_escapeStatus(escape) == EscapeStatus.Ready, "argent/invalid-escape");
@@ -422,11 +419,10 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
         delete escape;
     }
 
-    /// @notice Completes the escape and changes the guardian after the security period
-    /// Must be called by the account and authorised by just the owner
-    /// @dev
-    /// This method assumes that there is a guardian, and that the there is an escape for the guardian
-    /// This must be guaranteed before calling this method. Usually when validating the transaction
+    /// @notice Completes the escape and changes the guardian after the security period.
+    /// Must be called by the account and authorised by just the owner.
+    /// @dev This method assumes that there is a guardian, and that the there is an escape for the guardian.
+    /// This must be guaranteed before calling this method. Usually when validating the transaction.
     function escapeGuardian() external {
         _requireOnlySelf();
         require(_escapeStatus(escape) == EscapeStatus.Ready, "argent/invalid-escape");

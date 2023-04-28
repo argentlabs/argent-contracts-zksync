@@ -39,6 +39,7 @@ const config: HardhatUserConfig = {
     zkSyncMainnet: {
       url: "https://zksync2-mainnet.zksync.io",
       ethNetwork: `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_KEY}`,
+      verifyURL: "https://zksync2-mainnet-explorer.zksync.io/contract_verification",
       zksync: true,
     },
   },
