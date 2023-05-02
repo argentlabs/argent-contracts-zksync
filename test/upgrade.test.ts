@@ -29,9 +29,9 @@ describe("Account upgrade", () => {
 
     const proxyBytecode = argent.artifacts.proxy.bytecode;
     const constructorArguments = [zksync.utils.hashBytecode(proxyBytecode)];
-    const oldFactory = await deployer.deploy(argent.artifacts.factory, constructorArguments, undefined, [
+    const oldFactory = (await deployer.deploy(argent.artifacts.factory, constructorArguments, undefined, [
       proxyBytecode,
-    ]) as AccountFactory;
+    ])) as AccountFactory;
 
     const oldArgentInfra: ArgentInfrastructure = {
       deployer: argent.deployer,
