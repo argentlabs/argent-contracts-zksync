@@ -24,25 +24,23 @@ describe("Account upgrade", () => {
   });
 
   it("Should upgrade from old version", async () => {
-    const oldAccountFactoryArtifact = await deployer.loadArtifact("AccountFactoryV0dot1dot0");
     const oldAccountArtifact = await deployer.loadArtifact("ArgentAccountV0dot1dot0");
     const oldImplementation = await deployer.deploy(oldAccountArtifact, [10]);
 
     const proxyBytecode = argent.artifacts.proxy.bytecode;
     const constructorArguments = [zksync.utils.hashBytecode(proxyBytecode)];
-    const oldFactory = await deployer.deploy(oldAccountFactoryArtifact, constructorArguments, undefined, [
+    const oldFactory = await deployer.deploy(argent.artifacts.factory, constructorArguments, undefined, [
       proxyBytecode,
-    ]);
+    ]) as AccountFactory;
 
     const oldArgentInfra: ArgentInfrastructure = {
       deployer: argent.deployer,
       artifacts: {
         ...argent.artifacts,
         implementation: oldAccountArtifact,
-        factory: oldAccountFactoryArtifact,
       },
       implementation: oldImplementation,
-      factory: oldFactory as AccountFactory,
+      factory: oldFactory,
     };
 
     const oldAccount = await deployAccount({
