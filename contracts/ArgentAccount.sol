@@ -181,7 +181,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
 
     /// Semantic version of this contract
     function version() public pure returns (Version memory) {
-        return Version(0, 1, 1);
+        return Version(0, 1, 2);
     }
 
     /// @dev Sets the initial parameters of the account. It's mandatory to call this method to secure the account.
