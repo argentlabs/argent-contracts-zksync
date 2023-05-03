@@ -14,8 +14,9 @@ import {Transaction, TransactionHelper} from "@matterlabs/zksync-contracts/l2/sy
 import {Utils} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/Utils.sol";
 
 import {Signatures} from "../Signatures.sol";
+import {IUpgradeCallback} from "../IUpgradeCallback.sol";
 
-contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
+contract UpgradedArgentAccount is IAccount, IUpgradeCallback, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
 
@@ -111,15 +112,20 @@ contract UpgradedArgentAccount is IAccount, IERC165, IERC1271 {
         emit AccountUpgraded(_newImplementation);
         // using delegatecall to run the `executeAfterUpgrade` function of the new implementation
         (bool success, ) = _newImplementation.delegatecall(
-            abi.encodeCall(this.executeAfterUpgrade, (oldImplementation, _data))
+            abi.encodeCall(IUpgradeCallback.executeAfterUpgrade, (oldImplementation, _data))
         );
         require(success, "argent/upgrade-callback-failed");
     }
 
+    /// @inheritdoc IUpgradeCallback
     // only callable by `upgrade`, enforced in `validateTransaction` and `multicall`
     function executeAfterUpgrade(address /*_oldImplementation*/, bytes calldata _data) external {
         requireOnlySelf();
-        newStorage = abi.decode(_data, (uint256));
+        if (_data.length == 32) {
+            newStorage = abi.decode(_data, (uint256));
+        } else {
+            require(_data.length == 0, "argent/bad-data-size");
+        }
     }
 
     function multicall(Call[] memory _calls) external {

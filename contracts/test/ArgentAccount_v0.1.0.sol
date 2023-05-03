@@ -3,6 +3,7 @@ pragma solidity 0.8.18;
 
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
+import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
@@ -11,19 +12,14 @@ import {INonceHolder} from "@matterlabs/zksync-contracts/l2/system-contracts/int
 import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
 import {SystemContractsCaller} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/SystemContractsCaller.sol";
 import {SystemContractHelper} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/SystemContractHelper.sol";
-import {Transaction, TransactionHelper, IPaymasterFlow, EIP_712_TX_TYPE} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
+import {Transaction, TransactionHelper, IPaymasterFlow} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
 import {Utils} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/Utils.sol";
 
-import {IMulticall} from "./IMulticall.sol";
-import {IUpgradeCallback} from "./IUpgradeCallback.sol";
-import {IProxy} from "./Proxy.sol";
-import {ERC165Checker} from "./ERC165Checker.sol";
-import {Signatures} from "./Signatures.sol";
-import "./IUpgradeCallbackDeprecated.sol";
+import {IMulticall} from "../IMulticall.sol";
+import {IProxy} from "../Proxy.sol";
+import {Signatures} from "../Signatures.sol";
 
-/// @title The main Argent account on Era
-/// @notice This is the implementation contract. Actual user accounts are proxies deployed by the `AccountFactory`
-contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecated, IERC165, IERC1271 {
+contract ArgentAccountV0dot1dot0 is IAccount, IProxy, IMulticall, IERC165, IERC1271 {
     using TransactionHelper for Transaction;
     using ERC165Checker for address;
     using ECDSA for bytes32;
@@ -54,21 +50,19 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
     // prettier-ignore
     struct Escape {
         /// timestamp for activation of escape mode, 0 otherwise
-        uint32 readyAt;                         // bits [0...32[
+        uint32 readyAt;     // bits [0...32[
         /// packed `EscapeType` enum
-        uint8 escapeType;                       // bits [32...40[
+        uint8 escapeType;   // bits [32...40[
         /// new owner or new guardian address
-        address newSigner;                      // bits [40...200[
+        address newSigner;  // bits [40...200[
     }
 
     bytes32 public constant NAME = "ArgentAccount";
 
     /// Limit escape attempts by only one party
     uint32 public constant MAX_ESCAPE_ATTEMPTS = 5;
-    /// Limits gas price in escapes
-    uint256 public constant MAX_ESCAPE_PRIORITY_FEE = 50 gwei;
-    /// Limits pubdata price in escapes
-    uint256 public constant MAX_ESCAPE_GAS_PER_PUBDATA_BYTE = 50000;
+    /// Limit escape attempts by only one party
+    uint256 public constant MAX_ESCAPE_PRIORITY_FEE = 50 gwei; // Limit gas usage by only one party
 
     /// Time it takes for the escape to become ready after being triggered
     uint32 public immutable escapeSecurityPeriod;
@@ -181,7 +175,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
 
     /// Semantic version of this contract
     function version() public pure returns (Version memory) {
-        return Version(0, 1, 1);
+        return Version(0, 1, 0);
     }
 
     /// @dev Sets the initial parameters of the account. It's mandatory to call this method to secure the account.
@@ -203,24 +197,23 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
         _requireOnlySelf();
         bool isSupported = _newImplementation.supportsInterface(type(IAccount).interfaceId);
         require(isSupported, "argent/invalid-implementation");
-        address oldImplementation = implementation;
         implementation = _newImplementation;
         emit AccountUpgraded(_newImplementation);
         // using delegatecall to run the `executeAfterUpgrade` function of the new implementation
         (bool success, ) = _newImplementation.delegatecall(
-            abi.encodeCall(IUpgradeCallback.executeAfterUpgrade, (oldImplementation, _data))
+            abi.encodeCall(this.executeAfterUpgrade, (version(), _data))
         );
         require(success, "argent/upgrade-callback-failed");
     }
 
-    /// @inheritdoc IUpgradeCallbackDeprecated
-    function executeAfterUpgrade(Version memory _previousVersion, bytes calldata _data) external {
+    // @dev Logic to execute after an upgrade.
+    // Can only be called by the account after a call to `upgrade`.
+    // @param _previousVersion The previous account version
+    // @param _data Generic call data that can be passed to the method for future upgrade logic
+    function executeAfterUpgrade(Version memory /*_previousVersion*/, bytes calldata /*_data*/) external {
         _requireOnlySelf();
-        require(
-            _previousVersion.major == 0 && _previousVersion.minor == 1 && _previousVersion.patch == 0,
-            "argent/invalid-from-version"
-        );
-        require(_data.length == 0, "argent/invalid-from-data");
+        owner = owner; // useless code to suppress warning about pure function
+        // reserved upgrade callback for future account versions
     }
 
     /// @inheritdoc IAccount
@@ -241,6 +234,14 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
         Transaction calldata _transaction
     ) external payable override {
         _requireOnlyBootloader();
+        require(_transaction.paymasterInput.length >= 4, "argent/invalid-paymaster-data");
+        bytes4 paymasterInputSelector = bytes4(_transaction.paymasterInput[0:4]);
+        if (paymasterInputSelector == IPaymasterFlow.approvalBased.selector && guardian != address(0)) {
+            // The approval paymaster can take account tokens, up to the approved amount.
+            // It should be only allowed if both parties agree to the token amount (unless there is no guardian)
+            bool isValid = _transaction.signature.length == 2 * Signatures.SINGLE_LENGTH;
+            require(isValid, "argent/no-paymaster-with-single-signature");
+        }
         _transaction.processPaymasterInput();
     }
 
@@ -254,8 +255,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
     ) external payable override returns (bytes4) {
         _requireOnlyBootloader();
         bytes32 transactionHash = _suggestedSignedHash != bytes32(0) ? _suggestedSignedHash : _transaction.encodeHash();
-        bool isValid = _isValidTransaction(transactionHash, _transaction, /*isFromOutside*/ false);
-        return isValid ? ACCOUNT_VALIDATION_SUCCESS_MAGIC : bytes4(0);
+        return _validateTransaction(transactionHash, _transaction, false);
     }
 
     /// @inheritdoc IERC1271
@@ -291,29 +291,12 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
     }
 
     /// @inheritdoc IAccount
-    /// @notice This method allows reentrancy. A call to `executeTransaction` or `executeTransactionFromOutside` can trigger another nested transaction to `executeTransactionFromOutside`.
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
-        require(
-            _transaction.gasLimit == 0 &&
-                _transaction.gasPerPubdataByteLimit == 0 &&
-                _transaction.maxFeePerGas == 0 &&
-                _transaction.maxPriorityFeePerGas == 0 &&
-                _transaction.paymaster == 0 &&
-                _transaction.paymasterInput.length == 0 &&
-                _transaction.factoryDeps.length == 0,
-            "argent/invalid-outside-transaction"
-        );
-
-        // This makes sure that the executeTransactionFromOutside for that given transaction is only called from the expected address
-        bytes32 outsideTransactionHash = keccak256(
-            abi.encodePacked(this.executeTransactionFromOutside.selector, _transaction.encodeHash(), msg.sender)
-        ).toEthSignedMessageHash();
-
-        bool isValid = _isValidTransaction(outsideTransactionHash, _transaction, /*isFromOutside*/ true);
-        require(isValid, "argent/invalid-transaction");
-
+        bytes32 transactionHash = _transaction.encodeHash();
+        bytes4 result = _validateTransaction(transactionHash, _transaction, true);
+        require(result == ACCOUNT_VALIDATION_SUCCESS_MAGIC, "argent/invalid-transaction");
         bytes memory returnData = _execute(address(uint160(_transaction.to)), _transaction.value, _transaction.data);
-        emit TransactionExecuted(outsideTransactionHash, returnData);
+        emit TransactionExecuted(transactionHash, returnData);
     }
 
     /**************************************************** Recovery ****************************************************/
@@ -331,7 +314,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
     /// hash = keccak256(abi.encodePacked(changeOwner.selector, block.chainid, accountAddress, oldOwner))
     function changeOwner(address _newOwner, bytes memory _signature) external {
         _requireOnlySelf();
-        _requireValidNewOwner(_newOwner, _signature);
+        _validateNewOwner(_newOwner, _signature);
 
         _resetEscape();
         _resetEscapeAttempts();
@@ -369,8 +352,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
     /// Must be called by the account and authorised by just a guardian.
     /// Cannot override an ongoing escape of the guardian.
     /// @param _newOwner The new account owner if the escape completes
-    /// @dev This method assumes that there is a guardian, and that `_newOwner` is not 0.
-    /// This must be guaranteed before calling this method, usually when validating the transaction.
+    /// @dev
+    /// This method assumes that there is a guardian, and that `_newOwner` is not 0
+    /// This must be guaranteed before calling this method. Usually when validating the transaction
     function triggerEscapeOwner(address _newOwner) external {
         _requireOnlySelf();
         // no escape if there is an guardian escape triggered by the owner in progress
@@ -388,8 +372,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
     /// Must be called by the account and authorised by the owner alone.
     /// Can override an ongoing escape of the owner.
     /// @param _newGuardian The new account guardian if the escape completes
-    /// @dev This method assumes that there is a guardian.
-    /// This must be guaranteed before calling this method, usually when validating the transaction
+    /// @dev
+    /// This method assumes that there is a guardian
+    /// This must be guaranteed before calling this method. Usually when validating the transaction
     function triggerEscapeGuardian(address _newGuardian) external {
         _requireOnlySelf();
 
@@ -410,8 +395,9 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
 
     /// @notice Completes the escape and changes the owner after the security period
     /// Must be called by the account and authorised by just a guardian
-    /// @dev This method assumes that there is a guardian, and that the there is an escape for the owner.
-    /// This must be guaranteed before calling this method, usually when validating the transaction.
+    /// @dev
+    /// This method assumes that there is a guardian, and that the there is an escape for the owner
+    /// This must be guaranteed before calling this method. Usually when validating the transaction
     function escapeOwner() external {
         _requireOnlySelf();
         require(_escapeStatus(escape) == EscapeStatus.Ready, "argent/invalid-escape");
@@ -422,10 +408,11 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
         delete escape;
     }
 
-    /// @notice Completes the escape and changes the guardian after the security period.
-    /// Must be called by the account and authorised by just the owner.
-    /// @dev This method assumes that there is a guardian, and that the there is an escape for the guardian.
-    /// This must be guaranteed before calling this method. Usually when validating the transaction.
+    /// @notice Completes the escape and changes the guardian after the security period
+    /// Must be called by the account and authorised by just the owner
+    /// @dev
+    /// This method assumes that there is a guardian, and that the there is an escape for the guardian
+    /// This must be guaranteed before calling this method. Usually when validating the transaction
     function escapeGuardian() external {
         _requireOnlySelf();
         require(_escapeStatus(escape) == EscapeStatus.Ready, "argent/invalid-escape");
@@ -443,15 +430,16 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
         // NOTE: it's more efficient to use a mapping based implementation if there are more than 3 interfaces
         return
             _interfaceId == type(IERC165).interfaceId ||
-            _interfaceId == type(IAccount).interfaceId ||
             _interfaceId == type(IERC1271).interfaceId ||
-            _interfaceId == type(IMulticall).interfaceId;
+            _interfaceId == type(IMulticall).interfaceId ||
+            _interfaceId == type(IAccount).interfaceId;
     }
 
-    /// @dev Disallow fallback as it isn't needed and for forwards compatibility with future versions of
-    /// the account abstraction protocol
     fallback() external payable {
-        revert("argent/forbidden-fallback");
+        // fallback of default account shouldn't be called by bootloader under no circumstances
+        assert(msg.sender != BOOTLOADER_FORMAL_ADDRESS);
+
+        // If the contract is called directly, behave like an EOA
     }
 
     receive() external payable {
@@ -464,13 +452,12 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
 
     /*************************************************** Validation ***************************************************/
 
-    function _isValidTransaction(
+    function _validateTransaction(
         bytes32 _transactionHash,
         Transaction calldata _transaction,
         bool _isFromOutside
-    ) private returns (bool) {
+    ) private returns (bytes4) {
         require(owner != address(0), "argent/uninitialized");
-        bool canBeValid = true;
 
         SystemContractsCaller.systemCallWithPropagatedRevert(
             uint32(gasleft()),
@@ -479,16 +466,8 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
             abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
         );
 
-        if (_transaction.txType != EIP_712_TX_TYPE) {
-            // Returning false instead or reverting to allow estimation with any type. Needed since some dapps might
-            // estimate fees without using the wallet. They might use a different transaction type
-            canBeValid = false;
-        }
-        require(address(uint160(_transaction.from)) == address(this), "argent/invalid-from-address");
-
         address to = address(uint160(_transaction.to));
-
-        bytes4 selector = _transaction.data.length >= 4 ? bytes4(_transaction.data) : bytes4(0);
+        bytes4 selector = bytes4(_transaction.data);
         bytes memory signature = _transaction.signature;
 
         if (!_isFromOutside) {
@@ -502,17 +481,20 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
         // in gas estimation mode, we're called with a single signature filled with zeros
         // substituting the signature with some signature-like array to make sure that the
         // validation step uses as much steps as the validation with the correct signature provided
-        if (signature.length < _requiredSignatureLength(selector)) {
-            signature = new bytes(Signatures.DOUBLE_LENGTH);
+        uint256 requiredLength = _requiredSignatureLength(selector);
+        if (signature.length < requiredLength) {
+            signature = new bytes(requiredLength);
             signature[Signatures.SINGLE_LENGTH - 1] = bytes1(uint8(27));
-            signature[Signatures.DOUBLE_LENGTH - 1] = bytes1(uint8(27));
-            canBeValid = false;
+            if (requiredLength == 2 * Signatures.SINGLE_LENGTH) {
+                signature[(2 * Signatures.SINGLE_LENGTH) - 1] = bytes1(uint8(27));
+            }
         }
 
         if (to == address(this)) {
             if (selector == this.triggerEscapeOwner.selector) {
                 if (!_isFromOutside) {
-                    _requireValidEscapeParameters(_transaction, guardianEscapeAttempts);
+                    require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
+                    require(guardianEscapeAttempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     guardianEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
@@ -521,79 +503,70 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
                 _requireGuardian();
 
                 if (_isValidGuardianSignature(_transactionHash, signature)) {
-                    return canBeValid;
+                    return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
                 }
-                return false;
+                return bytes4(0);
             }
 
             if (selector == this.escapeOwner.selector) {
                 if (!_isFromOutside) {
-                    _requireValidEscapeParameters(_transaction, guardianEscapeAttempts);
+                    require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
+                    require(guardianEscapeAttempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     guardianEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
                 _requireGuardian();
                 require(escape.escapeType == uint8(EscapeType.Owner), "argent/invalid-escape");
                 if (_isValidGuardianSignature(_transactionHash, signature)) {
-                    return canBeValid;
+                    return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
                 }
-                return false;
+                return bytes4(0);
             }
 
             if (selector == this.triggerEscapeGuardian.selector) {
                 if (!_isFromOutside) {
-                    _requireValidEscapeParameters(_transaction, ownerEscapeAttempts);
+                    require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
+                    require(ownerEscapeAttempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4 + 32, "argent/invalid-call-data");
-                address newGuardian = abi.decode(_transaction.data[4:], (address)); // This also asserts that the call data is valid
-                require(newGuardian != address(0) || guardianBackup == address(0), "argent/backup-should-be-null");
+                abi.decode(_transaction.data[4:], (address)); // This asserts that the call data is valid
                 _requireGuardian();
                 if (_isValidOwnerSignature(_transactionHash, signature)) {
-                    return canBeValid;
+                    return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
                 }
-                return false;
+                return bytes4(0);
             }
 
             if (selector == this.escapeGuardian.selector) {
                 if (!_isFromOutside) {
-                    _requireValidEscapeParameters(_transaction, ownerEscapeAttempts);
+                    require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
+                    require(ownerEscapeAttempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
                     ownerEscapeAttempts++;
                 }
                 require(_transaction.data.length == 4, "argent/invalid-call-data");
                 _requireGuardian();
                 require(escape.escapeType == uint8(EscapeType.Guardian), "argent/invalid-escape");
                 if (_isValidOwnerSignature(_transactionHash, signature)) {
-                    return canBeValid;
+                    return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
                 }
-                return false;
+                return bytes4(0);
             }
 
             require(selector != this.executeAfterUpgrade.selector, "argent/forbidden-call");
         }
 
         if (_isValidSignature(_transactionHash, signature)) {
-            return canBeValid;
+            return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
         }
-        return false;
-    }
-
-    function _requireValidEscapeParameters(Transaction calldata _transaction, uint32 _attempts) private pure {
-        require(_transaction.maxPriorityFeePerGas <= MAX_ESCAPE_PRIORITY_FEE, "argent/tip-too-high");
-        require(
-            _transaction.gasPerPubdataByteLimit <= MAX_ESCAPE_GAS_PER_PUBDATA_BYTE,
-            "argent/gasPerPubdataByte-too-high"
-        );
-        require(_attempts < MAX_ESCAPE_ATTEMPTS, "argent/max-escape-attempts");
-        require(_transaction.paymaster == 0 && _transaction.paymasterInput.length == 0, "argent/forbidden-paymaster");
-        require(_transaction.factoryDeps.length == 0, "argent/forbidden-factory-deps");
+        return bytes4(0);
     }
 
     function _requiredSignatureLength(bytes4 _selector) private view returns (uint256) {
         if (guardian == address(0) || _isOwnerEscapeCall(_selector) || _isGuardianEscapeCall(_selector)) {
             return Signatures.SINGLE_LENGTH;
         }
-        return Signatures.DOUBLE_LENGTH;
+        return 2 * Signatures.SINGLE_LENGTH;
     }
 
     function _isValidOwnerSignature(bytes32 _hash, bytes memory _ownerSignature) private view returns (bool) {
@@ -620,7 +593,7 @@ contract ArgentAccount is IAccount, IProxy, IMulticall, IUpgradeCallbackDeprecat
         return guardianIsValid;
     }
 
-    function _requireValidNewOwner(address _newOwner, bytes memory _signature) private view {
+    function _validateNewOwner(address _newOwner, bytes memory _signature) private view {
         require(_newOwner != address(0), "argent/null-owner");
         bytes4 selector = this.changeOwner.selector;
         bytes memory message = abi.encodePacked(selector, block.chainid, address(this), owner);
