@@ -3,7 +3,6 @@ import { BigNumber } from "ethers";
 import fs from "fs";
 import hre, { ethers } from "hardhat";
 import * as zksync from "zksync-web3";
-import { ArgentAccount } from "../typechain-types";
 import { argentAccountAt, deployProxyAccount } from "./account.service";
 import { checkDeployer, getDeployer, loadArtifacts } from "./deployer.service";
 import { deployFactory, deployImplementation } from "./infrastructure.service";
@@ -44,8 +43,6 @@ const measureGasCosts = async () => {
   const argentPartial = { deployer, artifacts } as Partial<ArgentInfrastructure>;
   const report: Record<string, BigNumber> = {};
 
-  let response, account: ArgentAccount;
-
   console.log("Infrastructure deployment");
 
   report["Deploy implementation"] = await measure(async () => {
@@ -81,35 +78,73 @@ const measureGasCosts = async () => {
     return argentAccountAt(deployedAddress, argent, [owner, guardian]);
   };
 
-  console.log("Transactions");
+  console.log("Transactions (cold bytecode)");
 
   const eoa = zksync.Wallet.createRandom().connect(deployer.zkWallet.provider);
   await deployer.zkWallet.sendTransaction({ to: eoa.address, value: ethers.utils.parseEther("1") });
-  account = await newAccountFinalized();
+  let account = await newAccountFinalized();
 
   let to = randomAddress();
-  report["Transfer ETH from EOA to new EOA"] = await measure(() => eoa.sendTransaction({ to, value: 1 }));
-  report["Transfer ETH from EOA to existing EOA"] = await measure(() => eoa.sendTransaction({ to, value: 1 }));
+  report["Transfer ETH from EOA to new EOA (cold bytecode)"] = await measure(() =>
+    eoa.sendTransaction({ to, value: 1 }),
+  );
+  report["Transfer ETH from EOA to existing EOA (cold bytecode)"] = await measure(() =>
+    eoa.sendTransaction({ to, value: 1 }),
+  );
 
   to = randomAddress();
-  report["Transfer ETH from Argent to new EOA"] = await measure(() => account.signer.sendTransaction({ to, value: 1 }));
-  report["Transfer ETH from Argent to existing EOA"] = await measure(() =>
+  report["Transfer ETH from Argent to new EOA (cold Argent bytecode)"] = await measure(() =>
+    account.signer.sendTransaction({ to, value: 1 }),
+  );
+  report["Transfer ETH from Argent to existing EOA (cold Argent bytecode)"] = await measure(() =>
     account.signer.sendTransaction({ to, value: 1 }),
   );
 
-  report["Multicall with 2 transfers"] = await measure(() =>
-    account.multicall([
+  console.log("Transactions");
+
+  const warmEOABytecode = () => eoa.sendTransaction({ to: randomAddress(), value: 1 });
+  const warmArgentBytecode = () => account.signer.sendTransaction({ to: randomAddress(), value: 1 });
+
+  to = randomAddress();
+  report["Transfer ETH from EOA to new EOA"] = await measure(async () => {
+    await warmEOABytecode();
+    return eoa.sendTransaction({ to, value: 1 });
+  });
+  report["Transfer ETH from EOA to existing EOA"] = await measure(async () => {
+    await warmEOABytecode();
+    return eoa.sendTransaction({ to, value: 1 });
+  });
+
+  to = randomAddress();
+  report["Transfer ETH from Argent to new EOA"] = await measure(async () => {
+    await warmArgentBytecode();
+    return account.signer.sendTransaction({ to, value: 1 });
+  });
+  report["Transfer ETH from Argent to existing EOA"] = await measure(async () => {
+    await warmArgentBytecode();
+    return account.signer.sendTransaction({ to, value: 1 });
+  });
+
+  report["Multicall with 2 transfers"] = await measure(async () => {
+    await warmArgentBytecode();
+    return account.multicall([
       { to: randomAddress(), value: 1, data: "0x" },
       { to: randomAddress(), value: 1, data: "0x" },
-    ]),
-  );
+    ]);
+  });
 
   console.log("Recovery");
 
-  report["Change owner"] = await measure(() => changeOwnerWithSignature(zksync.Wallet.createRandom(), account));
+  report["Change owner"] = await measure(async () => {
+    await warmArgentBytecode();
+    return changeOwnerWithSignature(zksync.Wallet.createRandom(), account);
+  });
 
   account = await newAccountFinalized();
-  report["Change guardian"] = await measure(() => account.changeGuardian(randomAddress()));
+  report["Change guardian"] = await measure(async () => {
+    await warmArgentBytecode();
+    return account.changeGuardian(randomAddress());
+  });
 
   return report;
 };
