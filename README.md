@@ -95,37 +95,42 @@ Run once for every new contract version, the addresses will be stored in `config
 2. Create corresponding deployment folder:
 
 ```bash
-mkdir deployments/0.1.1-hydrogen
+version="0.1.2"
+env="mainnet"
+name="$version-$env"
+network="zkSyncMainnet"
+
+mkdir deployments/$name
 ```
 
 2. Deploy implementation and factory:
 
 ```bash
-VERIFY=true yarn hardhat run scripts/deploy-infrastructure.ts --network zkSyncTestnet
+VERIFY=true yarn hardhat run scripts/deploy-infrastructure.ts --network $network
 ```
 
 3. Update the deployment:
 
 ```bash
-cp config/zkSyncTestnet.json deployments/0.1.1-hydrogen/config.json
-cp artifacts-zk/contracts/{ArgentAccount.sol/ArgentAccount.json,AccountFactory.sol/AccountFactory.json} deployments/0.1.1-hydrogen
+cp config/$network.json deployments/$name/config.json
+cp artifacts-zk/contracts/{ArgentAccount.sol/ArgentAccount.json,AccountFactory.sol/AccountFactory.json} deployments/$name
 ```
 
 4. Deploy a new account:
 
 ```bash
-VERIFY=true yarn hardhat run scripts/deploy-account.ts --network zkSyncTestnet
+VERIFY=true yarn hardhat run scripts/deploy-account.ts --network $network
 ```
 
 5. Run some tests:
 
 ```bash
-yarn test test/account.test.ts --network zkSyncTestnet
+yarn test test/account.test.ts --network $network
 ```
 
 6. Tag and push
 
 ```bash
-git tag v0.1.1
+git tag v$version
 git push --tags
 ```

@@ -1,5 +1,5 @@
-Deploy implementation: 3,522,000 gas
-Deploy factory: 1,173,000 gas
+Deploy implementation: 3,533,000 gas
+Deploy factory: 1,174,000 gas
 Deploy account: 194,000 gas
 Transfer ETH from EOA to new EOA: 132,000 gas
 Transfer ETH from EOA to existing EOA: 130,000 gas
