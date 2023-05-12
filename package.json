@@ -20,7 +20,7 @@
   "devDependencies": {
     "@matterlabs/hardhat-zksync-deploy": "^0.6.3",
     "@matterlabs/hardhat-zksync-solc": "^0.3.16",
-    "@matterlabs/hardhat-zksync-verify": "^0.1.5",
+    "@matterlabs/hardhat-zksync-verify": "^0.1.7",
     "@matterlabs/zksync-contracts": "^0.6.1",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.6",
     "@nomiclabs/hardhat-ethers": "^2.2.3",
