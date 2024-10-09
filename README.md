@@ -1,6 +1,9 @@
 # Argent Account on zkSync
 
-_Warning: zkSync Era is still in alpha, so is this project. In particular the `ArgentAccount.sol` contract has not been audited yet and should not be used to store significant value._
+### ⚠️ Warning ⚠️
+This project and in particular the `ArgentAccount.sol` contract, is deprecated and should not be used to store significant value.
+
+This repository not excluded from any bug bounty program operated by Argent
 
 # Overview
 
