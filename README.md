@@ -3,7 +3,7 @@
 ### ⚠️ Warning ⚠️
 This project and in particular the `ArgentAccount.sol` contract, is deprecated and should not be used to store significant value.
 
-This repository not excluded from any bug bounty program operated by Argent
+This repository is excluded from any bug bounty program operated by Argent
 
 # Overview
 
